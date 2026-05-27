@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
 import { useConversation } from '@/hooks/useConversation'
+import { FeedbackCard } from '@/components/student/FeedbackCard'
 import { useAudioStore, CONFIDENCE_THRESHOLD } from '@/store/audioStore'
 import { useUIStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
@@ -69,7 +70,7 @@ export default function StudentPage() {
     setAvatarStatus, setInterimText, setSpeechResult, setLatency,
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages } = useUIStore()
-  const { sendToGPT, isSpeaking, stopSpeaking } = useConversation()
+  const { sendToGPT, isSpeaking, stopSpeaking, feedback, clearFeedback } = useConversation()
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [internalBlobUrl, setInternalBlobUrl] = useState<string | null>(null)
@@ -141,8 +142,7 @@ export default function StudentPage() {
     setSpeechResult({ text, confidence, path: 'A', isFinal: true })
     discardBlob()
     addLog(`Path A: "${text}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
-    // GPT로 전송
-    sendToGPT(text)
+    sendToGPT(text, { sttPath: 'A', confidence, latencyMs: latency })
   }, [discardBlob, setSpeechResult, setLatency, addLog, sendToGPT])
 
   const handleFallback = useCallback((confidence: number) => {
@@ -259,6 +259,10 @@ export default function StudentPage() {
               </p>
             )}
           </div>
+          {/* 피드백 카드 */}
+          {feedback && (
+            <FeedbackCard feedback={feedback} onClose={clearFeedback} />
+          )}
         </div>
 
         {/* 하단 마이크 버튼 */}

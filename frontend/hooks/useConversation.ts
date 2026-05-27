@@ -3,11 +3,15 @@
 import { useCallback, useRef, useState } from 'react'
 import { useUIStore } from '@/store/uiStore'
 import { useAudioStore } from '@/store/audioStore'
+import type { FeedbackData } from '@/components/student/FeedbackCard'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
 }
+
+// 임시 세션 ID (Week 5 교사 대시보드에서 실제 세션으로 교체)
+const TEMP_SESSION_ID = 'temp-session-' + Date.now()
 
 export function useConversation() {
   const { addMessage, setAIResponding } = useUIStore()
@@ -15,6 +19,7 @@ export function useConversation() {
   const historyRef = useRef<Message[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [feedback, setFeedback] = useState<FeedbackData | null>(null)
 
   const stopSpeaking = useCallback(() => {
     if (audioRef.current) {
@@ -67,7 +72,49 @@ export function useConversation() {
     }
   }, [setAvatarStatus])
 
-  const sendToGPT = useCallback(async (studentText: string) => {
+  // 대화 로그 Supabase 저장 (비동기 - 실패해도 대화 계속)
+  const saveLog = useCallback(async (
+    role: 'student' | 'ai',
+    content: string,
+    extra?: { stt_path?: string; confidence?: number; latency_ms?: number }
+  ) => {
+    try {
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: TEMP_SESSION_ID,
+          student_id: null, // Week 5에서 실제 student_id 연동
+          role,
+          content,
+          ...extra,
+        }),
+      })
+    } catch {
+      // 로그 저장 실패는 무시
+    }
+  }, [])
+
+  // 피드백 요청
+  const requestFeedback = useCallback(async (text: string) => {
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      setFeedback(data)
+    } catch {
+      // 피드백 실패는 무시
+    }
+  }, [])
+
+  const sendToGPT = useCallback(async (
+    studentText: string,
+    meta?: { sttPath?: string; confidence?: number; latencyMs?: number }
+  ) => {
     // 학생 메시지 UI에 추가
     addMessage({
       id: Date.now().toString(),
@@ -79,6 +126,14 @@ export function useConversation() {
     // 히스토리에 추가
     historyRef.current.push({ role: 'user', content: studentText })
 
+    // 피드백 + 로그 저장 병렬 실행
+    requestFeedback(studentText)
+    saveLog('student', studentText, {
+      stt_path: meta?.sttPath,
+      confidence: meta?.confidence,
+      latency_ms: meta?.latencyMs,
+    })
+
     setAIResponding(true)
     setAvatarStatus('processing')
 
@@ -87,7 +142,7 @@ export function useConversation() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: historyRef.current.slice(-10), // 최근 10개만 유지
+          messages: historyRef.current.slice(-10),
           studentText,
         }),
       })
@@ -105,19 +160,20 @@ export function useConversation() {
         createdAt: new Date().toISOString(),
       })
 
-      // 히스토리에 AI 응답 추가
+      // 히스토리 + 로그 저장
       historyRef.current.push({ role: 'assistant', content: aiText })
+      saveLog('ai', aiText)
 
       setAIResponding(false)
 
-      // TTS로 음성 재생
+      // TTS 음성 재생
       await speak(aiText)
 
     } catch {
       setAIResponding(false)
       setAvatarStatus('idle')
     }
-  }, [addMessage, setAIResponding, setAvatarStatus, speak])
+  }, [addMessage, setAIResponding, setAvatarStatus, speak, requestFeedback, saveLog])
 
-  return { sendToGPT, isSpeaking, stopSpeaking }
+  return { sendToGPT, isSpeaking, stopSpeaking, feedback, clearFeedback: () => setFeedback(null) }
 }
