@@ -11,7 +11,7 @@ interface Message {
 }
 
 // 임시 세션 ID (Week 5 교사 대시보드에서 실제 세션으로 교체)
-const TEMP_SESSION_ID = 'temp-session-' + Date.now()
+const TEMP_SESSION_ID = crypto.randomUUID()
 
 export function useConversation() {
   const { addMessage, setAIResponding } = useUIStore()
@@ -83,7 +83,7 @@ export function useConversation() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          session_id: TEMP_SESSION_ID,
+          session_id: null,
           student_id: null, // Week 5에서 실제 student_id 연동
           role,
           content,
