@@ -1,0 +1,65 @@
+// STT 처리 경로
+export type STTPath = 'A' | 'B'
+
+// 아바타 상태
+export type AvatarStatus = 'idle' | 'listening' | 'processing' | 'speaking'
+
+// Web Speech API 결과
+export interface SpeechResult {
+  text: string
+  confidence: number
+  path: STTPath
+  isFinal: boolean
+}
+
+// Whisper API 응답 (FastAPI)
+export interface WhisperResponse {
+  text: string
+  confidence: number
+  duration_ms: number
+}
+
+// 대화 메시지
+export interface ConversationMessage {
+  id: string
+  role: 'student' | 'ai'
+  content: string
+  sttPath?: STTPath
+  confidence?: number
+  latencyMs?: number
+  createdAt: string
+}
+
+// Supabase 테이블 타입
+export interface Profile {
+  id: string
+  role: 'student' | 'teacher'
+  name: string
+  created_at: string
+}
+
+export interface Class {
+  id: string
+  teacher_id: string
+  name: string
+  created_at: string
+}
+
+export interface Session {
+  id: string
+  class_id: string
+  started_at: string
+  ended_at: string | null
+}
+
+export interface ConversationLog {
+  id: string
+  session_id: string
+  student_id: string
+  role: 'student' | 'ai'
+  content: string
+  stt_path: STTPath | null
+  confidence: number | null
+  latency_ms: number | null
+  created_at: string
+}

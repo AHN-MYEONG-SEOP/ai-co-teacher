@@ -1,0 +1,31 @@
+# 환경변수 (절대 커밋 금지)
+.env
+.env.local
+.env.production
+.env.development
+frontend/.env.local
+backend/.env
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# 빌드 아티팩트
+*.log
