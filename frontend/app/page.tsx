@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
+import { useConversation } from '@/hooks/useConversation'
 import { useAudioStore, CONFIDENCE_THRESHOLD } from '@/store/audioStore'
 import { useUIStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
@@ -67,7 +68,8 @@ export default function StudentPage() {
     avatarStatus, interimText,
     setAvatarStatus, setInterimText, setSpeechResult, setLatency,
   } = useAudioStore()
-  const { isLogDrawerOpen, setLogDrawerOpen } = useUIStore()
+  const { isLogDrawerOpen, setLogDrawerOpen, messages } = useUIStore()
+  const { sendToGPT, isSpeaking, stopSpeaking } = useConversation()
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [internalBlobUrl, setInternalBlobUrl] = useState<string | null>(null)
@@ -138,9 +140,10 @@ export default function StudentPage() {
     setLatency(latency)
     setSpeechResult({ text, confidence, path: 'A', isFinal: true })
     discardBlob()
-    setAvatarStatus('processing')
     addLog(`Path A: "${text}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
-  }, [discardBlob, setAvatarStatus, setSpeechResult, setLatency, addLog])
+    // GPT로 전송
+    sendToGPT(text)
+  }, [discardBlob, setSpeechResult, setLatency, addLog, sendToGPT])
 
   const handleFallback = useCallback((confidence: number) => {
     addLog(`Path B 트리거: confidence ${(confidence * 100).toFixed(0)}% < ${CONFIDENCE_THRESHOLD * 100}%`, 'warning')
@@ -214,9 +217,38 @@ export default function StudentPage() {
             )}
           </div>
 
+          {/* 대화 로그 (최근 4개) */}
+          {messages.length > 0 && (
+            <div className="w-full space-y-2 max-h-48 overflow-y-auto">
+              {messages.slice(-4).map((msg) => (
+                <div key={msg.id} className={cn(
+                  'rounded-xl px-4 py-2 text-sm max-w-[85%]',
+                  msg.role === 'student'
+                    ? 'bg-emerald-900/40 text-emerald-200 ml-auto text-right border border-emerald-700/30'
+                    : 'bg-violet-900/40 text-violet-200 mr-auto border border-violet-700/30'
+                )}>
+                  <span className="text-xs opacity-50 block mb-1">
+                    {msg.role === 'student' ? '🧑 나' : '🤖 AI'}
+                  </span>
+                  {msg.content}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* 실시간 자막 영역 */}
           <div className="w-full min-h-[80px] bg-slate-900/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-4 flex items-center justify-center">
-            {interimText ? (
+            {isSpeaking ? (
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  {[0,1,2,3].map(i => (
+                    <div key={i} className="w-1 bg-violet-400 rounded-full animate-pulse"
+                      style={{ height: `${12 + i * 4}px`, animationDelay: `${i * 0.1}s` }} />
+                  ))}
+                </div>
+                <p className="text-violet-300 text-sm">AI 선생님 말하는 중...</p>
+              </div>
+            ) : interimText ? (
               <p className="text-white text-center leading-relaxed">
                 {interimText}
                 <span className="inline-block w-0.5 h-5 bg-emerald-400 ml-1 animate-pulse align-middle" />
