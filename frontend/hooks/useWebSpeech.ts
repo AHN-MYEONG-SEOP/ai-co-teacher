@@ -21,15 +21,20 @@ export function useWebSpeech({
   const wsRef = useRef<WebSocket | null>(null)
   const mrRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const finalProcessedRef = useRef(false)
   const [isListening, setIsListening] = useState(false)
   const isSupported = true
+
+  // 누적 transcript 관리
+  const accumulatedTextRef = useRef<string>('')
+  const accumulatedConfidenceRef = useRef<number[]>([])
 
   const startListening = useCallback(async () => {
     const apiKey = process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY
     if (!apiKey) { onError?.('Deepgram API 키 없음'); return }
 
-    finalProcessedRef.current = false
+    // 새 세션 시작 시 누적값 초기화
+    accumulatedTextRef.current = ''
+    accumulatedConfidenceRef.current = []
 
     try {
       onLog?.('마이크 스트림 요청 중...')
@@ -39,8 +44,11 @@ export function useWebSpeech({
 
       const wsUrl = 'wss://api.deepgram.com/v1/listen?' +
         new URLSearchParams({
-          language: 'en-US', model: 'nova-2',
-          smart_format: 'true', interim_results: 'true', punctuate: 'true',
+          language: 'en-US',
+          model: 'nova-2',
+          smart_format: 'true',
+          interim_results: 'true',
+          punctuate: 'true',
         }).toString()
 
       onLog?.('Deepgram WebSocket 연결 시도...')
@@ -69,26 +77,40 @@ export function useWebSpeech({
           const transcript = data.channel.alternatives?.[0]?.transcript || ''
           const confidence = data.channel.alternatives?.[0]?.confidence ?? 1.0
           const isFinal = data.is_final
-          if (transcript) onLog?.(`Deepgram: "${transcript}" | final=${isFinal} | conf=${confidence.toFixed(2)}`)
+
           if (!transcript) return
+
           if (!isFinal) {
-            onInterimResult?.(transcript)
+            // 실시간 자막: 누적 텍스트 + 현재 interim
+            const display = accumulatedTextRef.current
+              ? `${accumulatedTextRef.current} ${transcript}`
+              : transcript
+            onInterimResult?.(display)
           } else {
-            if (finalProcessedRef.current) return
-            finalProcessedRef.current = true
-            if (confidence >= CONFIDENCE_THRESHOLD) {
-              onLog?.(`✅ Path A: conf ${confidence.toFixed(2)} >= ${CONFIDENCE_THRESHOLD}`)
-              onFinalResult?.(transcript, confidence)
-            } else {
-              onLog?.(`⚠️ Path B: conf ${confidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`)
-              onFallback?.(confidence)
-            }
+            // 최종 확정 → 누적
+            accumulatedTextRef.current = accumulatedTextRef.current
+              ? `${accumulatedTextRef.current} ${transcript}`
+              : transcript
+            accumulatedConfidenceRef.current.push(confidence)
+            onLog?.(`누적: "${accumulatedTextRef.current}" (conf: ${confidence.toFixed(2)})`)
+
+            // 실시간 자막 업데이트
+            onInterimResult?.(accumulatedTextRef.current)
           }
         } catch { }
       }
 
-      ws.onerror = () => { onLog?.('❌ Deepgram WebSocket 오류'); onError?.('Deepgram 연결 오류'); setIsListening(false) }
-      ws.onclose = (e) => { onLog?.(`Deepgram 연결 종료: code=${e.code}`); setIsListening(false) }
+      ws.onerror = () => {
+        onLog?.('❌ Deepgram WebSocket 오류')
+        onError?.('Deepgram 연결 오류')
+        setIsListening(false)
+      }
+
+      ws.onclose = (e) => {
+        onLog?.(`Deepgram 연결 종료: code=${e.code}`)
+        setIsListening(false)
+      }
+
       wsRef.current = ws
 
     } catch (err) {
@@ -100,6 +122,29 @@ export function useWebSpeech({
 
   const stopListening = useCallback(() => {
     onLog?.('stopListening 호출')
+
+    // 손 뗄 때 누적된 전체 텍스트로 처리
+    const fullText = accumulatedTextRef.current.trim()
+    const confidences = accumulatedConfidenceRef.current
+    const avgConfidence = confidences.length > 0
+      ? confidences.reduce((a, b) => a + b, 0) / confidences.length
+      : 1.0
+
+    if (fullText) {
+      onLog?.(`최종 전송: "${fullText}" (avg conf: ${avgConfidence.toFixed(2)})`)
+      if (avgConfidence >= CONFIDENCE_THRESHOLD) {
+        onLog?.(`✅ Path A: avg conf ${avgConfidence.toFixed(2)} >= ${CONFIDENCE_THRESHOLD}`)
+        onFinalResult?.(fullText, avgConfidence)
+      } else {
+        onLog?.(`⚠️ Path B: avg conf ${avgConfidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`)
+        onFallback?.(avgConfidence)
+      }
+    }
+
+    // 초기화
+    accumulatedTextRef.current = ''
+    accumulatedConfidenceRef.current = []
+
     if (mrRef.current?.state === 'recording') mrRef.current.stop()
     setTimeout(() => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -109,7 +154,7 @@ export function useWebSpeech({
       streamRef.current?.getTracks().forEach((t) => t.stop())
       setIsListening(false)
     }, 500)
-  }, [onLog])
+  }, [onFinalResult, onFallback, onLog])
 
   return { isSupported, isListening, startListening, stopListening }
 }
