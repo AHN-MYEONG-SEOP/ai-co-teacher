@@ -103,11 +103,12 @@ export default function StudentPage() {
       setLatency(latency)
       setSpeechResult({ text: data.text, confidence: data.confidence, path: 'B', isFinal: true })
       addLog(`Path B 완료: "${data.text}" (${latency}ms)`, 'success')
+      sendToGPT(data.text, { sttPath: 'B', confidence: data.confidence, latencyMs: latency })
     } catch {
       addLog('Path B 실패: Whisper 서버 연결 불가', 'error')
       setAvatarStatus('idle')
     }
-  }, [addLog, setAvatarStatus, setSpeechResult, setLatency])
+  }, [addLog, setAvatarStatus, setSpeechResult, setLatency, sendToGPT])
 
   const handleBlobSaved = useCallback((success: boolean, filename?: string) => {
     if (success && filename) {
@@ -166,6 +167,7 @@ export default function StudentPage() {
 
   // 마이크 버튼 핸들러
   const handleMicStart = useCallback(async () => {
+    if (isHolding) return // 중복 호출 방지
     if (!isSupported) { addLog('Web Speech API 미지원 브라우저', 'error'); return }
     startTimeRef.current = Date.now()
     setIsHolding(true)

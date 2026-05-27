@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { SpeechResult, STTPath, AvatarStatus } from '@/types'
 
-export const CONFIDENCE_THRESHOLD = 0.85
+export const CONFIDENCE_THRESHOLD = 0.99
 
 interface AudioState {
   // 녹음 상태
