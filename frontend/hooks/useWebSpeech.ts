@@ -23,16 +23,10 @@ export function useWebSpeech({
   const streamRef = useRef<MediaStream | null>(null)
   const [isListening, setIsListening] = useState(false)
   const isSupported = true
-
-  // 누적 transcript 관리
   const accumulatedTextRef = useRef<string>('')
   const accumulatedConfidenceRef = useRef<number[]>([])
 
   const startListening = useCallback(async () => {
-    const apiKey = process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY
-    if (!apiKey) { onError?.('Deepgram API 키 없음'); return }
-
-    // 새 세션 시작 시 누적값 초기화
     accumulatedTextRef.current = ''
     accumulatedConfidenceRef.current = []
 
@@ -42,17 +36,19 @@ export function useWebSpeech({
       streamRef.current = stream
       onLog?.('마이크 스트림 획득 성공')
 
+      // 서버에서 토큰 발급
+      const tokenRes = await fetch('/api/deepgram-token')
+      if (!tokenRes.ok) { onError?.('Deepgram 토큰 발급 실패'); return }
+      const { token } = await tokenRes.json()
+
       const wsUrl = 'wss://api.deepgram.com/v1/listen?' +
         new URLSearchParams({
-          language: 'en-US',
-          model: 'nova-2',
-          smart_format: 'true',
-          interim_results: 'true',
-          punctuate: 'true',
+          language: 'en-US', model: 'nova-2',
+          smart_format: 'true', interim_results: 'true', punctuate: 'true',
         }).toString()
 
       onLog?.('Deepgram WebSocket 연결 시도...')
-      const ws = new WebSocket(wsUrl, ['token', apiKey])
+      const ws = new WebSocket(wsUrl, ['token', token])
 
       ws.onopen = () => {
         onLog?.('✅ Deepgram WebSocket 연결 성공!')
@@ -77,40 +73,25 @@ export function useWebSpeech({
           const transcript = data.channel.alternatives?.[0]?.transcript || ''
           const confidence = data.channel.alternatives?.[0]?.confidence ?? 1.0
           const isFinal = data.is_final
-
           if (!transcript) return
-
           if (!isFinal) {
-            // 실시간 자막: 누적 텍스트 + 현재 interim
             const display = accumulatedTextRef.current
               ? `${accumulatedTextRef.current} ${transcript}`
               : transcript
             onInterimResult?.(display)
           } else {
-            // 최종 확정 → 누적
             accumulatedTextRef.current = accumulatedTextRef.current
               ? `${accumulatedTextRef.current} ${transcript}`
               : transcript
             accumulatedConfidenceRef.current.push(confidence)
             onLog?.(`누적: "${accumulatedTextRef.current}" (conf: ${confidence.toFixed(2)})`)
-
-            // 실시간 자막 업데이트
             onInterimResult?.(accumulatedTextRef.current)
           }
         } catch { }
       }
 
-      ws.onerror = () => {
-        onLog?.('❌ Deepgram WebSocket 오류')
-        onError?.('Deepgram 연결 오류')
-        setIsListening(false)
-      }
-
-      ws.onclose = (e) => {
-        onLog?.(`Deepgram 연결 종료: code=${e.code}`)
-        setIsListening(false)
-      }
-
+      ws.onerror = () => { onLog?.('❌ Deepgram WebSocket 오류'); onError?.('Deepgram 연결 오류'); setIsListening(false) }
+      ws.onclose = (e) => { onLog?.(`Deepgram 연결 종료: code=${e.code}`); setIsListening(false) }
       wsRef.current = ws
 
     } catch (err) {
@@ -122,8 +103,6 @@ export function useWebSpeech({
 
   const stopListening = useCallback(() => {
     onLog?.('stopListening 호출')
-
-    // 손 뗄 때 누적된 전체 텍스트로 처리
     const fullText = accumulatedTextRef.current.trim()
     const confidences = accumulatedConfidenceRef.current
     const avgConfidence = confidences.length > 0
@@ -141,7 +120,6 @@ export function useWebSpeech({
       }
     }
 
-    // 초기화
     accumulatedTextRef.current = ''
     accumulatedConfidenceRef.current = []
 
