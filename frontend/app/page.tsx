@@ -216,7 +216,7 @@ export default function StudentPage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col">
-      <NavBar />
+      <NavBar logCount={logs.length} onLogClick={() => setLogDrawerOpen(!isLogDrawerOpen)} />
       {/* 배경 */}
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-950 to-black pointer-events-none" />
 
