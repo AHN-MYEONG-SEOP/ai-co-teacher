@@ -204,6 +204,7 @@ export default function StudentPage() {
 
   // 마이크 버튼 핸들러
   const handleMicStart = useCallback(async () => {
+    if (isHolding) return // 중복 호출 방지
     if (!isSupported) { addLog('Web Speech API 미지원 브라우저', 'error'); return }
     startTimeRef.current = Date.now()
     setIsHolding(true)
@@ -328,7 +329,7 @@ export default function StudentPage() {
 
             {/* 메인 마이크 버튼 */}
             <button
-              onMouseDown={handleMicStart}
+              onMouseDown={(e) => { if (e.nativeEvent instanceof MouseEvent && e.nativeEvent.sourceCapabilities?.firesTouchEvents) return; handleMicStart(); }}
               onMouseUp={handleMicStop}
               onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); handleMicStart(); }}
               onTouchEnd={(e) => { e.preventDefault(); handleMicStop(); }}
