@@ -329,7 +329,7 @@ export default function StudentPage() {
 
             {/* 메인 마이크 버튼 */}
             <button
-              onMouseDown={(e) => { if (e.nativeEvent instanceof MouseEvent && e.nativeEvent.sourceCapabilities?.firesTouchEvents) return; handleMicStart(); }}
+              onMouseDown={handleMicStart}
               onMouseUp={handleMicStop}
               onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); handleMicStart(); }}
               onTouchEnd={(e) => { e.preventDefault(); handleMicStop(); }}
