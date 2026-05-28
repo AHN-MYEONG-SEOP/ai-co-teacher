@@ -84,7 +84,17 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
   const saveLog = useCallback(async (
     role: 'student' | 'ai',
     content: string,
-    extra?: { stt_path?: string; confidence?: number; latency_ms?: number }
+    extra?: {
+      stt_path?: string
+      confidence?: number
+      latency_ms?: number
+      grammar?: number
+      fluency?: number
+      vocabulary?: number
+      overall?: number
+      correction?: string | null
+      tip?: string
+    }
   ) => {
     try {
       await fetch('/api/log', {
@@ -103,7 +113,7 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
     }
   }, [sessionId, studentId])
 
-  // 피드백 요청
+  // 피드백 요청 + DB 저장
   const requestFeedback = useCallback(async (text: string) => {
     try {
       const res = await fetch('/api/feedback', {
@@ -114,8 +124,9 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
       if (!res.ok) return
       const data = await res.json()
       setFeedback(data)
+      return data // 피드백 데이터 반환
     } catch {
-      // 피드백 실패는 무시
+      return null
     }
   }, [])
 
@@ -132,12 +143,20 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
 
     historyRef.current.push({ role: 'user', content: studentText })
 
-    // 피드백 + 로그 병렬 실행
-    requestFeedback(studentText)
+    // 피드백 요청 (결과를 로그 저장에 포함)
+    const feedbackData = await requestFeedback(studentText)
+
+    // 로그 저장 (피드백 포함)
     saveLog('student', studentText, {
       stt_path: meta?.sttPath,
       confidence: meta?.confidence,
       latency_ms: meta?.latencyMs,
+      grammar: feedbackData?.grammar,
+      fluency: feedbackData?.fluency,
+      vocabulary: feedbackData?.vocabulary,
+      overall: feedbackData?.overall,
+      correction: feedbackData?.correction,
+      tip: feedbackData?.tip,
     })
 
     setAIResponding(true)

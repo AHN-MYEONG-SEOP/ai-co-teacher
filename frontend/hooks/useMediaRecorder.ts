@@ -47,17 +47,7 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
     try {
       const url = URL.createObjectURL(blob)
       setLastBlobUrl(url)
-
-      // 파일 다운로드
-      const filename = `recording-${Date.now()}.webm`
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-
-      onBlobSaved?.(true, filename)
+      onBlobSaved?.(true, undefined)
     } catch {
       onBlobSaved?.(false)
     }

@@ -122,7 +122,7 @@ export default function StudentPage() {
     setTimeout(() => setSaveMessage(null), 4000)
   }, [addLog])
 
-  const { startRecording, discardBlob, exportBlob, lastBlobUrl } = useMediaRecorder({
+  const { startRecording, discardBlob, lastBlobUrl } = useMediaRecorder({
     onBlobReady: handleBlobReady,
     onBlobSaved: handleBlobSaved,
   })
@@ -147,10 +147,39 @@ export default function StudentPage() {
     sendToGPT(text, { sttPath: 'A', confidence, latencyMs: latency })
   }, [discardBlob, setSpeechResult, setLatency, addLog, sendToGPT])
 
-  const handleFallback = useCallback((confidence: number) => {
-    addLog(`Path B 트리거: confidence ${(confidence * 100).toFixed(0)}% < ${CONFIDENCE_THRESHOLD * 100}%`, 'warning')
-    exportBlob()
-  }, [exportBlob, addLog])
+  const handleFallback = useCallback(async (confidence: number) => {
+    addLog(`인식 불명확: confidence ${(confidence * 100).toFixed(0)}% — 재시도 요청`, 'warning')
+    discardBlob() // Blob 즉시 파기
+
+    // AI가 음성으로 다시 말해달라고 요청
+    setAvatarStatus('speaking')
+    const retryMessages = [
+      "Sorry, I couldn't quite hear you. Could you say that again?",
+      "I didn't catch that clearly. Could you repeat that, please?",
+      "Pardon? Could you say that once more?",
+    ]
+    const msg = retryMessages[Math.floor(Math.random() * retryMessages.length)]
+
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: msg, voice: 'nova' }),
+      })
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const audio = new Audio(url)
+        audio.onended = () => {
+          URL.revokeObjectURL(url)
+          setAvatarStatus('idle')
+        }
+        await audio.play()
+      }
+    } catch {
+      setAvatarStatus('idle')
+    }
+  }, [discardBlob, addLog, setAvatarStatus])
 
   const handleError = useCallback((error: string) => {
     addLog(`STT 오류: ${error}`, 'error')
