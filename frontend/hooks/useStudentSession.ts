@@ -2,47 +2,64 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 interface StudentSession {
-  studentId: string
+  studentId: string | undefined
   sessionId: string | null
+  studentName: string | null
+  isLoggedIn: boolean
 }
 
 export function useStudentSession(): StudentSession {
   const supabase = createClient()
+  const router = useRouter()
+  const [studentId, setStudentId] = useState<string | null>(null)
+  const [studentName, setStudentName] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const studentIdRef = useRef<string>('')
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
-    // 브라우저 세션마다 고유 학생 ID 생성 (sessionStorage 사용)
-    let sid = sessionStorage.getItem('ai-co-teacher-student-id')
-    if (!sid) {
-      sid = crypto.randomUUID()
-      sessionStorage.setItem('ai-co-teacher-student-id', sid)
-    }
-    studentIdRef.current = sid
+    const init = async () => {
+      // 로그인 상태 확인
+      const { data: { user } } = await supabase.auth.getUser()
 
-    // Supabase에 세션 생성
-    const createSession = async () => {
+      if (!user) {
+        // 로그인 안 되어 있으면 로그인 페이지로
+        router.push('/student-login')
+        return
+      }
+
+      setStudentId(user.id)
+      setIsLoggedIn(true)
+
+      // 프로필에서 이름 가져오기
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', user.id)
+        .single()
+
+      if (profile) setStudentName(profile.name)
+
+      // 세션 생성
       try {
         const { data, error } = await supabase
           .from('sessions')
           .insert({
-            class_id: null, // Week 5에서 실제 클래스 연동
+            class_id: null,
             started_at: new Date().toISOString(),
           })
           .select('id')
           .single()
 
-        if (!error && data) {
-          setSessionId(data.id)
-        }
+        if (!error && data) setSessionId(data.id)
       } catch {
-        // 세션 생성 실패 시 null 유지 (대화는 계속)
+        // 세션 생성 실패 무시
       }
     }
 
-    createSession()
+    init()
 
     // 페이지 언로드 시 세션 종료
     const handleUnload = async () => {
@@ -58,8 +75,5 @@ export function useStudentSession(): StudentSession {
     return () => window.removeEventListener('beforeunload', handleUnload)
   }, [])
 
-  return {
-    studentId: studentIdRef.current,
-    sessionId,
-  }
+  return { studentId: studentId ?? undefined, sessionId, studentName, isLoggedIn }
 }

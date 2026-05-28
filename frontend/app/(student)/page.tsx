@@ -6,6 +6,7 @@ import { useMediaRecorder } from '@/hooks/useMediaRecorder'
 import { useConversation } from '@/hooks/useConversation'
 import { useStudentSession } from '@/hooks/useStudentSession'
 import { FeedbackCard } from '@/components/student/FeedbackCard'
+import { NavBar } from '@/components/common/NavBar'
 import { useAudioStore, CONFIDENCE_THRESHOLD } from '@/store/audioStore'
 import { useUIStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
@@ -215,26 +216,11 @@ export default function StudentPage() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col">
+      <NavBar />
       {/* 배경 */}
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-950 to-black pointer-events-none" />
 
-      <div className="relative z-10 flex flex-col items-center justify-between min-h-screen p-6 max-w-lg mx-auto w-full">
-
-        {/* 상단 헤더 */}
-        <div className="w-full flex items-center justify-between pt-2">
-          <div className="flex items-center gap-2">
-            <div className={cn('w-2 h-2 rounded-full',
-              avatarStatus === 'idle' ? 'bg-slate-500' : 'bg-emerald-400 animate-pulse'
-            )} />
-            <span className="text-xs text-slate-400 font-mono">AI Co-Teacher</span>
-          </div>
-          <button
-            onClick={() => setLogDrawerOpen(!isLogDrawerOpen)}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors font-mono"
-          >
-            [{logs.length} logs]
-          </button>
-        </div>
+      <div className="relative z-10 flex flex-col items-center justify-between min-h-screen p-6 pt-16 max-w-lg mx-auto w-full">
 
         {/* 중앙 아바타 */}
         <div className="flex flex-col items-center gap-6 flex-1 justify-center">
