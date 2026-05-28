@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
 import { useConversation } from '@/hooks/useConversation'
+import { useStudentSession } from '@/hooks/useStudentSession'
 import { FeedbackCard } from '@/components/student/FeedbackCard'
 import { useAudioStore, CONFIDENCE_THRESHOLD } from '@/store/audioStore'
 import { useUIStore } from '@/store/uiStore'
@@ -70,7 +71,8 @@ export default function StudentPage() {
     setAvatarStatus, setInterimText, setSpeechResult, setLatency,
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages } = useUIStore()
-  const { sendToGPT, isSpeaking, stopSpeaking, feedback, clearFeedback } = useConversation()
+  const { studentId, sessionId } = useStudentSession()
+  const { sendToGPT, isSpeaking, stopSpeaking, feedback, clearFeedback } = useConversation({ sessionId, studentId })
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [internalBlobUrl, setInternalBlobUrl] = useState<string | null>(null)
@@ -103,12 +105,11 @@ export default function StudentPage() {
       setLatency(latency)
       setSpeechResult({ text: data.text, confidence: data.confidence, path: 'B', isFinal: true })
       addLog(`Path B 완료: "${data.text}" (${latency}ms)`, 'success')
-      sendToGPT(data.text, { sttPath: 'B', confidence: data.confidence, latencyMs: latency })
     } catch {
       addLog('Path B 실패: Whisper 서버 연결 불가', 'error')
       setAvatarStatus('idle')
     }
-  }, [addLog, setAvatarStatus, setSpeechResult, setLatency, sendToGPT])
+  }, [addLog, setAvatarStatus, setSpeechResult, setLatency])
 
   const handleBlobSaved = useCallback((success: boolean, filename?: string) => {
     if (success && filename) {
@@ -167,7 +168,6 @@ export default function StudentPage() {
 
   // 마이크 버튼 핸들러
   const handleMicStart = useCallback(async () => {
-    if (isHolding) return // 중복 호출 방지
     if (!isSupported) { addLog('Web Speech API 미지원 브라우저', 'error'); return }
     startTimeRef.current = Date.now()
     setIsHolding(true)

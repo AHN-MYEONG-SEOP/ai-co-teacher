@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
 import { useConversation } from '@/hooks/useConversation'
+import { useStudentSession } from '@/hooks/useStudentSession'
 import { FeedbackCard } from '@/components/student/FeedbackCard'
 import { useAudioStore, CONFIDENCE_THRESHOLD } from '@/store/audioStore'
 import { useUIStore } from '@/store/uiStore'
@@ -70,7 +71,8 @@ export default function StudentPage() {
     setAvatarStatus, setInterimText, setSpeechResult, setLatency,
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages } = useUIStore()
-  const { sendToGPT, isSpeaking, stopSpeaking, feedback, clearFeedback } = useConversation()
+  const { studentId, sessionId } = useStudentSession()
+  const { sendToGPT, isSpeaking, stopSpeaking, feedback, clearFeedback } = useConversation({ sessionId, studentId })
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [internalBlobUrl, setInternalBlobUrl] = useState<string | null>(null)

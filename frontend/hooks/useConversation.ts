@@ -10,10 +10,18 @@ interface Message {
   content: string
 }
 
-// 임시 세션 ID (Week 5 교사 대시보드에서 실제 세션으로 교체)
-const TEMP_SESSION_ID = crypto.randomUUID()
+interface ConversationMeta {
+  sttPath?: string
+  confidence?: number
+  latencyMs?: number
+}
 
-export function useConversation() {
+interface UseConversationProps {
+  sessionId?: string | null
+  studentId?: string
+}
+
+export function useConversation({ sessionId, studentId }: UseConversationProps = {}) {
   const { addMessage, setAIResponding } = useUIStore()
   const { setAvatarStatus } = useAudioStore()
   const historyRef = useRef<Message[]>([])
@@ -72,7 +80,7 @@ export function useConversation() {
     }
   }, [setAvatarStatus])
 
-  // 대화 로그 Supabase 저장 (비동기 - 실패해도 대화 계속)
+  // 대화 로그 Supabase 저장
   const saveLog = useCallback(async (
     role: 'student' | 'ai',
     content: string,
@@ -83,8 +91,8 @@ export function useConversation() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          session_id: null,
-          student_id: null, // Week 5에서 실제 student_id 연동
+          session_id: sessionId || null,
+          student_id: studentId || null,
           role,
           content,
           ...extra,
@@ -93,7 +101,7 @@ export function useConversation() {
     } catch {
       // 로그 저장 실패는 무시
     }
-  }, [])
+  }, [sessionId, studentId])
 
   // 피드백 요청
   const requestFeedback = useCallback(async (text: string) => {
@@ -113,9 +121,8 @@ export function useConversation() {
 
   const sendToGPT = useCallback(async (
     studentText: string,
-    meta?: { sttPath?: string; confidence?: number; latencyMs?: number }
+    meta?: ConversationMeta
   ) => {
-    // 학생 메시지 UI에 추가
     addMessage({
       id: Date.now().toString(),
       role: 'student',
@@ -123,10 +130,9 @@ export function useConversation() {
       createdAt: new Date().toISOString(),
     })
 
-    // 히스토리에 추가
     historyRef.current.push({ role: 'user', content: studentText })
 
-    // 피드백 + 로그 저장 병렬 실행
+    // 피드백 + 로그 병렬 실행
     requestFeedback(studentText)
     saveLog('student', studentText, {
       stt_path: meta?.sttPath,
@@ -152,7 +158,6 @@ export function useConversation() {
       const data = await res.json()
       const aiText = data.text
 
-      // AI 메시지 UI에 추가
       addMessage({
         id: (Date.now() + 1).toString(),
         role: 'ai',
@@ -160,13 +165,10 @@ export function useConversation() {
         createdAt: new Date().toISOString(),
       })
 
-      // 히스토리 + 로그 저장
       historyRef.current.push({ role: 'assistant', content: aiText })
       saveLog('ai', aiText)
 
       setAIResponding(false)
-
-      // TTS 음성 재생
       await speak(aiText)
 
     } catch {
