@@ -113,6 +113,7 @@ export default function StudentPage() {
   }, [addLog, setAvatarStatus, setSpeechResult, setLatency])
 
   const handleBlobSaved = useCallback((success: boolean, filename?: string) => {
+    if (!filename) return // 파일명 없으면 무시
     if (success && filename) {
       setSaveMessage({ text: `✅ 저장됨: 다운로드/${filename}`, ok: true })
       addLog(`녹음 저장 성공: ${filename}`, 'success')
