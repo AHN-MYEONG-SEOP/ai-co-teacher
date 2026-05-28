@@ -58,7 +58,7 @@ export function useWebSpeech({
         onLog?.(`MediaRecorder mimeType: ${mimeType}`)
         const mr = new MediaRecorder(stream, { mimeType })
         mr.ondataavailable = (e) => {
-          if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) ws.send(e.data)
+          if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) { ws.send(e.data); onLog?.(`오디오 전송: ${e.data.size}bytes`) }
         }
         mr.start(100)
         mrRef.current = mr
