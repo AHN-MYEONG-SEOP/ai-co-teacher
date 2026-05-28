@@ -72,6 +72,7 @@ export default function StudentPage() {
     setAvatarStatus, setInterimText, setSpeechResult, setLatency,
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages } = useUIStore()
+  const messagesEndRef = useRef<HTMLDivElement>(null)
   const { studentId, sessionId } = useStudentSession()
   const { sendToGPT, isSpeaking, stopSpeaking, feedback, clearFeedback } = useConversation({ sessionId, studentId })
 
@@ -134,6 +135,10 @@ export default function StudentPage() {
     setInternalBlobUrl(lastBlobUrl)
     setIsPlaying(false)
   }, [lastBlobUrl])
+
+  useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+}, [messages])
 
   // Web Speech API 콜백
   const handleInterim = useCallback((text: string) => {
@@ -235,10 +240,10 @@ export default function StudentPage() {
             )}
           </div>
 
-          {/* 대화 로그 (최근 4개) */}
+          {/* 대화 로그 (전체) */}
           {messages.length > 0 && (
-            <div className="w-full space-y-2 max-h-48 overflow-y-auto">
-              {messages.slice(-4).map((msg) => (
+            <div className="w-full space-y-2 max-h-72 overflow-y-auto">
+              {messages.map((msg) => (
                 <div key={msg.id} className={cn(
                   'rounded-xl px-4 py-2 text-sm max-w-[85%]',
                   msg.role === 'student'
@@ -251,6 +256,7 @@ export default function StudentPage() {
                   {msg.content}
                 </div>
               ))}
+              <div ref={messagesEndRef} /> 
             </div>
           )}
 
