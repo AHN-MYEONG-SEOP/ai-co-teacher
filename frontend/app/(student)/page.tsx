@@ -132,10 +132,11 @@ export default function StudentPage() {
     const latency = Date.now() - startTimeRef.current
     setLatency(latency)
     setSpeechResult({ text, confidence, path: 'A', isFinal: true })
+    setInterimText('')  // 메시지 버블로 전환되기 직전에 자막 클리어
     discardBlob()
     addLog(`Path A: "${text}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
     sendToGPT(text, { sttPath: 'A', confidence, latencyMs: latency })
-  }, [discardBlob, setSpeechResult, setLatency, addLog, sendToGPT])
+  }, [discardBlob, setSpeechResult, setLatency, setInterimText, addLog, sendToGPT])
 
   const handleFallback = useCallback(async (confidence: number) => {
     addLog(`인식 불명확: confidence ${(confidence * 100).toFixed(0)}% — 재시도 요청`, 'warning')
@@ -198,7 +199,8 @@ export default function StudentPage() {
 
   const handleMicStop = useCallback(() => {
     setIsHolding(false)
-    setAvatarStatus('idle')
+    setAvatarStatus('processing')  // 처리 중 상태
+    // interimText는 유지 — finalize 후 메시지 버블로 전환될 때 클리어
     stopListening()
   }, [stopListening, setAvatarStatus])
 
@@ -277,7 +279,7 @@ export default function StudentPage() {
             </div>
           ))}
 
-          {/* 실시간 자막 — 말하는 중일 때만 표시 */}
+          {/* 실시간 자막 */}
           {(isSpeaking || interimText) && (
             <div className="bg-slate-900/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl px-4 py-3 max-w-[85%] mr-auto">
               {isSpeaking ? (
@@ -290,7 +292,14 @@ export default function StudentPage() {
                   </div>
                   <p className="text-violet-300 text-xs">말하는 중...</p>
                 </div>
+              ) : avatarStatus === 'processing' ? (
+                // 마이크 놓은 후 처리 중 — 자막 흐리게 유지
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  {interimText}
+                  <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full ml-2 animate-pulse align-middle" />
+                </p>
               ) : (
+                // 말하는 중 — 자막 밝게 + 커서
                 <p className="text-white text-sm leading-relaxed">
                   {interimText}
                   <span className="inline-block w-0.5 h-4 bg-emerald-400 ml-1 animate-pulse align-middle" />
