@@ -110,7 +110,7 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
     meta?: ConversationMeta
   ) => {
     // 이번 턴의 log_id를 저장할 Promise resolve 함수
-    let resolveLogId: (id: string | null) => void
+    let resolveLogId: (id: string | null) => void = () => {}
     const logIdPromise = new Promise<string | null>((resolve) => { resolveLogId = resolve })
 
     // 1. 학생 메시지 UI 추가
