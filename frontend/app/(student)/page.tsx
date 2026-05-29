@@ -63,6 +63,7 @@ export default function StudentPage() {
   const [isHolding, setIsHolding] = useState(false)
   const startTimeRef = useRef<number>(0)
   const logIdRef = useRef(0)
+  const sentRef = useRef(false)  // 중복 전송 방지 플래그
 
   // 새 메시지 or 피드백 붙을 때 자동 스크롤
   useEffect(() => {
@@ -101,14 +102,12 @@ export default function StudentPage() {
   }, [addLog, setAvatarStatus, setSpeechResult, setLatency])
 
   const handleBlobSaved = useCallback((success: boolean, filename?: string) => {
-    if (success && filename) {
-      setSaveMessage({ text: `✅ 저장됨: 다운로드/${filename}`, ok: true })
-      addLog(`녹음 저장 성공: ${filename}`, 'success')
+    // filename은 항상 undefined이므로 success만 체크
+    if (success) {
+      addLog('녹음 저장 성공 (재생 가능)', 'success')
     } else {
-      setSaveMessage({ text: '❌ 저장 실패', ok: false })
       addLog('녹음 저장 실패', 'error')
     }
-    setTimeout(() => setSaveMessage(null), 4000)
   }, [addLog])
 
   const { startRecording, discardBlob, lastBlobUrl } = useMediaRecorder({
@@ -126,6 +125,10 @@ export default function StudentPage() {
   }, [setInterimText])
 
   const handleFinalResult = useCallback((text: string, confidence: number) => {
+    // 중복 호출 방지
+    if (sentRef.current) return
+    sentRef.current = true
+
     const latency = Date.now() - startTimeRef.current
     setLatency(latency)
     setSpeechResult({ text, confidence, path: 'A', isFinal: true })
@@ -179,6 +182,7 @@ export default function StudentPage() {
   const handleMicStart = useCallback(async () => {
     if (!isSupported) { addLog('Web Speech API 미지원 브라우저', 'error'); return }
     startTimeRef.current = Date.now()
+    sentRef.current = false  // 플래그 초기화
     setIsHolding(true)
     setAvatarStatus('listening')
     setInterimText('')
@@ -302,20 +306,18 @@ export default function StudentPage() {
             <button
               onClick={() => {
                 if (!internalBlobUrl) return
-                if (!audioRef.current) {
-                  audioRef.current = new Audio(internalBlobUrl)
-                  audioRef.current.onended = () => setIsPlaying(false)
-                } else {
-                  audioRef.current.src = internalBlobUrl
-                }
-                if (isPlaying) {
+                if (isPlaying && audioRef.current) {
                   audioRef.current.pause()
                   audioRef.current.currentTime = 0
                   setIsPlaying(false)
-                } else {
-                  audioRef.current.play()
-                  setIsPlaying(true)
+                  return
                 }
+                // 매번 새로 생성해서 최신 blobUrl 반영
+                const audio = new Audio(internalBlobUrl)
+                audioRef.current = audio
+                audio.onended = () => setIsPlaying(false)
+                audio.play()
+                setIsPlaying(true)
               }}
               disabled={!internalBlobUrl}
               className={cn(
