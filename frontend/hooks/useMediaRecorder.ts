@@ -1,5 +1,4 @@
 'use client'
-
 import { useCallback, useRef, useState } from 'react'
 
 interface MediaRecorderOptions {
@@ -16,15 +15,30 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
 
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 48000,      // 48kHz 고음질
+          channelCount: 1,        // 모노 (음성에 최적)
+        }
+      })
       streamRef.current = stream
       chunksRef.current = []
 
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : 'audio/mp4'
+      // 최고 음질 mimeType 선택
+      const mimeType =
+        MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' :
+        MediaRecorder.isTypeSupported('audio/webm')             ? 'audio/webm' :
+        MediaRecorder.isTypeSupported('audio/mp4')              ? 'audio/mp4' :
+        ''
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType })
+      const options: MediaRecorderInit = {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: 128000,   // 128kbps (기본값 ~32kbps 대비 4배)
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, options)
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
@@ -36,14 +50,12 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
     }
   }, [])
 
-  // Blob 저장 공통 처리
+  // Blob → URL 저장
   const _saveBlob = useCallback((blob: Blob) => {
-    // 이전 URL 해제
     setLastBlobUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev)
       return null
     })
-
     try {
       const url = URL.createObjectURL(blob)
       setLastBlobUrl(url)
@@ -53,10 +65,9 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
     }
   }, [onBlobSaved])
 
-  // Path A: 신뢰도 충족 → Blob 저장 후 파기
+  // Path A: 신뢰도 충족 → Blob 저장
   const discardBlob = useCallback(() => {
     if (!mediaRecorderRef.current) return
-
     mediaRecorderRef.current.onstop = () => {
       if (chunksRef.current.length > 0) {
         const blob = new Blob(chunksRef.current, {
@@ -67,7 +78,6 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
       chunksRef.current = []
       streamRef.current?.getTracks().forEach((t) => t.stop())
     }
-
     if (mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop()
     }
@@ -77,7 +87,6 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
   // Path B: 신뢰도 미달 → Blob 저장 + Whisper 전송
   const exportBlob = useCallback(() => {
     if (!mediaRecorderRef.current) return
-
     mediaRecorderRef.current.onstop = () => {
       const blob = new Blob(chunksRef.current, {
         type: mediaRecorderRef.current?.mimeType || 'audio/webm',
@@ -87,7 +96,6 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
       streamRef.current?.getTracks().forEach((t) => t.stop())
       onBlobReady?.(blob)
     }
-
     if (mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop()
     }
