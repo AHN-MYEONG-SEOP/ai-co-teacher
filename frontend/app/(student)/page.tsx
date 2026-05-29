@@ -5,7 +5,6 @@ import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
 import { useConversation } from '@/hooks/useConversation'
 import { useStudentSession } from '@/hooks/useStudentSession'
-import { FeedbackCard } from '@/components/student/FeedbackCard'
 import { NavBar } from '@/components/common/NavBar'
 import { useAudioStore, CONFIDENCE_THRESHOLD } from '@/store/audioStore'
 import { useUIStore } from '@/store/uiStore'
@@ -53,7 +52,7 @@ export default function StudentPage() {
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages } = useUIStore()
   const { studentId, sessionId } = useStudentSession()
-  const { sendToGPT, isSpeaking, stopSpeaking, feedback, clearFeedback } = useConversation({ sessionId, studentId })
+  const { sendToGPT, isSpeaking, stopSpeaking } = useConversation({ sessionId, studentId })
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
@@ -374,12 +373,7 @@ export default function StudentPage() {
         </div>
       </div>
 
-      {/* ④ 피드백 카드 — 하단 오버레이 슬라이드업 (대화창 안 가림) */}
-      {feedback && (
-        <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 max-w-lg mx-auto">
-          <FeedbackCard feedback={feedback} onClose={clearFeedback} />
-        </div>
-      )}
+      {/* 피드백은 대화 버블 인라인으로만 표시 — 오버레이 카드 제거 */}
 
       {/* 시스템 로그 Drawer */}
       <div className={cn(
