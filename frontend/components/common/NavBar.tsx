@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { useUIStore } from '@/store/uiStore'
 
 interface NavBarProps {
   logCount?: number
@@ -13,6 +14,7 @@ export function NavBar({ logCount = 0, onLogClick }: NavBarProps) {
   const router = useRouter()
   const [userName, setUserName] = useState<string | null>(null)
   const [isTeacher, setIsTeacher] = useState(false)
+  const { clearMessages } = useUIStore()
 
   useEffect(() => {
     const loadUser = async () => {
@@ -26,6 +28,9 @@ export function NavBar({ logCount = 0, onLogClick }: NavBarProps) {
   }, [])
 
   const handleLogout = async () => {
+    // 대화 내용 + 인사말 기록 전부 초기화
+    clearMessages()
+    sessionStorage.clear()
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
