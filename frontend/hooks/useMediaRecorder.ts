@@ -33,12 +33,10 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
         MediaRecorder.isTypeSupported('audio/mp4')              ? 'audio/mp4' :
         ''
 
-      const options: MediaRecorderOptions = {
+      const mediaRecorder = new MediaRecorder(stream, {
         ...(mimeType ? { mimeType } : {}),
-        audioBitsPerSecond: 128000,   // 128kbps (기본값 ~32kbps 대비 4배)
-      }
-
-      const mediaRecorder = new MediaRecorder(stream, options)
+        audioBitsPerSecond: 128000,   // 128kbps
+      })
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
