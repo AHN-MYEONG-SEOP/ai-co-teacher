@@ -58,9 +58,26 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
       }
       const audio = new Audio(url)
       audioRef.current = audio
-      audio.onended = () => { URL.revokeObjectURL(url); setIsSpeaking(false); setAvatarStatus('idle') }
-      audio.onerror = () => { setIsSpeaking(false); setAvatarStatus('idle') }
-      await audio.play()
+
+      // 재생 완료까지 기다리는 Promise
+      await new Promise<void>((resolve) => {
+        audio.onended = () => {
+          URL.revokeObjectURL(url)
+          setIsSpeaking(false)
+          setAvatarStatus('idle')
+          resolve()
+        }
+        audio.onerror = () => {
+          setIsSpeaking(false)
+          setAvatarStatus('idle')
+          resolve()
+        }
+        audio.play().catch(() => {
+          setIsSpeaking(false)
+          setAvatarStatus('idle')
+          resolve()
+        })
+      })
     } catch {
       setIsSpeaking(false)
       setAvatarStatus('idle')
