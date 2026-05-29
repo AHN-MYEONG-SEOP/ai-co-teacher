@@ -115,7 +115,7 @@ export function useWebSpeech({
 
       const wsUrl = 'wss://api.deepgram.com/v1/listen?' +
         new URLSearchParams({
-          language: 'en-US',
+          language: 'multi',         // 한국어 + 영어 동시 인식
           model: 'nova-2',
           smart_format: 'true',
           interim_results: 'true',
