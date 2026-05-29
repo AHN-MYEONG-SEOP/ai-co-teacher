@@ -90,7 +90,6 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
         if (!res.ok) throw new Error()
         const data = await res.json()
         const greetingText = data.text
-        addMessageRef.current({ id: 'greeting', role: 'ai', content: greetingText, createdAt: new Date().toISOString() })
         historyRef.current.push({ role: 'assistant', content: greetingText })
         fetch('/api/log', {
           method: 'POST',
@@ -98,11 +97,13 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
           body: JSON.stringify({ session_id: sessionId || null, student_id: studentId || null, ai_text: greetingText }),
         })
         await speakRef.current(greetingText)
+        // 재생 완료 후 텍스트 표시
+        addMessageRef.current({ id: 'greeting', role: 'ai', content: greetingText, createdAt: new Date().toISOString() })
       } catch {
         const fallback = `Hi ${studentNickname}! Great to see you. Are you ready to practice your English today?`
-        addMessageRef.current({ id: 'greeting', role: 'ai', content: fallback, createdAt: new Date().toISOString() })
         historyRef.current.push({ role: 'assistant', content: fallback })
         await speakRef.current(fallback)
+        addMessageRef.current({ id: 'greeting', role: 'ai', content: fallback, createdAt: new Date().toISOString() })
       }
     }, 800)
 
@@ -179,20 +180,23 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
       const data = await res.json()
       const aiText = data.text
 
-      addMessage({ id: (Date.now() + 1).toString(), role: 'ai', content: aiText, createdAt: new Date().toISOString() })
+      // TTS 먼저 재생 — 듣기 연습
       historyRef.current.push({ role: 'assistant', content: aiText })
+      setAIResponding(false)
+      await speak(aiText)
+
+      // 재생 완료 후 텍스트 표시 — 확인용
+      addMessageRef.current({ id: (Date.now() + 1).toString(), role: 'ai', content: aiText, createdAt: new Date().toISOString() })
 
       // 4. log_id 기다렸다가 ai_text 업데이트
       const logId = await logIdPromise
       if (logId) {
-        // 기존 row에 ai_text 추가
         fetch('/api/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ log_id: logId, ai_text: aiText }),
         })
       } else {
-        // 피드백 실패 등으로 log_id 없으면 ai_text만 별도 row
         fetch('/api/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -204,9 +208,6 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
           }),
         })
       }
-
-      setAIResponding(false)
-      await speak(aiText)
 
     } catch {
       setAIResponding(false)
