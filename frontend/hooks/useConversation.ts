@@ -71,9 +71,8 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
   useEffect(() => {
     if (!studentNickname) return
     const greetedKey = `greeted_${studentNickname}`
-    if (greetedRef.current || sessionStorage.getItem(greetedKey)) return
-    greetedRef.current = true
-    sessionStorage.setItem(greetedKey, '1')
+    if (sessionStorage.getItem(greetedKey)) return  // sessionStorage만 체크
+    sessionStorage.setItem(greetedKey, '1')  // 먼저 등록해서 중복 방지
 
     const greet = async () => {
       try {
@@ -87,7 +86,6 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
         const greetingText = data.text
         addMessage({ id: 'greeting', role: 'ai', content: greetingText, createdAt: new Date().toISOString() })
         historyRef.current.push({ role: 'assistant', content: greetingText })
-        // 인사말은 ai_text만 저장
         fetch('/api/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
