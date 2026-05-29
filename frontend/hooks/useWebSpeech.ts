@@ -118,7 +118,7 @@ export function useWebSpeech({
           smart_format: 'true',
           interim_results: 'true',
           punctuate: 'true',
-          utterance_end_ms: '1000',
+          utterance_end_ms: '2000',  // 2초로 늘려서 빠른 종료 방지
           vad_events: 'true',
         }).toString()
 
@@ -206,6 +206,11 @@ export function useWebSpeech({
       ws.onclose = (e) => {
         onLogRef.current?.(`Deepgram 연결 종료: code=${e.code}`)
         setIsListening(false)
+        // 예상치 못한 종료 시 누적된 텍스트 처리
+        if (accumulatedTextRef.current.trim()) {
+          onLogRef.current?.('예상치 못한 종료 — 누적 텍스트 finalize')
+          finalize()
+        }
       }
       wsRef.current = ws
 
