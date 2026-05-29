@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
-export default function StudentLoginPage() {
+export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -20,10 +20,27 @@ export default function StudentLoginPage() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
-      router.push('/')
+      // 1. 로그인
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInError) throw signInError
+
+      // 2. profiles에서 role 확인
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profileError || !profile) throw new Error('프로필을 찾을 수 없습니다.')
+
+      // 3. role에 따라 라우팅
+      if (profile.role === 'teacher') {
+        router.push('/teacher')
+      } else {
+        router.push('/')
+      }
       router.refresh()
+
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '로그인 실패')
     } finally {
@@ -34,11 +51,12 @@ export default function StudentLoginPage() {
   return (
     <main className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">
+
         {/* 로고 */}
         <div className="text-center space-y-2">
           <div className="text-6xl">🎙️</div>
           <h1 className="text-2xl font-bold text-white">AI Co-Teacher</h1>
-          <p className="text-slate-400 text-sm">학생 로그인</p>
+          <p className="text-slate-400 text-sm">코티 선생님과 영어 회화 연습</p>
         </div>
 
         {/* 폼 */}
@@ -49,8 +67,8 @@ export default function StudentLoginPage() {
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="student@school.com"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              placeholder="이메일을 입력하세요"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
             />
           </div>
           <div className="space-y-2">
@@ -61,7 +79,7 @@ export default function StudentLoginPage() {
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               onKeyDown={e => e.key === 'Enter' && handleLogin()}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
             />
           </div>
 
@@ -81,7 +99,7 @@ export default function StudentLoginPage() {
         </div>
 
         <p className="text-center text-xs text-slate-600">
-          계정이 없으면 선생님께 문의하세요
+          학생 계정이 없으면 선생님께 문의하세요
         </p>
       </div>
     </main>

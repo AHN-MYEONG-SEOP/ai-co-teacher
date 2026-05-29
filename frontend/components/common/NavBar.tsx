@@ -1,5 +1,4 @@
 'use client'
-
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
@@ -28,7 +27,7 @@ export function NavBar({ logCount = 0, onLogClick }: NavBarProps) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.push('/student-login')
+    router.push('/login')
     router.refresh()
   }
 

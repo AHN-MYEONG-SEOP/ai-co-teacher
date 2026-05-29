@@ -26,7 +26,7 @@ export function useStudentSession(): StudentSession {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        router.push('/student-login')
+        router.push('/login')
         return
       }
 
