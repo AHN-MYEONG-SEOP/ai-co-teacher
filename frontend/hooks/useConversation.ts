@@ -84,8 +84,13 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
 
   // 세션 시작 인사말 — nickname이 확정되면 한 번만 실행
   useEffect(() => {
-    if (!studentNickname || greetedRef.current) return
+    if (!studentNickname) return
+
+    // sessionStorage로 이미 인사했는지 확인 (리렌더링/스크롤 시 재실행 방지)
+    const greetedKey = `greeted_${studentNickname}`
+    if (greetedRef.current || sessionStorage.getItem(greetedKey)) return
     greetedRef.current = true
+    sessionStorage.setItem(greetedKey, '1')
 
     const greet = async () => {
       // GPT로 자연스러운 인사말 생성

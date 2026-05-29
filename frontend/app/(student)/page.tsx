@@ -304,7 +304,7 @@ export default function StudentPage() {
           <div className="flex items-center justify-center gap-6">
             {/* 녹음 재생 버튼 */}
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (!internalBlobUrl) return
                 if (isPlaying && audioRef.current) {
                   audioRef.current.pause()
@@ -312,12 +312,17 @@ export default function StudentPage() {
                   setIsPlaying(false)
                   return
                 }
-                // 매번 새로 생성해서 최신 blobUrl 반영
-                const audio = new Audio(internalBlobUrl)
-                audioRef.current = audio
-                audio.onended = () => setIsPlaying(false)
-                audio.play()
-                setIsPlaying(true)
+                try {
+                  const audio = new Audio(internalBlobUrl)
+                  audioRef.current = audio
+                  audio.onended = () => setIsPlaying(false)
+                  audio.onerror = () => setIsPlaying(false)
+                  setIsPlaying(true)
+                  await audio.play()
+                } catch (e) {
+                  console.error('재생 실패:', e)
+                  setIsPlaying(false)
+                }
               }}
               disabled={!internalBlobUrl}
               className={cn(
