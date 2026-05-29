@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils'
 
 interface ConversationLog {
   id: string
-  role: 'student' | 'ai'
-  content: string
+  student_text: string | null
+  ai_text: string | null
   stt_path: string | null
   confidence: number | null
   latency_ms: number | null
@@ -22,8 +22,8 @@ interface ConversationLog {
 interface RealtimeLog {
   id: string
   session_id: string
-  role: string
-  content: string
+  student_text: string | null
+  ai_text: string | null
   created_at: string
 }
 
@@ -111,7 +111,7 @@ export default function TeacherDashboard() {
     </main>
   )
 
-  const studentLogs = logs.filter(l => l.role === 'student')
+  const studentLogs = logs.filter(l => l.student_text)
   const confLogs = studentLogs.filter(l => l.confidence)
   const latLogs = studentLogs.filter(l => l.latency_ms)
   const avgConfidence = confLogs.length > 0
@@ -179,14 +179,14 @@ export default function TeacherDashboard() {
                 <p className="text-slate-500">학생이 말하면 여기에 실시간으로 표시됩니다</p>
               </div>
             ) : realtimeLogs.map((log) => (
-              <div key={log.id} className={cn('rounded-xl p-4 border text-sm',
-                log.role === 'student' ? 'bg-emerald-900/20 border-emerald-700/30' : 'bg-violet-900/20 border-violet-700/30'
-              )}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs opacity-60">{log.role === 'student' ? '🧑 학생' : '🤖 AI'}</span>
-                  <span className="text-xs text-slate-500">{new Date(log.created_at).toLocaleTimeString('ko-KR')}</span>
-                </div>
-                <p className="text-white">{log.content}</p>
+              <div key={log.id} className="rounded-xl p-4 border text-sm bg-slate-900/30 border-slate-700/30 space-y-2">
+                <span className="text-xs text-slate-500">{new Date(log.created_at).toLocaleTimeString('ko-KR')}</span>
+                {log.student_text && (
+                  <p className="text-emerald-200"><span className="text-xs opacity-60">🧑 학생: </span>{log.student_text}</p>
+                )}
+                {log.ai_text && (
+                  <p className="text-violet-200"><span className="text-xs opacity-60">🤖 AI: </span>{log.ai_text}</p>
+                )}
               </div>
             ))}
           </div>
@@ -200,24 +200,26 @@ export default function TeacherDashboard() {
                 <p className="text-slate-500">아직 대화 기록이 없습니다</p>
               </div>
             ) : logs.map((log) => (
-              <div key={log.id} className={cn('rounded-xl p-3 border text-sm flex items-start gap-3',
-                log.role === 'student' ? 'bg-emerald-900/10 border-emerald-800/30' : 'bg-violet-900/10 border-violet-800/30'
-              )}>
-                <span className="shrink-0">{log.role === 'student' ? '🧑' : '🤖'}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm">{log.content}</p>
-                  <div className="flex gap-3 mt-1 flex-wrap">
-                    {log.stt_path && (
-                      <span className={cn('text-xs px-1.5 py-0.5 rounded',
-                        log.stt_path === 'A' ? 'bg-emerald-900/40 text-emerald-400' : 'bg-amber-900/40 text-amber-400'
-                      )}>Path {log.stt_path}</span>
-                    )}
-                    {log.confidence && <span className="text-xs text-slate-500">신뢰도 {Math.round(log.confidence * 100)}%</span>}
-                    {log.latency_ms && <span className="text-xs text-slate-500">{log.latency_ms}ms</span>}
-                    {log.overall && <span className="text-xs text-emerald-400">종합 {log.overall}점</span>}
-                    <span className="text-xs text-slate-600">{new Date(log.created_at).toLocaleString('ko-KR')}</span>
-                  </div>
+              <div key={log.id} className="rounded-xl p-3 border text-sm bg-slate-900/10 border-slate-800/30 space-y-1.5">
+                {log.student_text && (
+                  <p className="text-emerald-200 text-sm"><span className="opacity-50">🧑 </span>{log.student_text}</p>
+                )}
+                {log.ai_text && (
+                  <p className="text-violet-200 text-sm"><span className="opacity-50">🤖 </span>{log.ai_text}</p>
+                )}
+                <div className="flex gap-3 mt-1 flex-wrap">
+                  {log.stt_path && (
+                    <span className={cn('text-xs px-1.5 py-0.5 rounded',
+                      log.stt_path === 'A' ? 'bg-emerald-900/40 text-emerald-400' : 'bg-amber-900/40 text-amber-400'
+                    )}>Path {log.stt_path}</span>
+                  )}
+                  {log.confidence && <span className="text-xs text-slate-500">신뢰도 {Math.round(log.confidence * 100)}%</span>}
+                  {log.latency_ms && <span className="text-xs text-slate-500">{log.latency_ms}ms</span>}
+                  {log.overall && <span className="text-xs text-emerald-400">종합 {log.overall}점</span>}
+                  <span className="text-xs text-slate-600">{new Date(log.created_at).toLocaleString('ko-KR')}</span>
                 </div>
+              </div>
+            ))}
               </div>
             ))}
           </div>

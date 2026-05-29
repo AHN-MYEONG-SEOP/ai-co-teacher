@@ -11,35 +11,55 @@ export async function POST(req: NextRequest) {
     )
 
     const {
-      session_id, student_id, role, content,
+      session_id, student_id,
+      student_text, ai_text,
       stt_path, confidence, latency_ms,
-      grammar, fluency, vocabulary, overall, correction, tip
+      grammar, fluency, vocabulary, overall, correction, tip,
+      log_id,  // 기존 row 업데이트용
     } = await req.json()
 
-    const { error } = await supabase
-      .from('conversation_logs')
-      .insert({
-        session_id: session_id || null,
-        student_id: student_id || null,
-        role,
-        content,
-        stt_path: stt_path || null,
-        confidence: confidence || null,
-        latency_ms: latency_ms || null,
-        grammar: grammar || null,
-        fluency: fluency || null,
-        vocabulary: vocabulary || null,
-        overall: overall || null,
-        correction: correction || null,
-        tip: tip || null,
-      })
+    if (log_id) {
+      // AI 응답이 왔을 때 기존 row에 ai_text 업데이트
+      const { error } = await supabase
+        .from('conversation_logs')
+        .update({ ai_text })
+        .eq('id', log_id)
 
-    if (error) {
-      console.error('Supabase 저장 오류:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      if (error) {
+        console.error('Supabase 업데이트 오류:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      return NextResponse.json({ success: true })
+
+    } else {
+      // 학생 발화 → 새 row 생성
+      const { data, error } = await supabase
+        .from('conversation_logs')
+        .insert({
+          session_id: session_id || null,
+          student_id: student_id || null,
+          student_text: student_text || null,
+          ai_text: ai_text || null,
+          stt_path: stt_path || null,
+          confidence: confidence || null,
+          latency_ms: latency_ms || null,
+          grammar: grammar || null,
+          fluency: fluency || null,
+          vocabulary: vocabulary || null,
+          overall: overall || null,
+          correction: correction || null,
+          tip: tip || null,
+        })
+        .select('id')
+        .single()
+
+      if (error) {
+        console.error('Supabase 저장 오류:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, log_id: data.id })
     }
 
-    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Log API 오류:', error)
     return NextResponse.json({ error: 'Log API 오류' }, { status: 500 })
