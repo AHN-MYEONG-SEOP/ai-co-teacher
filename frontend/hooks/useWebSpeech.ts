@@ -9,6 +9,7 @@ interface DeepgramOptions {
   onFallback?: (confidence: number) => void
   onError?: (error: string) => void
   onLog?: (msg: string) => void
+  onStreamReady?: (stream: MediaStream) => void  // 스트림 공유 콜백
 }
 
 export function useWebSpeech({
@@ -17,6 +18,7 @@ export function useWebSpeech({
   onFallback,
   onError,
   onLog,
+  onStreamReady,
 }: DeepgramOptions) {
   const wsRef = useRef<WebSocket | null>(null)
   const mrRef = useRef<MediaRecorder | null>(null)
@@ -32,11 +34,19 @@ export function useWebSpeech({
 
     try {
       onLog?.('마이크 스트림 요청 중...')
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          channelCount: 1,
+        }
+      })
       streamRef.current = stream
       onLog?.('마이크 스트림 획득 성공')
 
-      // 서버에서 토큰 발급
+      // 스트림을 MediaRecorder와 공유 (마이크 중복 열기 방지)
+      onStreamReady?.(stream)
+
       const tokenRes = await fetch('/api/deepgram-token')
       if (!tokenRes.ok) { onError?.('Deepgram 토큰 발급 실패'); return }
       const { token } = await tokenRes.json()
@@ -99,7 +109,7 @@ export function useWebSpeech({
       onError?.(`마이크 접근 실패: ${err}`)
       setIsListening(false)
     }
-  }, [onInterimResult, onFinalResult, onFallback, onError, onLog])
+  }, [onInterimResult, onFinalResult, onFallback, onError, onLog, onStreamReady])
 
   const stopListening = useCallback(() => {
     onLog?.('stopListening 호출')
@@ -129,6 +139,7 @@ export function useWebSpeech({
         wsRef.current.send(JSON.stringify({ type: 'CloseStream' }))
         wsRef.current.close()
       }
+      // 스트림 종료는 여기서 담당 (useMediaRecorder가 스트림을 소유하지 않으므로)
       streamRef.current?.getTracks().forEach((t) => t.stop())
       setIsListening(false)
     }, 500)

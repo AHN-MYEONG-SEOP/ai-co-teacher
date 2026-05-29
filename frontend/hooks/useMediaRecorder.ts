@@ -1,32 +1,22 @@
 'use client'
 import { useCallback, useRef, useState } from 'react'
 
-interface MediaRecorderOptions {
+interface MediaRecorderHookOptions {
   onBlobReady?: (blob: Blob) => void
   onBlobSaved?: (success: boolean, filename?: string) => void
 }
 
-export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOptions = {}) {
+export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderHookOptions = {}) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [lastBlobUrl, setLastBlobUrl] = useState<string | null>(null)
 
-  const startRecording = useCallback(async () => {
+  // 외부 스트림을 받아서 녹음 시작 (마이크를 직접 열지 않음)
+  const startRecording = useCallback((stream: MediaStream) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          channelCount: 1,        // 모노 (음성에 최적)
-          // sampleRate는 기기 기본값 사용 (강제 지정 시 속도 왜곡 발생)
-        }
-      })
-      streamRef.current = stream
       chunksRef.current = []
 
-      // 최고 음질 mimeType 선택
       const mimeType =
         MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' :
         MediaRecorder.isTypeSupported('audio/webm')             ? 'audio/webm' :
@@ -35,11 +25,13 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
 
       const mediaRecorder = new MediaRecorder(stream, {
         ...(mimeType ? { mimeType } : {}),
-        audioBitsPerSecond: 128000,   // 128kbps
+        audioBitsPerSecond: 128000,
       })
+
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
+
       mediaRecorder.start(100)
       mediaRecorderRef.current = mediaRecorder
       setIsRecording(true)
@@ -48,7 +40,6 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
     }
   }, [])
 
-  // Blob → URL 저장
   const _saveBlob = useCallback((blob: Blob) => {
     setLastBlobUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev)
@@ -57,13 +48,13 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
     try {
       const url = URL.createObjectURL(blob)
       setLastBlobUrl(url)
-      onBlobSaved?.(true, undefined)
+      onBlobSaved?.(true)
     } catch {
       onBlobSaved?.(false)
     }
   }, [onBlobSaved])
 
-  // Path A: 신뢰도 충족 → Blob 저장
+  // Path A: 신뢰도 충족 → Blob 저장 (스트림은 useWebSpeech가 종료)
   const discardBlob = useCallback(() => {
     if (!mediaRecorderRef.current) return
     mediaRecorderRef.current.onstop = () => {
@@ -74,7 +65,6 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
         _saveBlob(blob)
       }
       chunksRef.current = []
-      streamRef.current?.getTracks().forEach((t) => t.stop())
     }
     if (mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop()
@@ -91,7 +81,6 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
       })
       _saveBlob(blob)
       chunksRef.current = []
-      streamRef.current?.getTracks().forEach((t) => t.stop())
       onBlobReady?.(blob)
     }
     if (mediaRecorderRef.current.state === 'recording') {

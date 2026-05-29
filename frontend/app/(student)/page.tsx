@@ -171,25 +171,30 @@ export default function StudentPage() {
     discardBlob()
   }, [addLog, setAvatarStatus, discardBlob])
 
+  // useWebSpeech가 연 스트림을 useMediaRecorder와 공유 (마이크 중복 열기 방지)
+  const handleStreamReady = useCallback((stream: MediaStream) => {
+    startRecording(stream)
+  }, [startRecording])
+
   const { isSupported, isListening, startListening, stopListening } = useWebSpeech({
     onInterimResult: handleInterim,
     onFinalResult: handleFinalResult,
     onFallback: handleFallback,
     onError: handleError,
     onLog: (msg) => addLog(msg, 'info'),
+    onStreamReady: handleStreamReady,
   })
 
   const handleMicStart = useCallback(async () => {
     if (!isSupported) { addLog('Web Speech API 미지원 브라우저', 'error'); return }
     startTimeRef.current = Date.now()
-    sentRef.current = false  // 플래그 초기화
+    sentRef.current = false
     setIsHolding(true)
     setAvatarStatus('listening')
     setInterimText('')
-    addLog('마이크 시작 — Web Speech + MediaRecorder 병렬 실행', 'info')
-    await startRecording()
-    startListening()
-  }, [isSupported, startRecording, startListening, setAvatarStatus, setInterimText, addLog])
+    addLog('마이크 시작 — 단일 스트림으로 Deepgram + 녹음 동시 처리', 'info')
+    startListening()  // 스트림은 useWebSpeech가 열고 onStreamReady로 공유
+  }, [isSupported, startListening, setAvatarStatus, setInterimText, addLog])
 
   const handleMicStop = useCallback(() => {
     setIsHolding(false)
