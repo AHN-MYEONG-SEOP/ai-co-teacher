@@ -22,7 +22,7 @@ interface UseConversationProps {
 }
 
 export function useConversation({ sessionId, studentId }: UseConversationProps = {}) {
-  const { addMessage, setAIResponding } = useUIStore()
+  const { addMessage, setAIResponding, updateMessageFeedback } = useUIStore()
   const { setAvatarStatus } = useAudioStore()
   const historyRef = useRef<Message[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -113,7 +113,7 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
     }
   }, [sessionId, studentId])
 
-  // 피드백 요청 + DB 저장
+  // 피드백 요청
   const requestFeedback = useCallback(async (text: string) => {
     try {
       const res = await fetch('/api/feedback', {
@@ -121,10 +121,9 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      if (!res.ok) return
+      if (!res.ok) return null
       const data = await res.json()
-      setFeedback(data)
-      return data // 피드백 데이터 반환
+      return data
     } catch {
       return null
     }
@@ -134,8 +133,10 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
     studentText: string,
     meta?: ConversationMeta
   ) => {
+    // 학생 메시지 먼저 추가
+    const studentMsgId = Date.now().toString()
     addMessage({
-      id: Date.now().toString(),
+      id: studentMsgId,
       role: 'student',
       content: studentText,
       createdAt: new Date().toISOString(),
@@ -143,20 +144,25 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
 
     historyRef.current.push({ role: 'user', content: studentText })
 
-    // 피드백 요청 (결과를 로그 저장에 포함)
-    const feedbackData = await requestFeedback(studentText)
-
-    // 로그 저장 (피드백 포함)
-    saveLog('student', studentText, {
-      stt_path: meta?.sttPath,
-      confidence: meta?.confidence,
-      latency_ms: meta?.latencyMs,
-      grammar: feedbackData?.grammar,
-      fluency: feedbackData?.fluency,
-      vocabulary: feedbackData?.vocabulary,
-      overall: feedbackData?.overall,
-      correction: feedbackData?.correction,
-      tip: feedbackData?.tip,
+    // 피드백 요청 — 완료되면 해당 메시지에 attach
+    requestFeedback(studentText).then((feedbackData) => {
+      if (!feedbackData) return
+      // 오버레이 피드백 카드도 유지 (기존 동작)
+      setFeedback(feedbackData)
+      // 학생 메시지 버블에 피드백 인라인 표시
+      updateMessageFeedback(studentMsgId, feedbackData)
+      // 로그 저장
+      saveLog('student', studentText, {
+        stt_path: meta?.sttPath,
+        confidence: meta?.confidence,
+        latency_ms: meta?.latencyMs,
+        grammar: feedbackData.grammar,
+        fluency: feedbackData.fluency,
+        vocabulary: feedbackData.vocabulary,
+        overall: feedbackData.overall,
+        correction: feedbackData.correction,
+        tip: feedbackData.tip,
+      })
     })
 
     setAIResponding(true)
@@ -194,7 +200,7 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
       setAIResponding(false)
       setAvatarStatus('idle')
     }
-  }, [addMessage, setAIResponding, setAvatarStatus, speak, requestFeedback, saveLog])
+  }, [addMessage, setAIResponding, setAvatarStatus, speak, requestFeedback, saveLog, updateMessageFeedback])
 
   return { sendToGPT, isSpeaking, stopSpeaking, feedback, clearFeedback: () => setFeedback(null) }
 }

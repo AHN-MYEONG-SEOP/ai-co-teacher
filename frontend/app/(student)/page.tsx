@@ -65,9 +65,12 @@ export default function StudentPage() {
   const startTimeRef = useRef<number>(0)
   const logIdRef = useRef(0)
 
-  // 새 메시지 오면 자동 스크롤
+  // 새 메시지 or 피드백 붙을 때 자동 스크롤
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, 50)
+    return () => clearTimeout(timer)
   }, [messages])
 
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
@@ -220,15 +223,49 @@ export default function StudentPage() {
           )}
           {messages.map((msg) => (
             <div key={msg.id} className={cn(
-              'rounded-2xl px-4 py-3 text-sm max-w-[85%]',
-              msg.role === 'student'
-                ? 'bg-emerald-900/40 text-emerald-200 ml-auto text-right border border-emerald-700/30'
-                : 'bg-violet-900/40 text-violet-200 mr-auto border border-violet-700/30'
+              'flex flex-col',
+              msg.role === 'student' ? 'items-end' : 'items-start'
             )}>
-              <span className="text-xs opacity-50 block mb-1">
-                {msg.role === 'student' ? '🧑 나' : '🤖 AI'}
-              </span>
-              {msg.content}
+              {/* 말풍선 */}
+              <div className={cn(
+                'rounded-2xl px-4 py-3 text-sm max-w-[85%]',
+                msg.role === 'student'
+                  ? 'bg-emerald-900/40 text-emerald-200 text-right border border-emerald-700/30'
+                  : 'bg-violet-900/40 text-violet-200 border border-violet-700/30'
+              )}>
+                <span className="text-xs opacity-50 block mb-1">
+                  {msg.role === 'student' ? '🧑 나' : '🤖 AI'}
+                </span>
+                {msg.content}
+              </div>
+
+              {/* 인라인 피드백 — 학생 메시지 바로 아래 */}
+              {msg.role === 'student' && msg.feedback && (
+                <div className="mt-1.5 max-w-[85%] w-full bg-slate-800/60 border border-slate-700/40 rounded-xl px-3 py-2 space-y-1.5">
+                  {/* 점수 한 줄 요약 */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <span>문법 <span className={cn('font-bold font-mono', msg.feedback.grammar >= 80 ? 'text-emerald-400' : msg.feedback.grammar >= 60 ? 'text-amber-400' : 'text-red-400')}>{msg.feedback.grammar}</span></span>
+                      <span>유창성 <span className={cn('font-bold font-mono', msg.feedback.fluency >= 80 ? 'text-emerald-400' : msg.feedback.fluency >= 60 ? 'text-amber-400' : 'text-red-400')}>{msg.feedback.fluency}</span></span>
+                      <span>어휘 <span className={cn('font-bold font-mono', msg.feedback.vocabulary >= 80 ? 'text-emerald-400' : msg.feedback.vocabulary >= 60 ? 'text-amber-400' : 'text-red-400')}>{msg.feedback.vocabulary}</span></span>
+                    </div>
+                    <span className={cn(
+                      'text-sm font-bold font-mono',
+                      msg.feedback.overall >= 80 ? 'text-emerald-400' : msg.feedback.overall >= 60 ? 'text-amber-400' : 'text-red-400'
+                    )}>{msg.feedback.overall}</span>
+                  </div>
+                  {/* 교정 */}
+                  {msg.feedback.correction && (
+                    <p className="text-xs text-amber-300">
+                      <span className="opacity-60">💡 </span>{msg.feedback.correction}
+                    </p>
+                  )}
+                  {/* 팁 */}
+                  <p className="text-xs text-emerald-300">
+                    <span className="opacity-60">✨ </span>{msg.feedback.tip}
+                  </p>
+                </div>
+              )}
             </div>
           ))}
 

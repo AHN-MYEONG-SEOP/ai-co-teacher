@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ConversationMessage } from '@/types'
+import type { ConversationMessage, MessageFeedback } from '@/types'
 
 interface UIState {
   // 대화 로그
@@ -11,6 +11,7 @@ interface UIState {
 
   // Actions
   addMessage: (message: ConversationMessage) => void
+  updateMessageFeedback: (id: string, feedback: MessageFeedback) => void
   setLogDrawerOpen: (open: boolean) => void
   setAIResponding: (responding: boolean) => void
   clearMessages: () => void
@@ -23,6 +24,15 @@ export const useUIStore = create<UIState>((set) => ({
 
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
+
+  // 학생 메시지에 피드백 데이터 attach
+  updateMessageFeedback: (id, feedback) =>
+    set((state) => ({
+      messages: state.messages.map((msg) =>
+        msg.id === id ? { ...msg, feedback } : msg
+      ),
+    })),
+
   setLogDrawerOpen: (isLogDrawerOpen) => set({ isLogDrawerOpen }),
   setAIResponding: (isAIResponding) => set({ isAIResponding }),
   clearMessages: () => set({ messages: [] }),

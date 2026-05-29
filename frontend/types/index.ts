@@ -1,9 +1,7 @@
 // STT 처리 경로
 export type STTPath = 'A' | 'B'
-
 // 아바타 상태
 export type AvatarStatus = 'idle' | 'listening' | 'processing' | 'speaking'
-
 // Web Speech API 결과
 export interface SpeechResult {
   text: string
@@ -11,14 +9,21 @@ export interface SpeechResult {
   path: STTPath
   isFinal: boolean
 }
-
 // Whisper API 응답 (FastAPI)
 export interface WhisperResponse {
   text: string
   confidence: number
   duration_ms: number
 }
-
+// 피드백 데이터 (인라인 표시용)
+export interface MessageFeedback {
+  grammar: number
+  fluency: number
+  vocabulary: number
+  overall: number
+  correction: string | null
+  tip: string
+}
 // 대화 메시지
 export interface ConversationMessage {
   id: string
@@ -28,8 +33,8 @@ export interface ConversationMessage {
   confidence?: number
   latencyMs?: number
   createdAt: string
+  feedback?: MessageFeedback   // 학생 메시지에만 첨부
 }
-
 // Supabase 테이블 타입
 export interface Profile {
   id: string
@@ -37,21 +42,18 @@ export interface Profile {
   name: string
   created_at: string
 }
-
 export interface Class {
   id: string
   teacher_id: string
   name: string
   created_at: string
 }
-
 export interface Session {
   id: string
   class_id: string
   started_at: string
   ended_at: string | null
 }
-
 export interface ConversationLog {
   id: string
   session_id: string
