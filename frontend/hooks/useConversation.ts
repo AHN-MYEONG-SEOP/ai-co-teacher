@@ -67,14 +67,20 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
     }
   }, [setAvatarStatus])
 
-  // 인사말 — 세션 시작 시 한 번만
+  // addMessage, speak를 ref로 저장 (useEffect 의존성에서 제거)
+  const addMessageRef = useRef(addMessage)
+  const speakRef = useRef(speak)
+  useEffect(() => { addMessageRef.current = addMessage }, [addMessage])
+  useEffect(() => { speakRef.current = speak }, [speak])
+
+  // 인사말 — studentNickname이 처음 설정될 때 한 번만
   useEffect(() => {
     if (!studentNickname) return
     const greetedKey = `greeted_${studentNickname}`
-    if (sessionStorage.getItem(greetedKey)) return  // sessionStorage만 체크
-    sessionStorage.setItem(greetedKey, '1')  // 먼저 등록해서 중복 방지
+    if (sessionStorage.getItem(greetedKey)) return
+    sessionStorage.setItem(greetedKey, '1')
 
-    const greet = async () => {
+    const timer = setTimeout(async () => {
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
@@ -84,24 +90,25 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
         if (!res.ok) throw new Error()
         const data = await res.json()
         const greetingText = data.text
-        addMessage({ id: 'greeting', role: 'ai', content: greetingText, createdAt: new Date().toISOString() })
+        addMessageRef.current({ id: 'greeting', role: 'ai', content: greetingText, createdAt: new Date().toISOString() })
         historyRef.current.push({ role: 'assistant', content: greetingText })
         fetch('/api/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId || null, student_id: studentId || null, ai_text: greetingText }),
         })
-        await speak(greetingText)
+        await speakRef.current(greetingText)
       } catch {
         const fallback = `Hi ${studentNickname}! Great to see you. Are you ready to practice your English today?`
-        addMessage({ id: 'greeting', role: 'ai', content: fallback, createdAt: new Date().toISOString() })
+        addMessageRef.current({ id: 'greeting', role: 'ai', content: fallback, createdAt: new Date().toISOString() })
         historyRef.current.push({ role: 'assistant', content: fallback })
-        await speak(fallback)
+        await speakRef.current(fallback)
       }
-    }
-    const timer = setTimeout(greet, 800)
-    return () => clearTimeout(timer)
-  }, [studentNickname, addMessage, speak, sessionId, studentId])
+    }, 800)
+
+    // cleanup 없음 — 타이머 취소 안 함
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentNickname])
 
   const sendToGPT = useCallback(async (
     studentText: string,
