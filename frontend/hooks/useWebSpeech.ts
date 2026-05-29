@@ -107,9 +107,11 @@ export function useWebSpeech({
       onLogRef.current?.('마이크 스트림 획득 성공')
       onStreamReadyRef.current?.(stream)
 
+      // 토큰 발급
       const tokenRes = await fetch('/api/deepgram-token')
       if (!tokenRes.ok) { onErrorRef.current?.('Deepgram 토큰 발급 실패'); return }
       const { token } = await tokenRes.json()
+      onLogRef.current?.('토큰 발급 완료')
 
       const wsUrl = 'wss://api.deepgram.com/v1/listen?' +
         new URLSearchParams({
@@ -118,46 +120,28 @@ export function useWebSpeech({
           smart_format: 'true',
           interim_results: 'true',
           punctuate: 'true',
-          utterance_end_ms: '2000',  // 2초로 늘려서 빠른 종료 방지
+          utterance_end_ms: '2000',
           vad_events: 'true',
         }).toString()
 
       onLogRef.current?.('Deepgram WebSocket 연결 시도...')
-
-      // WebSocket 연결 전에 미리 MediaRecorder 시작 → 앞부분 버퍼에 저장
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
-      const preBuffer: Blob[] = []
-      const preMr = new MediaRecorder(stream, { mimeType })
-      preMr.ondataavailable = (e) => { if (e.data.size > 0) preBuffer.push(e.data) }
-      preMr.start(100)
-      mrRef.current = preMr
-      onLogRef.current?.('프리버퍼 녹음 시작 (WebSocket 연결 대기 중)')
-
       const ws = new WebSocket(wsUrl, ['token', token])
 
       ws.onopen = () => {
         onLogRef.current?.('✅ Deepgram WebSocket 연결 성공!')
 
-        // 이후 실시간 전송으로 먼저 전환
-        preMr.ondataavailable = (e) => {
+        // 연결 완료 후 MediaRecorder 시작 (단일 스트림, 프리버퍼 없음)
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+        const mr = new MediaRecorder(stream, { mimeType })
+        mr.ondataavailable = (e) => {
           if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) ws.send(e.data)
         }
-
-        // Deepgram 안정화 후 버퍼 전송 (200ms 딜레이)
-        setTimeout(() => {
-          if (preBuffer.length > 0) {
-            onLogRef.current?.(`프리버퍼 전송: ${preBuffer.length}개 청크`)
-            preBuffer.forEach((chunk) => {
-              if (ws.readyState === WebSocket.OPEN) ws.send(chunk)
-            })
-            preBuffer.length = 0
-          }
-        }, 200)
-
+        mr.start(100)
+        mrRef.current = mr
         setIsListening(true)
-        onLogRef.current?.('실시간 스트리밍 시작')
+        onLogRef.current?.('녹음 + 스트리밍 시작')
       }
 
       ws.onmessage = (event) => {
