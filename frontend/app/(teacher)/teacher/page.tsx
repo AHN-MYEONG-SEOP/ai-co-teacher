@@ -29,6 +29,7 @@ interface RealtimeLog {
 
 interface NewStudent {
   name: string
+  nickname: string
   email: string
   password: string
 }
@@ -41,7 +42,7 @@ export default function TeacherDashboard() {
   const [realtimeLogs, setRealtimeLogs] = useState<RealtimeLog[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'students'>('realtime')
-  const [newStudent, setNewStudent] = useState<NewStudent>({ name: '', email: '', password: '' })
+  const [newStudent, setNewStudent] = useState<NewStudent>({ name: '', nickname: '', email: '', password: '' })
   const [createLoading, setCreateLoading] = useState(false)
   const [createMessage, setCreateMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
@@ -57,7 +58,7 @@ export default function TeacherDashboard() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setCreateMessage({ text: `✅ ${newStudent.name} 학생 계정 생성 완료!`, ok: true })
-      setNewStudent({ name: '', email: '', password: '' })
+      setNewStudent({ name: '', nickname: '', email: '', password: '' })
     } catch (err) {
       setCreateMessage({ text: `❌ ${err instanceof Error ? err.message : '생성 실패'}`, ok: false })
     } finally {
@@ -227,12 +228,19 @@ export default function TeacherDashboard() {
           <div className="space-y-4">
             <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6 space-y-4">
               <h3 className="text-white font-medium">👨‍🎓 새 학생 계정 생성</h3>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <input
                   type="text"
-                  placeholder="학생 이름"
+                  placeholder="학생 이름 (예: 김민수)"
                   value={newStudent.name}
                   onChange={e => setNewStudent(p => ({ ...p, name: e.target.value }))}
+                  className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+                <input
+                  type="text"
+                  placeholder="호칭 (예: Minsu, 민수야) — 비워두면 이름 사용"
+                  value={newStudent.nickname}
+                  onChange={e => setNewStudent(p => ({ ...p, nickname: e.target.value }))}
                   className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
                 <input

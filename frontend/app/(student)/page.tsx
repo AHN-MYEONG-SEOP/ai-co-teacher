@@ -51,8 +51,8 @@ export default function StudentPage() {
     setAvatarStatus, setInterimText, setSpeechResult, setLatency,
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages } = useUIStore()
-  const { studentId, sessionId } = useStudentSession()
-  const { sendToGPT, isSpeaking, stopSpeaking } = useConversation({ sessionId, studentId })
+  const { studentId, sessionId, studentNickname } = useStudentSession()
+  const { sendToGPT, isSpeaking, stopSpeaking } = useConversation({ sessionId, studentId, studentNickname })
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)

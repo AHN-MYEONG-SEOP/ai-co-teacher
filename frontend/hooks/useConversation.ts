@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUIStore } from '@/store/uiStore'
 import { useAudioStore } from '@/store/audioStore'
 import type { FeedbackData } from '@/components/student/FeedbackCard'
@@ -19,15 +19,17 @@ interface ConversationMeta {
 interface UseConversationProps {
   sessionId?: string | null
   studentId?: string
+  studentNickname?: string | null
 }
 
-export function useConversation({ sessionId, studentId }: UseConversationProps = {}) {
+export function useConversation({ sessionId, studentId, studentNickname }: UseConversationProps = {}) {
   const { addMessage, setAIResponding, updateMessageFeedback } = useUIStore()
   const { setAvatarStatus } = useAudioStore()
   const historyRef = useRef<Message[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackData | null>(null)
+  const greetedRef = useRef(false)  // 인사말 중복 방지
 
   const stopSpeaking = useCallback(() => {
     if (audioRef.current) {
@@ -79,6 +81,56 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
       setAvatarStatus('idle')
     }
   }, [setAvatarStatus])
+
+  // 세션 시작 인사말 — nickname이 확정되면 한 번만 실행
+  useEffect(() => {
+    if (!studentNickname || greetedRef.current) return
+    greetedRef.current = true
+
+    const greet = async () => {
+      // GPT로 자연스러운 인사말 생성
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [],
+            studentText: `__GREETING__:${studentNickname}`,  // 특수 플래그
+          }),
+        })
+        if (!res.ok) throw new Error()
+        const data = await res.json()
+        const greetingText = data.text
+
+        // AI 메시지로 대화창에 추가
+        addMessage({
+          id: 'greeting',
+          role: 'ai',
+          content: greetingText,
+          createdAt: new Date().toISOString(),
+        })
+        historyRef.current.push({ role: 'assistant', content: greetingText })
+
+        // TTS로 읽어주기
+        await speak(greetingText)
+      } catch {
+        // 실패 시 기본 인사말
+        const fallback = `Hi ${studentNickname}! Great to see you. Are you ready to practice your English today?`
+        addMessage({
+          id: 'greeting',
+          role: 'ai',
+          content: fallback,
+          createdAt: new Date().toISOString(),
+        })
+        historyRef.current.push({ role: 'assistant', content: fallback })
+        await speak(fallback)
+      }
+    }
+
+    // 약간의 딜레이 후 인사말 (화면 로드 완료 후)
+    const timer = setTimeout(greet, 800)
+    return () => clearTimeout(timer)
+  }, [studentNickname, addMessage, speak])
 
   // 대화 로그 Supabase 저장
   const saveLog = useCallback(async (
@@ -133,7 +185,6 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
     studentText: string,
     meta?: ConversationMeta
   ) => {
-    // 학생 메시지 먼저 추가
     const studentMsgId = Date.now().toString()
     addMessage({
       id: studentMsgId,
@@ -144,14 +195,10 @@ export function useConversation({ sessionId, studentId }: UseConversationProps =
 
     historyRef.current.push({ role: 'user', content: studentText })
 
-    // 피드백 요청 — 완료되면 해당 메시지에 attach
     requestFeedback(studentText).then((feedbackData) => {
       if (!feedbackData) return
-      // 오버레이 피드백 카드도 유지 (기존 동작)
       setFeedback(feedbackData)
-      // 학생 메시지 버블에 피드백 인라인 표시
       updateMessageFeedback(studentMsgId, feedbackData)
-      // 로그 저장
       saveLog('student', studentText, {
         stt_path: meta?.sttPath,
         confidence: meta?.confidence,

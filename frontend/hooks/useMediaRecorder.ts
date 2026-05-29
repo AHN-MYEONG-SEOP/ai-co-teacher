@@ -19,8 +19,8 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderOpti
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 48000,      // 48kHz 고음질
           channelCount: 1,        // 모노 (음성에 최적)
+          // sampleRate는 기기 기본값 사용 (강제 지정 시 속도 왜곡 발생)
         }
       })
       streamRef.current = stream

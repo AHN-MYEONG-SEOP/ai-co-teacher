@@ -8,6 +8,7 @@ interface StudentSession {
   studentId: string | undefined
   sessionId: string | null
   studentName: string | null
+  studentNickname: string | null
   isLoggedIn: boolean
 }
 
@@ -16,16 +17,15 @@ export function useStudentSession(): StudentSession {
   const router = useRouter()
   const [studentId, setStudentId] = useState<string | null>(null)
   const [studentName, setStudentName] = useState<string | null>(null)
+  const [studentNickname, setStudentNickname] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
     const init = async () => {
-      // 로그인 상태 확인
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        // 로그인 안 되어 있으면 로그인 페이지로
         router.push('/student-login')
         return
       }
@@ -33,16 +33,18 @@ export function useStudentSession(): StudentSession {
       setStudentId(user.id)
       setIsLoggedIn(true)
 
-      // 프로필에서 이름 가져오기
+      // nickname 포함해서 가져오기
       const { data: profile } = await supabase
         .from('profiles')
-        .select('name')
+        .select('name, nickname')
         .eq('id', user.id)
         .single()
 
-      if (profile) setStudentName(profile.name)
+      if (profile) {
+        setStudentName(profile.name)
+        setStudentNickname(profile.nickname || profile.name) // nickname 없으면 name 사용
+      }
 
-      // 세션 생성
       try {
         const { data, error } = await supabase
           .from('sessions')
@@ -61,7 +63,6 @@ export function useStudentSession(): StudentSession {
 
     init()
 
-    // 페이지 언로드 시 세션 종료
     const handleUnload = async () => {
       if (sessionId) {
         await supabase
@@ -75,5 +76,5 @@ export function useStudentSession(): StudentSession {
     return () => window.removeEventListener('beforeunload', handleUnload)
   }, [])
 
-  return { studentId: studentId ?? undefined, sessionId, studentName, isLoggedIn }
+  return { studentId: studentId ?? undefined, sessionId, studentName, studentNickname, isLoggedIn }
 }
