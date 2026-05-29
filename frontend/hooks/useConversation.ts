@@ -97,6 +97,14 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
     if (sessionStorage.getItem(greetedKey)) return
     sessionStorage.setItem(greetedKey, '1')
 
+    // 즉시 환영 텍스트 표시 (TTS 없이)
+    addMessageRef.current({
+      id: 'welcome',
+      role: 'ai',
+      content: 'AI Co-Teacher 오신 것을 환영합니다. 🎙️',
+      createdAt: new Date().toISOString(),
+    })
+
     const timer = setTimeout(async () => {
       try {
         const res = await fetch('/api/chat', {
@@ -122,7 +130,7 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
         await speakRef.current(fallback)
         addMessageRef.current({ id: 'greeting', role: 'ai', content: fallback, createdAt: new Date().toISOString() })
       }
-    }, 800)
+    }, 300)
 
     // cleanup 없음 — 타이머 취소 안 함
     // eslint-disable-next-line react-hooks/exhaustive-deps
