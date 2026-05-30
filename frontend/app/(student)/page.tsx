@@ -79,39 +79,24 @@ function SettingsModal({
           </div>
         </div>
 
-        {/* 인식 민감도 */}
-        <div className="space-y-3">
-          <p className="text-sm font-medium text-slate-300">🎤 인식 민감도</p>
-          <div className="space-y-2">
-            {([
-              { value: 'low',    label: '낮음', desc: '소음이 많은 환경 (교실, 카페)' },
-              { value: 'normal', label: '보통', desc: '일반적인 환경' },
-              { value: 'high',   label: '높음', desc: '조용한 환경 (도서관, 집)' },
-            ] as const).map((opt) => (
-              <label key={opt.value} className="flex items-center gap-3 cursor-pointer group">
-                <div className={cn(
-                  'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
-                  local.stt_sensitivity === opt.value
-                    ? 'border-emerald-400 bg-emerald-400'
-                    : 'border-slate-600 group-hover:border-slate-400'
-                )}>
-                  {local.stt_sensitivity === opt.value && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-900" />
-                  )}
-                </div>
-                <input
-                  type="radio"
-                  className="sr-only"
-                  checked={local.stt_sensitivity === opt.value}
-                  onChange={() => setLocal(p => ({ ...p, stt_sensitivity: opt.value }))}
-                />
-                <div>
-                  <span className="text-sm text-white">{opt.label}</span>
-                  <span className="text-xs text-slate-500 ml-2">{opt.desc}</span>
-                </div>
-              </label>
-            ))}
+        {/* AI 한국어 번역 표시 */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-300">🇰🇷 AI 한국어 번역 표시</p>
+            <p className="text-xs text-slate-500 mt-0.5">AI가 한 말을 한국어로 번역해서 보여줌</p>
           </div>
+          <button
+            onClick={() => setLocal(p => ({ ...p, show_translation: !p.show_translation }))}
+            className={cn(
+              'w-12 h-6 rounded-full transition-colors relative',
+              local.show_translation ? 'bg-emerald-500' : 'bg-slate-600'
+            )}
+          >
+            <div className={cn(
+              'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform',
+              local.show_translation ? 'translate-x-6' : 'translate-x-0.5'
+            )} />
+          </button>
         </div>
 
         {/* 발화 피드백 표시 */}
@@ -211,15 +196,13 @@ export default function StudentPage() {
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage } = useUIStore()
   const { studentId, sessionId, studentNickname, settings, updateSettings } = useStudentSession()
-  const { sendToGPT, isSpeaking, stopSpeaking } = useConversation({ sessionId, studentId, studentNickname, ttsSpeed: settings.tts_speed })
+  const { sendToGPT, isSpeaking, stopSpeaking } = useConversation({
+    sessionId, studentId, studentNickname,
+    ttsSpeed: settings.tts_speed,
+    showTranslation: settings.show_translation,
+  })
   const [showSettings, setShowSettings] = useState(false)
 
-  // 인식 민감도 → confidence threshold
-  const confidenceThreshold = {
-    low: 0.70,
-    normal: 0.85,
-    high: 0.92,
-  }[settings.stt_sensitivity] ?? 0.85
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const [internalBlobUrl, setInternalBlobUrl] = useState<string | null>(null)
@@ -405,7 +388,6 @@ export default function StudentPage() {
     onError: handleError,
     onLog: (msg) => addLog(msg, 'info'),
     onStreamReady: handleStreamReady,
-    confidenceThreshold,
   })
 
   const isTouchRef = useRef(false)  // 터치 이벤트 감지 플래그
@@ -509,6 +491,12 @@ export default function StudentPage() {
                   </div>
                 ) : (
                   <span>{msg.content}</span>
+                )}
+                {/* AI 메시지 — 한국어 번역 */}
+                {msg.role === 'ai' && msg.translation && (
+                  <p className="text-xs text-violet-300/70 mt-2 pt-2 border-t border-violet-700/30">
+                    {msg.translation}
+                  </p>
                 )}
               </div>
 

@@ -22,11 +22,12 @@ interface UseConversationProps {
   studentId?: string
   studentNickname?: string | null
   ttsSpeed?: 'slow' | 'normal' | 'fast'
+  showTranslation?: boolean
 }
 
 const TTS_SPEED_MAP = { slow: 0.75, normal: 1.0, fast: 1.25 }
 
-export function useConversation({ sessionId, studentId, studentNickname, ttsSpeed = 'normal' }: UseConversationProps = {}) {
+export function useConversation({ sessionId, studentId, studentNickname, ttsSpeed = 'normal', showTranslation = false }: UseConversationProps = {}) {
   const { addMessage, setAIResponding, updateMessageFeedback } = useUIStore()
   const { setAvatarStatus } = useAudioStore()
   const historyRef = useRef<Message[]>([])
@@ -35,7 +36,9 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
   const [feedback, setFeedback] = useState<FeedbackData | null>(null)
   const greetedRef = useRef(false)
   const ttsSpeedRef = useRef(ttsSpeed)
+  const showTranslationRef = useRef(showTranslation)
   useEffect(() => { ttsSpeedRef.current = ttsSpeed }, [ttsSpeed])
+  useEffect(() => { showTranslationRef.current = showTranslation }, [showTranslation])
 
   const stopSpeaking = useCallback(() => {
     if (audioRef.current) {
@@ -207,19 +210,30 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: historyRef.current.slice(-10), studentText }),
+        body: JSON.stringify({
+          messages: historyRef.current.slice(-10),
+          studentText,
+          withTranslation: showTranslationRef.current,
+        }),
       })
       if (!res.ok) throw new Error('GPT 응답 실패')
       const data = await res.json()
       const aiText = data.text
+      const translation = data.translation || ''
 
       // TTS 먼저 재생 — 듣기 연습
       historyRef.current.push({ role: 'assistant', content: aiText })
       setAIResponding(false)
       await speak(aiText)
 
-      // 재생 완료 후 텍스트 표시 — 확인용
-      addMessageRef.current({ id: (Date.now() + 1).toString(), role: 'ai', content: aiText, createdAt: new Date().toISOString() })
+      // 재생 완료 후 텍스트 + 번역 표시
+      addMessageRef.current({
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        content: aiText,
+        translation: translation || undefined,
+        createdAt: new Date().toISOString(),
+      })
 
       // 4. log_id 기다렸다가 ai_text 업데이트
       const logId = await logIdPromise

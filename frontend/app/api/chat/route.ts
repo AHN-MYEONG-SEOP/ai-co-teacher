@@ -25,7 +25,7 @@ Guidelines:
 export async function POST(req: NextRequest) {
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const { messages, studentText } = await req.json()
+    const { messages, studentText, withTranslation } = await req.json()
 
     if (!studentText) {
       return NextResponse.json({ error: 'studentText is required' }, { status: 400 })
@@ -86,6 +86,25 @@ You heard a partial utterance. Ask them to clarify naturally in 1 sentence.
     })
 
     const aiText = response.choices[0]?.message?.content || ''
+
+    // 한국어 번역 요청 시 병렬로 번역
+    if (withTranslation && aiText) {
+      const translationRes = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: '다음 영어 문장을 자연스러운 한국어로 번역해줘. 번역문만 출력하고 다른 말은 하지 마.',
+          },
+          { role: 'user', content: aiText },
+        ],
+        max_tokens: 150,
+        temperature: 0.3,
+      })
+      const translation = translationRes.choices[0]?.message?.content || ''
+      return NextResponse.json({ text: aiText, translation, role: 'assistant' })
+    }
+
     return NextResponse.json({ text: aiText, role: 'assistant' })
 
   } catch (error) {

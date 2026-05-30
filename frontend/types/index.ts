@@ -41,7 +41,8 @@ export interface ConversationMessage {
   latencyMs?: number
   createdAt: string
   feedback?: MessageFeedback
-  words?: WordResult[]   // 학생 메시지에만 첨부 (단어별 confidence)
+  words?: WordResult[]
+  translation?: string   // AI 메시지 한국어 번역
 }
 // Supabase 테이블 타입
 export interface Profile {

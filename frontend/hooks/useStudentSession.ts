@@ -5,14 +5,14 @@ import { useRouter } from 'next/navigation'
 
 export interface StudentSettings {
   tts_speed: 'slow' | 'normal' | 'fast'
-  stt_sensitivity: 'low' | 'normal' | 'high'
   show_feedback: boolean
+  show_translation: boolean
 }
 
 const DEFAULT_SETTINGS: StudentSettings = {
   tts_speed: 'normal',
-  stt_sensitivity: 'normal',
   show_feedback: true,
+  show_translation: false,
 }
 
 interface StudentSession {
@@ -47,7 +47,7 @@ export function useStudentSession(): StudentSession {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('name, nickname, tts_speed, stt_sensitivity, show_feedback')
+        .select('name, nickname, tts_speed, show_feedback, show_translation')
         .eq('id', user.id)
         .single()
 
@@ -56,8 +56,8 @@ export function useStudentSession(): StudentSession {
         setStudentNickname(profile.nickname || profile.name)
         setSettings({
           tts_speed: profile.tts_speed || 'normal',
-          stt_sensitivity: profile.stt_sensitivity || 'normal',
           show_feedback: profile.show_feedback ?? true,
+          show_translation: profile.show_translation ?? false,
         })
       }
 
@@ -94,8 +94,8 @@ export function useStudentSession(): StudentSession {
       .from('profiles')
       .update({
         tts_speed: updated.tts_speed,
-        stt_sensitivity: updated.stt_sensitivity,
         show_feedback: updated.show_feedback,
+        show_translation: updated.show_translation,
       })
       .eq('id', studentId)
   }
