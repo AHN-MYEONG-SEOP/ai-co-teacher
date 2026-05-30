@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `You are an English teacher evaluating a Korean student's spoken English.
+          content: `You are an English pronunciation coach for Korean students.
 Use the conversation context to understand what the student meant to say.
 Respond ONLY with a JSON object (no markdown, no backticks):
 {
@@ -31,12 +31,12 @@ Respond ONLY with a JSON object (no markdown, no backticks):
   "vocabulary": <score 0-100>,
   "overall": <score 0-100>,
   "correction": "<corrected version considering context, or null if correct>",
-  "tip": "<one short encouraging tip in English>"
+  "tip": "<pronunciation tip in Korean comparing what they said vs what they should say. If correction exists, focus on the mispronounced word(s) — explain the difference in pronunciation between the student's word and the correct word, using simple Korean explanations like 'park[pɑːrk]는 끝에 k 소리가 나요, part[pɑːrt]와 달리'. If no correction, give a short encouraging pronunciation tip in Korean.>"
 }`
         },
         { role: 'user', content: contextText }
       ],
-      max_tokens: 200,
+      max_tokens: 300,
       temperature: 0.3,
     })
 
