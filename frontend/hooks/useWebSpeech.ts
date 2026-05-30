@@ -42,9 +42,9 @@ export function useWebSpeech({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true,   // 자동 음량 조절 추가
+          autoGainControl: true,
           channelCount: 1,
-          sampleRate: 16000,       // Deepgram 최적 샘플레이트
+          // sampleRate 강제 지정 제거 — 기기 기본값 사용 (스마트폰 호환성)
         }
       })
       streamRef.current = stream

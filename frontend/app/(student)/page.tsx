@@ -301,9 +301,13 @@ export default function StudentPage() {
                         : w.confidence >= 0.7
                         ? 'text-amber-300'
                         : 'text-red-300'
+                      // 첫 단어 대문자
+                      const displayWord = i === 0
+                        ? w.word.charAt(0).toUpperCase() + w.word.slice(1)
+                        : w.word
                       return (
                         <span key={i} className={cn('text-sm font-medium', color)}>
-                          {w.word}
+                          {displayWord}
                         </span>
                       )
                     })}
