@@ -405,8 +405,11 @@ export default function StudentPage() {
     confidenceThreshold,
   })
 
+  const isTouchRef = useRef(false)  // 터치 이벤트 감지 플래그
+
   const handleMicStart = useCallback(async () => {
     if (!isSupported) { addLog('Web Speech API 미지원 브라우저', 'error'); return }
+    if (isHolding) return  // 이미 누르고 있는 경우 무시
     startTimeRef.current = Date.now()
     sentRef.current = false
     setIsHolding(true)
@@ -415,7 +418,7 @@ export default function StudentPage() {
     setInterimWords([])
     addLog('마이크 시작', 'info')
     startListening()
-  }, [isSupported, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog])
+  }, [isSupported, isHolding, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog])
 
   const handleMicStop = useCallback(async () => {
     if (!isHolding) return  // 이미 중지된 경우 무시
@@ -621,11 +624,36 @@ export default function StudentPage() {
 
             {/* 메인 마이크 버튼 — 크게 */}
             <button
-              onMouseDown={handleMicStart}
-              onMouseUp={() => { handleMicStop() }}
-              onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); handleMicStart(); }}
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); handleMicStop(); }}
-              onTouchCancel={(e) => { e.preventDefault(); handleMicStop(); }}
+              onMouseDown={(e) => {
+                if (isTouchRef.current) return  // 터치 이벤트 후 발생하는 마우스 이벤트 무시
+                e.preventDefault()
+                handleMicStart()
+              }}
+              onMouseUp={(e) => {
+                if (isTouchRef.current) return
+                e.preventDefault()
+                handleMicStop()
+              }}
+              onMouseLeave={(e) => {
+                if (isTouchRef.current) return
+                if (isHolding) handleMicStop()  // 마우스가 버튼 밖으로 나가면 정지
+              }}
+              onTouchStart={(e) => {
+                e.preventDefault()
+                isTouchRef.current = true
+                handleMicStart()
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault()
+                handleMicStop()
+                // 300ms 후 터치 플래그 해제
+                setTimeout(() => { isTouchRef.current = false }, 300)
+              }}
+              onTouchCancel={(e) => {
+                e.preventDefault()
+                handleMicStop()
+                setTimeout(() => { isTouchRef.current = false }, 300)
+              }}
               onContextMenu={(e) => e.preventDefault()}
               disabled={!isSupported}
               className={cn(
