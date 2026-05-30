@@ -24,6 +24,13 @@ export interface MessageFeedback {
   correction: string | null
   tip: string
 }
+// 단어별 인식 결과
+export interface WordResult {
+  word: string
+  confidence: number  // 0~1
+  start: number
+  end: number
+}
 // 대화 메시지
 export interface ConversationMessage {
   id: string
@@ -33,7 +40,8 @@ export interface ConversationMessage {
   confidence?: number
   latencyMs?: number
   createdAt: string
-  feedback?: MessageFeedback   // 학생 메시지에만 첨부
+  feedback?: MessageFeedback
+  words?: WordResult[]   // 학생 메시지에만 첨부 (단어별 confidence)
 }
 // Supabase 테이블 타입
 export interface Profile {

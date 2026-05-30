@@ -9,6 +9,36 @@ import { NavBar } from '@/components/common/NavBar'
 import { useAudioStore, CONFIDENCE_THRESHOLD } from '@/store/audioStore'
 import { useUIStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
+import type { WordResult } from '@/types'
+
+// 단어 confidence → 색상
+function WordConfidenceDisplay({ words }: { words: WordResult[] }) {
+  if (!words.length) return null
+  return (
+    <div className="flex flex-wrap gap-x-2 gap-y-1">
+      {words.map((w, i) => {
+        const color = w.confidence >= 0.9
+          ? 'text-emerald-400'
+          : w.confidence >= 0.7
+          ? 'text-amber-400'
+          : 'text-red-400'
+        // IPA 변환 시도
+        let ipa = ''
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const enIpa = require('en-ipa')
+          ipa = enIpa.convert ? enIpa.convert(w.word) : enIpa(w.word)
+        } catch { }
+        return (
+          <div key={i} className="flex flex-col items-center">
+            <span className={cn('text-sm font-medium', color)}>{w.word}</span>
+            {ipa && <span className="text-xs text-slate-500">{ipa}</span>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 // ── 상단 상태 인디케이터 (아바타 대체 — 공간 최소화) ──
 function StatusBar({ status }: { status: string }) {
@@ -47,8 +77,9 @@ interface LogEntry {
 // ── 메인 페이지 ───────────────────────────────────────
 export default function StudentPage() {
   const {
-    avatarStatus, interimText,
+    avatarStatus, interimText, interimWords,
     setAvatarStatus, setInterimText, setSpeechResult, setLatency,
+    setInterimWords, setFinalWords,
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages } = useUIStore()
   const { studentId, sessionId, studentNickname } = useStudentSession()
@@ -120,23 +151,24 @@ export default function StudentPage() {
     setIsPlaying(false)
   }, [lastBlobUrl])
 
-  const handleInterim = useCallback((text: string) => {
+  const handleInterim = useCallback((text: string, words?: WordResult[]) => {
     setInterimText(text)
-  }, [setInterimText])
+    if (words) setInterimWords(words)
+  }, [setInterimText, setInterimWords])
 
-  const handleFinalResult = useCallback((text: string, confidence: number) => {
-    // 중복 호출 방지
+  const handleFinalResult = useCallback((text: string, confidence: number, words?: WordResult[]) => {
     if (sentRef.current) return
     sentRef.current = true
 
     const latency = Date.now() - startTimeRef.current
     setLatency(latency)
     setSpeechResult({ text, confidence, path: 'A', isFinal: true })
-    setInterimText('')  // 메시지 버블로 전환되기 직전에 자막 클리어
+    setInterimText('')
+    if (words) setFinalWords(words)
     discardBlob()
     addLog(`Path A: "${text}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
-    sendToGPT(text, { sttPath: 'A', confidence, latencyMs: latency })
-  }, [discardBlob, setSpeechResult, setLatency, setInterimText, addLog, sendToGPT])
+    sendToGPT(text, { sttPath: 'A', confidence, latencyMs: latency }, words)
+  }, [discardBlob, setSpeechResult, setLatency, setInterimText, setInterimWords, setFinalWords, addLog, sendToGPT])
 
   const handleFallback = useCallback(async (confidence: number) => {
     addLog(`인식 불명확: confidence ${(confidence * 100).toFixed(0)}% — 재시도 요청`, 'warning')
@@ -246,7 +278,32 @@ export default function StudentPage() {
                 <span className="text-xs opacity-50 block mb-1">
                   {msg.role === 'student' ? '🧑 나' : '🤖 AI'}
                 </span>
-                {msg.content}
+                {/* 학생 메시지 — words 있으면 단어별 색상 표시 */}
+                {msg.role === 'student' && msg.words && msg.words.length > 0 ? (
+                  <div className="flex flex-wrap gap-x-2 gap-y-1 justify-end">
+                    {msg.words.map((w, i) => {
+                      const color = w.confidence >= 0.9
+                        ? 'text-emerald-300'
+                        : w.confidence >= 0.7
+                        ? 'text-amber-300'
+                        : 'text-red-300'
+                      let ipa = ''
+                      try {
+                        // eslint-disable-next-line @typescript-eslint/no-require-imports
+                        const enIpa = require('en-ipa')
+                        ipa = enIpa.convert ? enIpa.convert(w.word) : enIpa(w.word)
+                      } catch { }
+                      return (
+                        <div key={i} className="flex flex-col items-center">
+                          <span className={cn('text-sm font-medium', color)}>{w.word}</span>
+                          {ipa && <span className="text-xs text-slate-500">{ipa}</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <span>{msg.content}</span>
+                )}
               </div>
 
               {/* 인라인 피드백 — 학생 메시지 바로 아래 */}
@@ -292,14 +349,20 @@ export default function StudentPage() {
                   </div>
                   <p className="text-violet-300 text-xs">말하는 중...</p>
                 </div>
+              ) : interimWords.length > 0 ? (
+                // 단어별 confidence 색상 + IPA 표시
+                <div className="space-y-1">
+                  <WordConfidenceDisplay words={interimWords} />
+                  {avatarStatus === 'processing' && (
+                    <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full ml-1 animate-pulse align-middle" />
+                  )}
+                </div>
               ) : avatarStatus === 'processing' ? (
-                // 마이크 놓은 후 처리 중 — 자막 흐리게 유지
                 <p className="text-slate-400 text-sm leading-relaxed">
                   {interimText}
                   <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full ml-2 animate-pulse align-middle" />
                 </p>
               ) : (
-                // 말하는 중 — 자막 밝게 + 커서
                 <p className="text-white text-sm leading-relaxed">
                   {interimText}
                   <span className="inline-block w-0.5 h-4 bg-emerald-400 ml-1 animate-pulse align-middle" />

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUIStore } from '@/store/uiStore'
 import { useAudioStore } from '@/store/audioStore'
 import type { FeedbackData } from '@/components/student/FeedbackCard'
+import type { WordResult } from '@/types'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -138,15 +139,15 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
 
   const sendToGPT = useCallback(async (
     studentText: string,
-    meta?: ConversationMeta
+    meta?: ConversationMeta,
+    words?: WordResult[]
   ) => {
-    // 이번 턴의 log_id를 저장할 Promise resolve 함수
     let resolveLogId: (id: string | null) => void = () => {}
     const logIdPromise = new Promise<string | null>((resolve) => { resolveLogId = resolve })
 
-    // 1. 학생 메시지 UI 추가
+    // 1. 학생 메시지 UI 추가 (words 포함)
     const studentMsgId = Date.now().toString()
-    addMessage({ id: studentMsgId, role: 'student', content: studentText, createdAt: new Date().toISOString() })
+    addMessage({ id: studentMsgId, role: 'student', content: studentText, createdAt: new Date().toISOString(), words })
     historyRef.current.push({ role: 'user', content: studentText })
 
     // 2. 피드백 + 학생 발화 로그 저장 (병렬, log_id 반환)

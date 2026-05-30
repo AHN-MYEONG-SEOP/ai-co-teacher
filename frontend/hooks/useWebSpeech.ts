@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CONFIDENCE_THRESHOLD } from '@/store/audioStore'
+import type { WordResult } from '@/types'
 
 interface DeepgramOptions {
-  onInterimResult?: (text: string) => void
-  onFinalResult?: (text: string, confidence: number) => void
+  onInterimResult?: (text: string, words?: WordResult[]) => void
+  onFinalResult?: (text: string, confidence: number, words?: WordResult[]) => void
   onFallback?: (confidence: number) => void
   onError?: (error: string) => void
   onLog?: (msg: string) => void
@@ -28,6 +29,7 @@ export function useWebSpeech({
 
   const accumulatedTextRef = useRef<string>('')
   const accumulatedConfidenceRef = useRef<number[]>([])
+  const accumulatedWordsRef = useRef<WordResult[]>([])
   const isStoppingRef = useRef(false)
   const finalizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -55,24 +57,29 @@ export function useWebSpeech({
 
     const fullText = accumulatedTextRef.current.trim()
     const confidences = accumulatedConfidenceRef.current
+    const finalWords = [...accumulatedWordsRef.current]
     const avgConfidence = confidences.length > 0
       ? confidences.reduce((a, b) => a + b, 0) / confidences.length
       : 1.0
 
     accumulatedTextRef.current = ''
     accumulatedConfidenceRef.current = []
+    accumulatedWordsRef.current = []
     isStoppingRef.current = false
 
     if (!fullText) {
       onLogRef.current?.('finalize: 텍스트 없음 — 무시')
+      onInterimResultRef.current?.('')
       return
     }
+
+    onInterimResultRef.current?.('')
 
     onLogRef.current?.(`최종 전송: "${fullText}" (avg conf: ${avgConfidence.toFixed(2)})`)
 
     if (avgConfidence >= CONFIDENCE_THRESHOLD) {
       onLogRef.current?.(`✅ Path A`)
-      onFinalResultRef.current?.(fullText, avgConfidence)
+      onFinalResultRef.current?.(fullText, avgConfidence, finalWords)
     } else {
       onLogRef.current?.(`⚠️ Path B`)
       onFallbackRef.current?.(avgConfidence)
@@ -92,6 +99,7 @@ export function useWebSpeech({
   const startListening = useCallback(async () => {
     accumulatedTextRef.current = ''
     accumulatedConfidenceRef.current = []
+    accumulatedWordsRef.current = []
     isStoppingRef.current = false
 
     try {
@@ -115,13 +123,14 @@ export function useWebSpeech({
 
       const wsUrl = 'wss://api.deepgram.com/v1/listen?' +
         new URLSearchParams({
-          language: 'multi',         // 한국어 + 영어 동시 인식
+          language: 'multi',
           model: 'nova-2',
           smart_format: 'true',
           interim_results: 'true',
           punctuate: 'true',
           utterance_end_ms: '2000',
           vad_events: 'true',
+          utterances: 'true',   // 단어별 타임스탬프 + confidence
         }).toString()
 
       onLogRef.current?.('Deepgram WebSocket 연결 시도...')
@@ -157,6 +166,7 @@ export function useWebSpeech({
           if (!data.channel) return
           const transcript = data.channel.alternatives?.[0]?.transcript || ''
           const confidence = data.channel.alternatives?.[0]?.confidence ?? 1.0
+          const words = data.channel.alternatives?.[0]?.words || []
           const isFinal = data.is_final
 
           if (!transcript) return
@@ -165,14 +175,16 @@ export function useWebSpeech({
             const display = accumulatedTextRef.current
               ? `${accumulatedTextRef.current} ${transcript}`
               : transcript
-            onInterimResultRef.current?.(display)
+            onInterimResultRef.current?.(display, words)
           } else {
             accumulatedTextRef.current = accumulatedTextRef.current
               ? `${accumulatedTextRef.current} ${transcript}`
               : transcript
             accumulatedConfidenceRef.current.push(confidence)
+            // 단어 누적
+            accumulatedWordsRef.current = [...accumulatedWordsRef.current, ...words]
             onLogRef.current?.(`누적: "${accumulatedTextRef.current}"`)
-            onInterimResultRef.current?.(accumulatedTextRef.current)
+            onInterimResultRef.current?.(accumulatedTextRef.current, accumulatedWordsRef.current)
 
             if (isStoppingRef.current) {
               if (finalizeTimerRef.current) clearTimeout(finalizeTimerRef.current)
