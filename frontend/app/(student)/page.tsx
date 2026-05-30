@@ -312,6 +312,10 @@ export default function StudentPage() {
   }, [discardBlob, setSpeechResult, setLatency, setInterimText, setInterimWords, setFinalWords, addLog, sendToGPT])
 
   const handleFallback = useCallback(async (confidence: number) => {
+    // 중복 호출 방지
+    if (sentRef.current) return
+    sentRef.current = true
+
     addLog(`인식 불명확: confidence ${(confidence * 100).toFixed(0)}% — 재시도 요청`, 'warning')
     discardBlob()
 
