@@ -131,7 +131,8 @@ export function useWebSpeech({
 
     const chunks = chunksRef.current
     if (chunks.length === 0) {
-      onLogRef.current?.('녹음 데이터 없음')
+      onLogRef.current?.('녹음 데이터 없음 — 재시도 요청')
+      onFallbackRef.current?.(0)
       return
     }
 
@@ -142,9 +143,20 @@ export function useWebSpeech({
     onLogRef.current?.(`Deepgram 전송 중... (${(blob.size / 1024).toFixed(1)}KB)`)
 
     try {
+      // 10초 타임아웃 설정
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => {
+        controller.abort()
+        onLogRef.current?.('⏱️ Deepgram 타임아웃 — 재시도 요청')
+      }, 10000)
+
       // 서버에서 토큰 발급
-      const tokenRes = await fetch('/api/deepgram-token')
-      if (!tokenRes.ok) { onErrorRef.current?.('Deepgram 토큰 발급 실패'); return }
+      const tokenRes = await fetch('/api/deepgram-token', { signal: controller.signal })
+      if (!tokenRes.ok) {
+        clearTimeout(timeoutId)
+        onFallbackRef.current?.(0)
+        return
+      }
       const { token } = await tokenRes.json()
 
       // Deepgram HTTP API로 전송
@@ -154,7 +166,7 @@ export function useWebSpeech({
         smart_format: 'true',
         punctuate: 'true',
         utterances: 'true',
-        filler_words: 'false',     // 필러 단어 제거 (um, uh 등)
+        filler_words: 'false',
         profanity_filter: 'false',
       })
 
@@ -165,10 +177,14 @@ export function useWebSpeech({
           'Content-Type': mimeType,
         },
         body: blob,
+        signal: controller.signal,
       })
 
+      clearTimeout(timeoutId)
+
       if (!res.ok) {
-        onErrorRef.current?.(`Deepgram API 오류: ${res.status}`)
+        onLogRef.current?.(`Deepgram API 오류: ${res.status} — 재시도 요청`)
+        onFallbackRef.current?.(0)
         return
       }
 
@@ -212,9 +228,13 @@ export function useWebSpeech({
         onFallbackRef.current?.(confidence)
       }
 
-    } catch (err) {
-      onLogRef.current?.(`❌ Deepgram 오류: ${err}`)
-      onErrorRef.current?.(`Deepgram 오류: ${err}`)
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        onLogRef.current?.('⏱️ 타임아웃 — 재시도 요청')
+      } else {
+        onLogRef.current?.(`❌ Deepgram 오류: ${err}`)
+      }
+      onFallbackRef.current?.(0)  // 항상 fallback으로 처리 → 재시도 안내
     }
   }, [])
 

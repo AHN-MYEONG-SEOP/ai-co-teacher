@@ -166,12 +166,24 @@ export default function StudentPage() {
   const handleFallback = useCallback(async (confidence: number) => {
     addLog(`인식 불명확: confidence ${(confidence * 100).toFixed(0)}% — 재시도 요청`, 'warning')
     discardBlob()
+
+    // "분석 중" 메시지 클리어
+    setInterimText('')
+    setInterimWords([])
     setAvatarStatus('speaking')
-    const retryMessages = [
-      "Sorry, I couldn't quite hear you. Could you say that again?",
-      "I didn't catch that clearly. Could you repeat that, please?",
-      "Pardon? Could you say that once more?",
-    ]
+
+    const retryMessages = confidence === 0
+      ? [  // 인식 자체 실패 (소음, 타임아웃 등)
+          "I couldn't hear you clearly. There might be too much background noise. Could you try again in a quieter place?",
+          "I had trouble hearing that. Could you speak a bit louder and try again?",
+          "Sorry, I couldn't understand that. Could you speak more clearly and try again?",
+        ]
+      : [  // confidence 낮음
+          "Sorry, I couldn't quite hear you. Could you say that again?",
+          "I didn't catch that clearly. Could you repeat that, please?",
+          "Pardon? Could you say that once more?",
+        ]
+
     const msg = retryMessages[Math.floor(Math.random() * retryMessages.length)]
     try {
       const res = await fetch('/api/tts', {
@@ -183,13 +195,15 @@ export default function StudentPage() {
         const blob = await res.blob()
         const url = URL.createObjectURL(blob)
         const audio = new Audio(url)
-        audio.onended = () => { URL.revokeObjectURL(url); setAvatarStatus('idle') }
-        await audio.play()
+        await new Promise<void>((resolve) => {
+          audio.onended = () => { URL.revokeObjectURL(url); resolve() }
+          audio.onerror = () => { resolve() }
+          audio.play().catch(() => resolve())
+        })
       }
-    } catch {
-      setAvatarStatus('idle')
-    }
-  }, [discardBlob, addLog, setAvatarStatus])
+    } catch { /* ignore */ }
+    setAvatarStatus('idle')
+  }, [discardBlob, addLog, setAvatarStatus, setInterimText, setInterimWords])
 
   const handleError = useCallback((error: string) => {
     addLog(`STT 오류: ${error}`, 'error')
