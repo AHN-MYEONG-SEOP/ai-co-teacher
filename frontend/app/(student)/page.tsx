@@ -174,6 +174,27 @@ function StatusBar({ status }: { status: string }) {
   )
 }
 
+// 단어 confidence → 색상 표시
+function WordConfidenceDisplay({ words }: { words: WordResult[] }) {
+  if (!words.length) return null
+  return (
+    <div className="flex flex-wrap gap-x-2 gap-y-1">
+      {words.map((w, i) => {
+        const color = w.confidence >= 0.9
+          ? 'text-emerald-400'
+          : w.confidence >= 0.7
+          ? 'text-amber-400'
+          : 'text-red-400'
+        return (
+          <span key={i} className={cn('text-sm font-medium', color)}>
+            {w.word}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 interface LogEntry {
   id: number
   time: string
