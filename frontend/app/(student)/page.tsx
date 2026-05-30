@@ -231,13 +231,13 @@ export default function StudentPage() {
   const logIdRef = useRef(0)
   const sentRef = useRef(false)  // 중복 전송 방지 플래그
 
-  // 새 메시지 or 피드백 붙을 때 자동 스크롤
+  // 새 메시지 or 상태 변화 시 자동 스크롤
   useEffect(() => {
     const timer = setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, 50)
     return () => clearTimeout(timer)
-  }, [messages])
+  }, [messages, isHolding, interimText, isSpeaking])
 
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
     const now = new Date()
@@ -418,12 +418,13 @@ export default function StudentPage() {
   }, [isSupported, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog])
 
   const handleMicStop = useCallback(async () => {
+    if (!isHolding) return  // 이미 중지된 경우 무시
     setIsHolding(false)
     setAvatarStatus('processing')
     setInterimText('Coty가 분석 중입니다...')
     setInterimWords([])
     await stopListening()
-  }, [stopListening, setAvatarStatus, setInterimText, setInterimWords])
+  }, [isHolding, stopListening, setAvatarStatus, setInterimText, setInterimWords])
 
   return (
     <main className="h-[100dvh] bg-slate-950 text-white flex flex-col overflow-hidden">
@@ -536,7 +537,7 @@ export default function StudentPage() {
           ))}
 
           {/* 실시간 자막 */}
-          {(isSpeaking || interimText) && (
+          {(isSpeaking || isHolding || interimText) && (
             <div className="bg-slate-900/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl px-4 py-3 max-w-[85%] mr-auto">
               {isSpeaking ? (
                 <div className="flex items-center gap-2">
@@ -560,13 +561,11 @@ export default function StudentPage() {
                   <p className="text-emerald-300 text-sm">Coty가 당신의 말을 듣고 있습니다.</p>
                 </div>
               ) : interimWords.length > 0 ? (
-                // 처리 완료 — 단어별 confidence 색상
                 <div className="space-y-1">
                   <WordConfidenceDisplay words={interimWords} />
                   <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full ml-1 animate-pulse align-middle" />
                 </div>
               ) : (
-                // 처리 중
                 <p className="text-slate-400 text-sm leading-relaxed">
                   {interimText}
                   <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full ml-2 animate-pulse align-middle" />
@@ -623,9 +622,10 @@ export default function StudentPage() {
             {/* 메인 마이크 버튼 — 크게 */}
             <button
               onMouseDown={handleMicStart}
-              onMouseUp={handleMicStop}
+              onMouseUp={() => { handleMicStop() }}
               onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); handleMicStart(); }}
-              onTouchEnd={(e) => { e.preventDefault(); handleMicStop(); }}
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); handleMicStop(); }}
+              onTouchCancel={(e) => { e.preventDefault(); handleMicStop(); }}
               onContextMenu={(e) => e.preventDefault()}
               disabled={!isSupported}
               className={cn(
