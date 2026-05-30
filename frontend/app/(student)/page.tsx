@@ -295,22 +295,35 @@ export default function StudentPage() {
                 {/* 학생 메시지 — words 있으면 단어별 색상 표시 */}
                 {msg.role === 'student' && msg.words && msg.words.length > 0 ? (
                   <div className="flex flex-wrap gap-x-2 gap-y-1 justify-end">
-                    {msg.words.map((w, i) => {
-                      const color = w.confidence >= 0.9
-                        ? 'text-emerald-300'
-                        : w.confidence >= 0.7
-                        ? 'text-amber-300'
-                        : 'text-red-300'
-                      // 첫 단어 대문자
-                      const displayWord = i === 0
-                        ? w.word.charAt(0).toUpperCase() + w.word.slice(1)
-                        : w.word
-                      return (
-                        <span key={i} className={cn('text-sm font-medium', color)}>
-                          {displayWord}
-                        </span>
-                      )
-                    })}
+                    {(() => {
+                      // correction과 비교해서 색상 결정
+                      const correctionWords = msg.feedback?.correction
+                        ? msg.feedback.correction.toLowerCase().replace(/[.,!?]/g, '').split(' ')
+                        : null
+                      const originalWords = msg.content.toLowerCase().replace(/[.,!?]/g, '').split(' ')
+
+                      return msg.words.map((w, i) => {
+                        let color = 'text-emerald-300'  // 기본: 초록
+                        if (correctionWords) {
+                          // correction이 있으면 — 원문과 비교
+                          const originalWord = originalWords[i] || ''
+                          const correctedWord = correctionWords[i] || ''
+                          // 해당 위치 단어가 다르거나 correction에 없으면 빨강
+                          color = originalWord === correctedWord || !correctedWord
+                            ? 'text-emerald-300'
+                            : 'text-red-300'
+                        }
+                        // correction 없으면 전부 초록
+                        const displayWord = i === 0
+                          ? w.word.charAt(0).toUpperCase() + w.word.slice(1)
+                          : w.word
+                        return (
+                          <span key={i} className={cn('text-sm font-medium', color)}>
+                            {displayWord}
+                          </span>
+                        )
+                      })
+                    })()}
                   </div>
                 ) : (
                   <span>{msg.content}</span>
