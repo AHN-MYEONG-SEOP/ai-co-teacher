@@ -23,11 +23,13 @@ interface UseConversationProps {
   studentNickname?: string | null
   ttsSpeed?: 'slow' | 'normal' | 'fast'
   showTranslation?: boolean
+  currentBook?: string
+  currentUnit?: number
 }
 
 const TTS_SPEED_MAP = { slow: 0.75, normal: 1.0, fast: 1.25 }
 
-export function useConversation({ sessionId, studentId, studentNickname, ttsSpeed = 'normal', showTranslation = false }: UseConversationProps = {}) {
+export function useConversation({ sessionId, studentId, studentNickname, ttsSpeed = 'normal', showTranslation = false, currentBook, currentUnit }: UseConversationProps = {}) {
   const { addMessage, setAIResponding, updateMessageFeedback } = useUIStore()
   const { setAvatarStatus } = useAudioStore()
   const historyRef = useRef<Message[]>([])
@@ -121,19 +123,39 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: [], studentText: `__GREETING__:${studentNickname}` }),
+          body: JSON.stringify({
+            messages: [],
+            studentText: `__GREETING__:${studentNickname}`,
+            currentBook,
+            currentUnit,
+          }),
         })
         if (!res.ok) throw new Error()
         const data = await res.json()
         const greetingText = data.text
         historyRef.current.push({ role: 'assistant', content: greetingText })
+
+        // 학습 로그 저장
+        if (currentBook && currentUnit) {
+          fetch('/api/study-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              student_id: studentId,
+              session_id: sessionId,
+              book: currentBook,
+              unit: currentUnit,
+              unit_title: data.unitTitle || '',
+            }),
+          })
+        }
+
         fetch('/api/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId || null, student_id: studentId || null, ai_text: greetingText }),
         })
         await speakRef.current(greetingText)
-        // 재생 완료 후 텍스트 표시
         addMessageRef.current({ id: 'greeting', role: 'ai', content: greetingText, createdAt: new Date().toISOString() })
       } catch {
         const fallback = `Hi ${studentNickname}! Great to see you. Are you ready to practice your English today?`

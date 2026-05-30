@@ -44,6 +44,14 @@ function SettingsModal({
           <button onClick={onClose} className="text-slate-500 hover:text-white text-sm">✕</button>
         </div>
 
+        {/* 현재 학습 */}
+        <div className="bg-slate-800/60 rounded-xl px-4 py-3">
+          <p className="text-xs text-slate-400 mb-1">📚 현재 학습 중</p>
+          <p className="text-sm text-white font-medium">{settings.current_book}</p>
+          <p className="text-xs text-emerald-400">Unit {settings.current_unit}</p>
+          <p className="text-xs text-slate-500 mt-1">학습 진도는 선생님이 설정합니다</p>
+        </div>
+
         {/* AI 말하기 속도 */}
         <div className="space-y-3">
           <p className="text-sm font-medium text-slate-300">🔊 AI 말하기 속도</p>
@@ -200,6 +208,8 @@ export default function StudentPage() {
     sessionId, studentId, studentNickname,
     ttsSpeed: settings.tts_speed,
     showTranslation: settings.show_translation,
+    currentBook: settings.current_book,
+    currentUnit: settings.current_unit,
   })
   const [showSettings, setShowSettings] = useState(false)
 
