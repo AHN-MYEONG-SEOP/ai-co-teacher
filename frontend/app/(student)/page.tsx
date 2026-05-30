@@ -209,7 +209,7 @@ export default function StudentPage() {
     setAvatarStatus, setInterimText, setSpeechResult, setLatency,
     setInterimWords, setFinalWords,
   } = useAudioStore()
-  const { isLogDrawerOpen, setLogDrawerOpen, messages } = useUIStore()
+  const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage } = useUIStore()
   const { studentId, sessionId, studentNickname, settings, updateSettings } = useStudentSession()
   const { sendToGPT, isSpeaking, stopSpeaking } = useConversation({ sessionId, studentId, studentNickname, ttsSpeed: settings.tts_speed })
   const [showSettings, setShowSettings] = useState(false)
@@ -321,23 +321,50 @@ export default function StudentPage() {
     setAvatarStatus('speaking')
 
     const retryMessages = confidence === 0
-      ? [  // 인식 자체 실패 (소음, 타임아웃 등)
-          "I couldn't hear you clearly. There might be too much background noise. Could you try again in a quieter place?",
-          "I had trouble hearing that. Could you speak a bit louder and try again?",
-          "Sorry, I couldn't understand that. Could you speak more clearly and try again?",
+      ? [
+          {
+            en: "I couldn't hear you clearly. There might be too much background noise. Could you try again?",
+            ko: "잘 못 들었어요. 주변 소음이 많은 것 같아요. 다시 말씀해 주시겠어요?",
+          },
+          {
+            en: "I had trouble hearing that. Could you speak a bit louder and try again?",
+            ko: "소리가 잘 안 들렸어요. 조금 더 크게 말씀해 주시겠어요?",
+          },
+          {
+            en: "Sorry, I couldn't understand that. Could you speak more clearly and try again?",
+            ko: "죄송해요, 잘 이해하지 못했어요. 좀 더 또렷하게 말씀해 주시겠어요?",
+          },
         ]
-      : [  // confidence 낮음
-          "Sorry, I couldn't quite hear you. Could you say that again?",
-          "I didn't catch that clearly. Could you repeat that, please?",
-          "Pardon? Could you say that once more?",
+      : [
+          {
+            en: "Sorry, I couldn't quite hear you. Could you say that again?",
+            ko: "잘 못 들었어요. 다시 한 번 말씀해 주시겠어요?",
+          },
+          {
+            en: "I didn't catch that clearly. Could you repeat that, please?",
+            ko: "정확히 듣지 못했어요. 다시 말씀해 주시겠어요?",
+          },
+          {
+            en: "Pardon? Could you say that once more?",
+            ko: "다시 한 번 말씀해 주시겠어요?",
+          },
         ]
 
-    const msg = retryMessages[Math.floor(Math.random() * retryMessages.length)]
+    const selected = retryMessages[Math.floor(Math.random() * retryMessages.length)]
+
+    // 대화창에 AI 메시지로 표시 (영어 + 한국어)
+    addMessage({
+      id: `fallback_${Date.now()}`,
+      role: 'ai',
+      content: `${selected.en}\n(${selected.ko})`,
+      createdAt: new Date().toISOString(),
+    })
+
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: msg, voice: 'nova' }),
+        body: JSON.stringify({ text: selected.en, voice: 'nova' }),
       })
       if (res.ok) {
         const blob = await res.blob()
@@ -351,7 +378,7 @@ export default function StudentPage() {
       }
     } catch { /* ignore */ }
     setAvatarStatus('idle')
-  }, [discardBlob, addLog, setAvatarStatus, setInterimText, setInterimWords])
+  }, [discardBlob, addLog, addMessage, setAvatarStatus, setInterimText, setInterimWords])
 
   const handleError = useCallback((error: string) => {
     addLog(`STT 오류: ${error}`, 'error')
