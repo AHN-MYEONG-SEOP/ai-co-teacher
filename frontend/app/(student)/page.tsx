@@ -5,6 +5,7 @@ import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
 import { useConversation } from '@/hooks/useConversation'
 import { useStudentSession, type StudentSettings } from '@/hooks/useStudentSession'
+import { useCurriculum } from '@/hooks/useCurriculum'
 import { NavBar } from '@/components/common/NavBar'
 import { useAudioStore } from '@/store/audioStore'
 import { useUIStore } from '@/store/uiStore'
@@ -23,6 +24,7 @@ function SettingsModal({
 }) {
   const [local, setLocal] = useState(settings)
   const [saving, setSaving] = useState(false)
+  const { booksByLevel, level_order, getUnits } = useCurriculum()
 
   const handleSave = async () => {
     setSaving(true)
@@ -31,11 +33,13 @@ function SettingsModal({
     onClose()
   }
 
+  const units = getUnits(local.current_book)
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-lg bg-slate-900 border border-slate-700/50 rounded-t-3xl p-6 space-y-6 animate-in slide-in-from-bottom-4 duration-300"
+        className="relative w-full max-w-lg bg-slate-900 border border-slate-700/50 rounded-t-3xl p-6 space-y-5 animate-in slide-in-from-bottom-4 duration-300 max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
@@ -44,15 +48,60 @@ function SettingsModal({
           <button onClick={onClose} className="text-slate-500 hover:text-white text-sm">✕</button>
         </div>
 
-        {/* 현재 학습 */}
-        <div className="bg-slate-800/60 rounded-xl px-4 py-3">
-          <p className="text-xs text-slate-400 mb-1">📚 현재 학습 중</p>
-          <p className="text-sm text-white font-medium">{settings.current_book}</p>
-          <p className="text-xs text-emerald-400">Unit {settings.current_unit}</p>
-          <p className="text-xs text-slate-500 mt-1">학습 진도는 선생님이 설정합니다</p>
-        </div>
+        {/* 📚 학습 교재 선택 */}
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-slate-300">📚 학습 교재</p>
 
-        {/* AI 말하기 속도 */}
+          {/* Book 선택 */}
+          <div className="space-y-1">
+            <p className="text-xs text-slate-500">Book</p>
+            <select
+              value={local.current_book}
+              onChange={(e) => setLocal(p => ({
+                ...p,
+                current_book: e.target.value,
+                current_unit: 1,  // book 바뀌면 unit 1로 초기화
+              }))}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+            >
+              {level_order.map(level => (
+                booksByLevel[level] && (
+                  <optgroup key={level} label={`── ${level} ──`}>
+                    {booksByLevel[level].map(book => (
+                      <option key={book} value={book}>{book}</option>
+                    ))}
+                  </optgroup>
+                )
+              ))}
+            </select>
+          </div>
+
+          {/* Unit 선택 */}
+          <div className="space-y-1">
+            <p className="text-xs text-slate-500">Unit</p>
+            <select
+              value={local.current_unit}
+              onChange={(e) => setLocal(p => ({ ...p, current_unit: Number(e.target.value) }))}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+            >
+              {units.map(u => (
+                <option key={u.unit} value={u.unit}>
+                  Unit {u.unit}{u.title ? ` — ${u.title}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 선택된 Unit 미리보기 */}
+          {units.find(u => u.unit === local.current_unit) && (
+            <div className="bg-slate-800/60 rounded-xl px-3 py-2 space-y-1">
+              <p className="text-xs text-emerald-400">학습 단어</p>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {units.find(u => u.unit === local.current_unit)?.words.split(',').slice(0, 8).join(', ')}...
+              </p>
+            </div>
+          )}
+        </div>
         <div className="space-y-3">
           <p className="text-sm font-medium text-slate-300">🔊 AI 말하기 속도</p>
           <div className="space-y-2">

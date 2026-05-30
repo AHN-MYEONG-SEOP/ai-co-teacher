@@ -39,8 +39,12 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
   const greetedRef = useRef(false)
   const ttsSpeedRef = useRef(ttsSpeed)
   const showTranslationRef = useRef(showTranslation)
+  const currentBookRef = useRef(currentBook)
+  const currentUnitRef = useRef(currentUnit)
   useEffect(() => { ttsSpeedRef.current = ttsSpeed }, [ttsSpeed])
   useEffect(() => { showTranslationRef.current = showTranslation }, [showTranslation])
+  useEffect(() => { currentBookRef.current = currentBook }, [currentBook])
+  useEffect(() => { currentUnitRef.current = currentUnit }, [currentUnit])
 
   const stopSpeaking = useCallback(() => {
     if (audioRef.current) {
@@ -236,6 +240,8 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
           messages: historyRef.current.slice(-10),
           studentText,
           withTranslation: showTranslationRef.current,
+          currentBook: currentBookRef.current,
+          currentUnit: currentUnitRef.current,
         }),
       })
       if (!res.ok) throw new Error('GPT 응답 실패')

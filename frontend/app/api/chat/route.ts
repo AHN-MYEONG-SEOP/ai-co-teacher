@@ -95,12 +95,12 @@ Today is ${dayName}, ${monthName} ${date}.
 Generate a natural greeting and lesson introduction for ${nickname} following this EXACT sequence:
 1. Greet with their name and today's day/date (1 sentence)
 2. Ask about the weather today (1 sentence)  
-3. ${prevData ? `Brief review mention: "Last time we studied '${prevData.title || ''}' with words like ${prevData.words.split(',').slice(0,3).join(', ')}. Do you remember?" (1-2 sentences)` : 'Skip review (first lesson)'}
-4. Announce today's lesson: "${currentBook ? `Today we're going to study ${currentBook}${unitData ? `, Unit ${currentUnit} - '${unitData.title || ''}'` : ''}!` : 'Let\'s practice English today!'}" (1 sentence)
+3. ${prevData ? `Brief review mention: "Last time we studied '${prevData.title || ''}' with words like ${prevData.words.split(',').slice(0,3).join(', ')}. Do you remember any?" (1-2 sentences)` : 'Skip review (first lesson)'}
+4. Announce today's lesson: "${currentBook ? `Today we're going to study ${currentBook}${unitData ? `, Unit ${currentUnit} - '${unitData.title || ''}'` : ''}!` : "Let's practice English today!"}" (1 sentence)
 5. ${unitData ? `Introduce 2-3 key words from: ${unitData.words.split(',').slice(0,5).join(', ')} (1 sentence)` : ''}
-6. Encourage them to start speaking (1 sentence)
+6. Ask: "Would you like to review last lesson first, or shall we start today's new lesson?" (give clear two choices)
 
-Keep it natural, warm, and under 6 sentences total. Never use Korean.`
+Keep it natural, warm, and under 7 sentences total. Never use Korean.`
 
       const response = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
@@ -146,15 +146,23 @@ Keep it natural, warm, and under 6 sentences total. Never use Korean.`
     let curriculumContext = ''
     if (currentBook && currentUnit) {
       const unitData = getUnitData(currentBook, currentUnit)
+      const prevData = getPrevStudyInfo(currentBook, currentUnit)
       if (unitData) {
         curriculumContext = `
+
 Current lesson: ${currentBook}, Unit ${currentUnit}${unitData.title ? ` - "${unitData.title}"` : ''}
 Target words: ${unitData.words}
 Objectives: ${unitData.objectives}
 ${unitData.sentence_patterns ? `Key sentence patterns: ${unitData.sentence_patterns}` : ''}
 ${unitData.grammar ? `Grammar focus: ${unitData.grammar}` : ''}
+${prevData ? `Previous lesson: Unit ${prevData.unit} - "${prevData.title || ''}" (words: ${prevData.words.split(',').slice(0,5).join(', ')})` : ''}
 
-Guide the student to naturally use these words and sentence patterns. Gently encourage usage of target vocabulary when appropriate.`
+Teaching guidelines:
+- If student chooses "review": go back to previous lesson content and practice those words/patterns
+- If student chooses "new lesson" or "continue": teach today's target words through natural conversation
+- Guide the student to naturally use target words and sentence patterns
+- Ask questions that encourage use of today's vocabulary
+- Gently correct mistakes and model correct usage`
       }
     }
 
