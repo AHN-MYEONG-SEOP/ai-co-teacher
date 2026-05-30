@@ -41,10 +41,34 @@ export async function POST(req: NextRequest) {
           { role: 'user', content: `Generate a greeting for a student named "${nickname}".` },
         ],
         max_tokens: 80,
-        temperature: 0.9,  // 매번 다른 인사말
+        temperature: 0.9,
       })
       const greetingText = response.choices[0]?.message?.content || `Hi ${nickname}! Great to see you. Are you ready to practice your English today?`
       return NextResponse.json({ text: greetingText, role: 'assistant' })
+    }
+
+    // 인식 불명확 — 부분 텍스트 기반 되묻기
+    if (studentText.startsWith('__CLARIFY__:')) {
+      const partialText = studentText.replace('__CLARIFY__:', '').trim()
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are Coty, an English teacher. The student said something but it was unclear.
+You heard a partial utterance. Ask them to clarify naturally in 1 sentence.
+- Reference what you heard if possible
+- Be warm and encouraging
+- Keep it very short (1 sentence max)
+- Never use Korean`,
+          },
+          { role: 'user', content: `I partially heard: "${partialText}". Ask the student to clarify.` },
+        ],
+        max_tokens: 60,
+        temperature: 0.7,
+      })
+      const clarifyText = response.choices[0]?.message?.content || "Sorry, I didn't catch that. Could you say it again?"
+      return NextResponse.json({ text: clarifyText, role: 'assistant' })
     }
 
     // 일반 대화 처리

@@ -311,56 +311,59 @@ export default function StudentPage() {
     sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency }, words)
   }, [discardBlob, setSpeechResult, setLatency, setInterimText, setInterimWords, setFinalWords, addLog, sendToGPT])
 
-  const handleFallback = useCallback(async (confidence: number) => {
-    // 중복 호출 방지
+  const handleFallback = useCallback(async (confidence: number, partialText?: string) => {
     if (sentRef.current) return
     sentRef.current = true
 
     addLog(`인식 불명확: confidence ${(confidence * 100).toFixed(0)}% — 재시도 요청`, 'warning')
     discardBlob()
-
-    // "분석 중" 메시지 클리어
     setInterimText('')
     setInterimWords([])
     setAvatarStatus('speaking')
 
-    const retryMessages = confidence === 0
-      ? [
-          {
-            en: "I couldn't hear you clearly. There might be too much background noise. Could you try again?",
-            ko: "잘 못 들었어요. 주변 소음이 많은 것 같아요. 다시 말씀해 주시겠어요?",
-          },
-          {
-            en: "I had trouble hearing that. Could you speak a bit louder and try again?",
-            ko: "소리가 잘 안 들렸어요. 조금 더 크게 말씀해 주시겠어요?",
-          },
-          {
-            en: "Sorry, I couldn't understand that. Could you speak more clearly and try again?",
-            ko: "죄송해요, 잘 이해하지 못했어요. 좀 더 또렷하게 말씀해 주시겠어요?",
-          },
-        ]
-      : [
-          {
-            en: "Sorry, I couldn't quite hear you. Could you say that again?",
-            ko: "잘 못 들었어요. 다시 한 번 말씀해 주시겠어요?",
-          },
-          {
-            en: "I didn't catch that clearly. Could you repeat that, please?",
-            ko: "정확히 듣지 못했어요. 다시 말씀해 주시겠어요?",
-          },
-          {
-            en: "Pardon? Could you say that once more?",
-            ko: "다시 한 번 말씀해 주시겠어요?",
-          },
-        ]
+    let msgEn = ''
+    let msgKo = ''
 
-    const selected = retryMessages[Math.floor(Math.random() * retryMessages.length)]
+    if (partialText && partialText.trim() && confidence > 0) {
+      // 부분 인식된 텍스트가 있으면 GPT로 자연스럽게 되물음
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [],
+            studentText: `__CLARIFY__:${partialText}`,
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          msgEn = data.text
+          msgKo = '(잘 못 들었어요. 다시 한 번 말씀해 주시겠어요?)'
+        }
+      } catch { /* ignore */ }
+    }
 
-    // 대화창에 AI 메시지로 표시 (영어 + 한국어)
+    // GPT 실패 or 완전 인식 실패 → 기본 메시지
+    if (!msgEn) {
+      const retryMessages = confidence === 0
+        ? [
+            { en: "I couldn't hear you clearly. There might be too much background noise. Could you try again?", ko: "잘 못 들었어요. 주변 소음이 많은 것 같아요. 다시 말씀해 주시겠어요?" },
+            { en: "I had trouble hearing that. Could you speak a bit louder and try again?", ko: "소리가 잘 안 들렸어요. 조금 더 크게 말씀해 주시겠어요?" },
+          ]
+        : [
+            { en: "Sorry, I couldn't quite hear you. Could you say that again?", ko: "잘 못 들었어요. 다시 한 번 말씀해 주시겠어요?" },
+            { en: "I didn't catch that clearly. Could you repeat that, please?", ko: "정확히 듣지 못했어요. 다시 말씀해 주시겠어요?" },
+          ]
+      const selected = retryMessages[Math.floor(Math.random() * retryMessages.length)]
+      msgEn = selected.en
+      msgKo = selected.ko
+    }
+
+    // 대화창에 표시
     addMessage({
       id: `fallback_${Date.now()}`,
       role: 'ai',
-      content: `${selected.en}\n(${selected.ko})`,
+      content: `${msgEn}\n(${msgKo})`,
       createdAt: new Date().toISOString(),
     })
 
@@ -368,7 +371,7 @@ export default function StudentPage() {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: selected.en, voice: 'nova' }),
+        body: JSON.stringify({ text: msgEn, voice: 'nova' }),
       })
       if (res.ok) {
         const blob = await res.blob()

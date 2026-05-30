@@ -7,7 +7,7 @@ import type { WordResult } from '@/types'
 interface DeepgramOptions {
   onInterimResult?: (text: string, words?: WordResult[]) => void
   onFinalResult?: (text: string, confidence: number, words?: WordResult[]) => void
-  onFallback?: (confidence: number) => void
+  onFallback?: (confidence: number, partialText?: string) => void
   onError?: (error: string) => void
   onLog?: (msg: string) => void
   onStreamReady?: (stream: MediaStream) => void
@@ -154,12 +154,12 @@ export function useWebSpeech({
     onLogRef.current?.(`Deepgram 전송 중... (${(blob.size / 1024).toFixed(1)}KB)`)
 
     try {
-      // 10초 타임아웃 설정
+      // 30초 타임아웃 설정 (긴 발화 대응)
       const controller = new AbortController()
       const timeoutId = setTimeout(() => {
         controller.abort()
         onLogRef.current?.('⏱️ Deepgram 타임아웃 — 재시도 요청')
-      }, 10000)
+      }, 30000)
 
       // 서버에서 토큰 발급
       const tokenRes = await fetch('/api/deepgram-token', { signal: controller.signal })
@@ -235,8 +235,8 @@ export function useWebSpeech({
         onLogRef.current?.('✅ Path A')
         onFinalResultRef.current?.(transcript, confidence, words)
       } else {
-        onLogRef.current?.('⚠️ Path B')
-        onFallbackRef.current?.(confidence)
+        onLogRef.current?.('⚠️ Path B — 부분 인식 텍스트 전달')
+        onFallbackRef.current?.(confidence, transcript)  // 텍스트도 전달
       }
 
     } catch (err: unknown) {
