@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { CONFIDENCE_THRESHOLD } from '@/store/audioStore'
 import type { WordResult } from '@/types'
 
@@ -14,93 +14,27 @@ interface DeepgramOptions {
 }
 
 export function useWebSpeech({
-  onInterimResult,
   onFinalResult,
   onFallback,
   onError,
   onLog,
   onStreamReady,
 }: DeepgramOptions) {
-  const wsRef = useRef<WebSocket | null>(null)
   const mrRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const chunksRef = useRef<Blob[]>([])
   const [isListening, setIsListening] = useState(false)
   const isSupported = true
 
-  const accumulatedTextRef = useRef<string>('')
-  const accumulatedConfidenceRef = useRef<number[]>([])
-  const accumulatedWordsRef = useRef<WordResult[]>([])
-  const isStoppingRef = useRef(false)
-  const finalizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // 콜백들을 ref로 저장 — 클로저 안에서 항상 최신 버전 참조
+  // 콜백 ref
   const onFinalResultRef = useRef(onFinalResult)
   const onFallbackRef = useRef(onFallback)
   const onLogRef = useRef(onLog)
-  const onInterimResultRef = useRef(onInterimResult)
   const onErrorRef = useRef(onError)
   const onStreamReadyRef = useRef(onStreamReady)
 
-  useEffect(() => { onFinalResultRef.current = onFinalResult }, [onFinalResult])
-  useEffect(() => { onFallbackRef.current = onFallback }, [onFallback])
-  useEffect(() => { onLogRef.current = onLog }, [onLog])
-  useEffect(() => { onInterimResultRef.current = onInterimResult }, [onInterimResult])
-  useEffect(() => { onErrorRef.current = onError }, [onError])
-  useEffect(() => { onStreamReadyRef.current = onStreamReady }, [onStreamReady])
-
-  // finalize — ref 사용으로 항상 최신 콜백 호출
-  const finalize = useCallback(() => {
-    if (finalizeTimerRef.current) {
-      clearTimeout(finalizeTimerRef.current)
-      finalizeTimerRef.current = null
-    }
-
-    const fullText = accumulatedTextRef.current.trim()
-    const confidences = accumulatedConfidenceRef.current
-    const finalWords = [...accumulatedWordsRef.current]
-    const avgConfidence = confidences.length > 0
-      ? confidences.reduce((a, b) => a + b, 0) / confidences.length
-      : 1.0
-
-    accumulatedTextRef.current = ''
-    accumulatedConfidenceRef.current = []
-    accumulatedWordsRef.current = []
-    isStoppingRef.current = false
-
-    if (!fullText) {
-      onLogRef.current?.('finalize: 텍스트 없음 — 무시')
-      onInterimResultRef.current?.('')
-      return
-    }
-
-    onInterimResultRef.current?.('')
-
-    onLogRef.current?.(`최종 전송: "${fullText}" (avg conf: ${avgConfidence.toFixed(2)})`)
-
-    if (avgConfidence >= CONFIDENCE_THRESHOLD) {
-      onLogRef.current?.(`✅ Path A`)
-      onFinalResultRef.current?.(fullText, avgConfidence, finalWords)
-    } else {
-      onLogRef.current?.(`⚠️ Path B`)
-      onFallbackRef.current?.(avgConfidence)
-    }
-
-    // WebSocket + 스트림 종료
-    setTimeout(() => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'CloseStream' }))
-        wsRef.current.close()
-      }
-      streamRef.current?.getTracks().forEach((t) => t.stop())
-      setIsListening(false)
-    }, 300)
-  }, []) // 의존성 없음 — ref로만 접근
-
   const startListening = useCallback(async () => {
-    accumulatedTextRef.current = ''
-    accumulatedConfidenceRef.current = []
-    accumulatedWordsRef.current = []
-    isStoppingRef.current = false
+    chunksRef.current = []
 
     try {
       onLogRef.current?.('마이크 스트림 요청 중...')
@@ -113,124 +47,133 @@ export function useWebSpeech({
       })
       streamRef.current = stream
       onLogRef.current?.('마이크 스트림 획득 성공')
+
+      // 스트림을 MediaRecorder와 공유
       onStreamReadyRef.current?.(stream)
 
-      // 토큰 발급
-      const tokenRes = await fetch('/api/deepgram-token')
-      if (!tokenRes.ok) { onErrorRef.current?.('Deepgram 토큰 발급 실패'); return }
-      const { token } = await tokenRes.json()
-      onLogRef.current?.('토큰 발급 완료')
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
 
-      const wsUrl = 'wss://api.deepgram.com/v1/listen?' +
-        new URLSearchParams({
-          language: 'multi',
-          model: 'nova-2',
-          smart_format: 'true',
-          interim_results: 'true',
-          punctuate: 'true',
-          utterance_end_ms: '2000',
-          vad_events: 'true',
-          utterances: 'true',   // 단어별 타임스탬프 + confidence
-        }).toString()
-
-      onLogRef.current?.('Deepgram WebSocket 연결 시도...')
-      const ws = new WebSocket(wsUrl, ['token', token])
-
-      ws.onopen = () => {
-        onLogRef.current?.('✅ Deepgram WebSocket 연결 성공!')
-
-        // 연결 완료 후 MediaRecorder 시작 (단일 스트림, 프리버퍼 없음)
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
-        const mr = new MediaRecorder(stream, { mimeType })
-        mr.ondataavailable = (e) => {
-          if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) ws.send(e.data)
-        }
-        mr.start(100)
-        mrRef.current = mr
-        setIsListening(true)
-        onLogRef.current?.('녹음 + 스트리밍 시작')
+      const mr = new MediaRecorder(stream, { mimeType })
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
       }
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-
-          if (data.type === 'UtteranceEnd') {
-            onLogRef.current?.('UtteranceEnd 감지')
-            if (isStoppingRef.current) finalize()
-            return
-          }
-
-          if (!data.channel) return
-          const transcript = data.channel.alternatives?.[0]?.transcript || ''
-          const confidence = data.channel.alternatives?.[0]?.confidence ?? 1.0
-          const words = data.channel.alternatives?.[0]?.words || []
-          const isFinal = data.is_final
-
-          if (!transcript) return
-
-          if (!isFinal) {
-            const display = accumulatedTextRef.current
-              ? `${accumulatedTextRef.current} ${transcript}`
-              : transcript
-            onInterimResultRef.current?.(display, words)
-          } else {
-            accumulatedTextRef.current = accumulatedTextRef.current
-              ? `${accumulatedTextRef.current} ${transcript}`
-              : transcript
-            accumulatedConfidenceRef.current.push(confidence)
-            // 단어 누적
-            accumulatedWordsRef.current = [...accumulatedWordsRef.current, ...words]
-            onLogRef.current?.(`누적: "${accumulatedTextRef.current}"`)
-            onInterimResultRef.current?.(accumulatedTextRef.current, accumulatedWordsRef.current)
-
-            if (isStoppingRef.current) {
-              if (finalizeTimerRef.current) clearTimeout(finalizeTimerRef.current)
-              finalizeTimerRef.current = setTimeout(finalize, 600)
-            }
-          }
-        } catch { }
-      }
-
-      ws.onerror = () => {
-        onLogRef.current?.('❌ Deepgram WebSocket 오류')
-        onErrorRef.current?.('Deepgram 연결 오류')
-        setIsListening(false)
-      }
-      ws.onclose = (e) => {
-        onLogRef.current?.(`Deepgram 연결 종료: code=${e.code}`)
-        setIsListening(false)
-        // 예상치 못한 종료 시 누적된 텍스트 처리
-        if (accumulatedTextRef.current.trim()) {
-          onLogRef.current?.('예상치 못한 종료 — 누적 텍스트 finalize')
-          finalize()
-        }
-      }
-      wsRef.current = ws
+      mr.start(100)
+      mrRef.current = mr
+      setIsListening(true)
+      onLogRef.current?.('녹음 시작 — 말씀하세요')
 
     } catch (err) {
       onLogRef.current?.(`❌ 마이크 접근 실패: ${err}`)
       onErrorRef.current?.(`마이크 접근 실패: ${err}`)
       setIsListening(false)
     }
-  }, [finalize])
+  }, [])
 
-  const stopListening = useCallback(() => {
-    onLogRef.current?.('stopListening 호출 — 마지막 응답 대기 중...')
-    isStoppingRef.current = true
+  const stopListening = useCallback(async () => {
+    onLogRef.current?.('녹음 종료 — Deepgram 전송 중...')
+    setIsListening(false)
 
-    if (mrRef.current?.state === 'recording') {
+    // MediaRecorder 정지 후 Blob 수집
+    await new Promise<void>((resolve) => {
+      if (!mrRef.current || mrRef.current.state === 'inactive') {
+        resolve()
+        return
+      }
+      mrRef.current.onstop = () => resolve()
       mrRef.current.stop()
+    })
+
+    // 스트림 종료
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+
+    const chunks = chunksRef.current
+    if (chunks.length === 0) {
+      onLogRef.current?.('녹음 데이터 없음')
+      return
     }
 
-    // 안전장치: 1.5초 후 강제 finalize
-    finalizeTimerRef.current = setTimeout(() => {
-      onLogRef.current?.('안전장치: 강제 finalize')
-      finalize()
-    }, 1500)
-  }, [finalize])
+    const mimeType = mrRef.current?.mimeType || 'audio/webm'
+    const blob = new Blob(chunks, { type: mimeType })
+    chunksRef.current = []
+
+    onLogRef.current?.(`Deepgram 전송 중... (${(blob.size / 1024).toFixed(1)}KB)`)
+
+    try {
+      // 서버에서 토큰 발급
+      const tokenRes = await fetch('/api/deepgram-token')
+      if (!tokenRes.ok) { onErrorRef.current?.('Deepgram 토큰 발급 실패'); return }
+      const { token } = await tokenRes.json()
+
+      // Deepgram HTTP API로 전송
+      const params = new URLSearchParams({
+        language: 'multi',
+        model: 'nova-2',
+        smart_format: 'true',
+        punctuate: 'true',
+        utterances: 'true',
+      })
+
+      const res = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': mimeType,
+        },
+        body: blob,
+      })
+
+      if (!res.ok) {
+        onErrorRef.current?.(`Deepgram API 오류: ${res.status}`)
+        return
+      }
+
+      const data = await res.json()
+      const channel = data.results?.channels?.[0]
+      const alternative = channel?.alternatives?.[0]
+
+      if (!alternative) {
+        onLogRef.current?.('인식 결과 없음')
+        onFallbackRef.current?.(0)
+        return
+      }
+
+      const transcript = alternative.transcript || ''
+      const confidence = alternative.confidence ?? 1.0
+      const words: WordResult[] = (alternative.words || []).map((w: {
+        word: string
+        confidence: number
+        start: number
+        end: number
+      }) => ({
+        word: w.word,
+        confidence: w.confidence,
+        start: w.start,
+        end: w.end,
+      }))
+
+      onLogRef.current?.(`인식 완료: "${transcript}" (conf: ${confidence.toFixed(2)})`)
+
+      if (!transcript.trim()) {
+        onLogRef.current?.('빈 텍스트 — 재시도 요청')
+        onFallbackRef.current?.(0)
+        return
+      }
+
+      if (confidence >= CONFIDENCE_THRESHOLD) {
+        onLogRef.current?.('✅ Path A')
+        onFinalResultRef.current?.(transcript, confidence, words)
+      } else {
+        onLogRef.current?.('⚠️ Path B')
+        onFallbackRef.current?.(confidence)
+      }
+
+    } catch (err) {
+      onLogRef.current?.(`❌ Deepgram 오류: ${err}`)
+      onErrorRef.current?.(`Deepgram 오류: ${err}`)
+    }
+  }, [])
 
   return { isSupported, isListening, startListening, stopListening }
 }

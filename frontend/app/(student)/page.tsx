@@ -156,6 +156,7 @@ export default function StudentPage() {
     setLatency(latency)
     setSpeechResult({ text, confidence, path: 'A', isFinal: true })
     setInterimText('')
+    setInterimWords([])
     if (words) setFinalWords(words)
     discardBlob()
     addLog(`Path A: "${text}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
@@ -216,17 +217,19 @@ export default function StudentPage() {
     sentRef.current = false
     setIsHolding(true)
     setAvatarStatus('listening')
-    setInterimText('')
-    addLog('마이크 시작 — 단일 스트림으로 Deepgram + 녹음 동시 처리', 'info')
-    startListening()  // 스트림은 useWebSpeech가 열고 onStreamReady로 공유
-  }, [isSupported, startListening, setAvatarStatus, setInterimText, addLog])
+    setInterimText('Coty가 당신의 말을 듣고 있습니다.')
+    setInterimWords([])
+    addLog('마이크 시작', 'info')
+    startListening()
+  }, [isSupported, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog])
 
-  const handleMicStop = useCallback(() => {
+  const handleMicStop = useCallback(async () => {
     setIsHolding(false)
-    setAvatarStatus('processing')  // 처리 중 상태
-    // interimText는 유지 — finalize 후 메시지 버블로 전환될 때 클리어
-    stopListening()
-  }, [stopListening, setAvatarStatus])
+    setAvatarStatus('processing')
+    setInterimText('Coty가 분석 중입니다...')
+    setInterimWords([])
+    await stopListening()
+  }, [stopListening, setAvatarStatus, setInterimText, setInterimWords])
 
   return (
     <main className="h-[100dvh] bg-slate-950 text-white flex flex-col overflow-hidden">
@@ -334,23 +337,28 @@ export default function StudentPage() {
                   </div>
                   <p className="text-violet-300 text-xs">말하는 중...</p>
                 </div>
+              ) : isHolding ? (
+                // 마이크 누르고 있는 중 — Coty 듣는 중 메시지
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1">
+                    {[0,1,2,3].map(i => (
+                      <div key={i} className="w-1 bg-emerald-400 rounded-full animate-pulse"
+                        style={{ height: `${8 + i * 3}px`, animationDelay: `${i * 0.15}s` }} />
+                    ))}
+                  </div>
+                  <p className="text-emerald-300 text-sm">Coty가 당신의 말을 듣고 있습니다.</p>
+                </div>
               ) : interimWords.length > 0 ? (
-                // 단어별 confidence 색상 + IPA 표시
+                // 처리 완료 — 단어별 confidence 색상
                 <div className="space-y-1">
                   <WordConfidenceDisplay words={interimWords} />
-                  {avatarStatus === 'processing' && (
-                    <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full ml-1 animate-pulse align-middle" />
-                  )}
+                  <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full ml-1 animate-pulse align-middle" />
                 </div>
-              ) : avatarStatus === 'processing' ? (
+              ) : (
+                // 처리 중
                 <p className="text-slate-400 text-sm leading-relaxed">
                   {interimText}
                   <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full ml-2 animate-pulse align-middle" />
-                </p>
-              ) : (
-                <p className="text-white text-sm leading-relaxed">
-                  {interimText}
-                  <span className="inline-block w-0.5 h-4 bg-emerald-400 ml-1 animate-pulse align-middle" />
                 </p>
               )}
             </div>
