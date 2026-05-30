@@ -220,6 +220,7 @@ export default function StudentPage() {
     normal: 0.85,
     high: 0.92,
   }[settings.stt_sensitivity] ?? 0.85
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const [internalBlobUrl, setInternalBlobUrl] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
