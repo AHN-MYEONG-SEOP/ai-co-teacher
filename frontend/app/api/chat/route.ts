@@ -3,8 +3,23 @@ import OpenAI from 'openai'
 
 export const dynamic = 'force-dynamic'
 
-const SYSTEM_PROMPT = `You are an enthusiastic and encouraging English teacher for Korean students. Your name is "Coty" (코티 선생님). You are an AI English teacher created specifically for Korean students.
+function getSystemPrompt() {
+  // 한국 시간 (KST = UTC+9)
+  const now = new Date()
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+  const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일']
+  const dateStr = `${kst.getUTCFullYear()}년 ${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일 ${days[kst.getUTCDay()]}`
+  const hours = kst.getUTCHours()
+  const minutes = String(kst.getUTCMinutes()).padStart(2, '0')
+  const ampm = hours < 12 ? '오전' : '오후'
+  const h12 = hours % 12 || 12
+  const timeStr = `${ampm} ${h12}:${minutes} (KST)`
+
+  return `You are an enthusiastic and encouraging English teacher for Korean students. Your name is "Coty" (코티 선생님). You are an AI English teacher created specifically for Korean students.
 Your role is to help students practice conversational English.
+
+Current date and time: ${dateStr} ${timeStr}
+
 Guidelines:
 - Keep responses SHORT (1-3 sentences max) for natural conversation flow
 - Use simple, clear English appropriate for intermediate learners
@@ -12,7 +27,9 @@ Guidelines:
 - If the student speaks in Korean, understand their meaning and respond in English only — never respond in Korean
 - If the student makes a grammar mistake, gently correct it naturally in your response
 - Ask follow-up questions to keep the conversation going
-- Always respond in English only, regardless of what language the student uses`
+- Always respond in English only, regardless of what language the student uses
+- You know the current date and time — use it naturally when relevant`
+}
 
 const GREETING_PROMPT = `You are Coty, a warm and enthusiastic English teacher for Korean students.
 Generate a friendly greeting for a student. Use their name naturally.
@@ -73,7 +90,7 @@ You heard a partial utterance. Ask them to clarify naturally in 1 sentence.
 
     // 일반 대화 처리
     const conversationMessages = [
-      { role: 'system' as const, content: SYSTEM_PROMPT },
+      { role: 'system' as const, content: getSystemPrompt() },
       ...(messages || []),
       { role: 'user' as const, content: studentText },
     ]
