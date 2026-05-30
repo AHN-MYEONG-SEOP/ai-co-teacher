@@ -11,7 +11,7 @@ import { useUIStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import type { WordResult } from '@/types'
 
-// 단어 confidence → 색상
+// 단어 confidence → 색상 표시 (IPA 없이)
 function WordConfidenceDisplay({ words }: { words: WordResult[] }) {
   if (!words.length) return null
   return (
@@ -22,18 +22,10 @@ function WordConfidenceDisplay({ words }: { words: WordResult[] }) {
           : w.confidence >= 0.7
           ? 'text-amber-400'
           : 'text-red-400'
-        // IPA 변환 시도
-        let ipa = ''
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const enIpa = require('en-ipa')
-          ipa = enIpa.convert ? enIpa.convert(w.word) : enIpa(w.word)
-        } catch { }
         return (
-          <div key={i} className="flex flex-col items-center">
-            <span className={cn('text-sm font-medium', color)}>{w.word}</span>
-            {ipa && <span className="text-xs text-slate-500">{ipa}</span>}
-          </div>
+          <span key={i} className={cn('text-sm font-medium', color)}>
+            {w.word}
+          </span>
         )
       })}
     </div>
@@ -287,17 +279,10 @@ export default function StudentPage() {
                         : w.confidence >= 0.7
                         ? 'text-amber-300'
                         : 'text-red-300'
-                      let ipa = ''
-                      try {
-                        // eslint-disable-next-line @typescript-eslint/no-require-imports
-                        const enIpa = require('en-ipa')
-                        ipa = enIpa.convert ? enIpa.convert(w.word) : enIpa(w.word)
-                      } catch { }
                       return (
-                        <div key={i} className="flex flex-col items-center">
-                          <span className={cn('text-sm font-medium', color)}>{w.word}</span>
-                          {ipa && <span className="text-xs text-slate-500">{ipa}</span>}
-                        </div>
+                        <span key={i} className={cn('text-sm font-medium', color)}>
+                          {w.word}
+                        </span>
                       )
                     })}
                   </div>
