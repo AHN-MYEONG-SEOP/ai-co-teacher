@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CONFIDENCE_THRESHOLD } from '@/store/audioStore'
 import type { WordResult } from '@/types'
 
