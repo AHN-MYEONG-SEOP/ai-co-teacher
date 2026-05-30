@@ -152,15 +152,20 @@ export default function StudentPage() {
     if (sentRef.current) return
     sentRef.current = true
 
+    // 텍스트 정제 — 첫 글자 대문자, 마지막 문장부호 추가
+    const normalized = text.trim()
+    const capitalized = normalized.charAt(0).toUpperCase() + normalized.slice(1)
+    const punctuated = /[.?!]$/.test(capitalized) ? capitalized : capitalized + '.'
+
     const latency = Date.now() - startTimeRef.current
     setLatency(latency)
-    setSpeechResult({ text, confidence, path: 'A', isFinal: true })
+    setSpeechResult({ text: punctuated, confidence, path: 'A', isFinal: true })
     setInterimText('')
     setInterimWords([])
     if (words) setFinalWords(words)
     discardBlob()
-    addLog(`Path A: "${text}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
-    sendToGPT(text, { sttPath: 'A', confidence, latencyMs: latency }, words)
+    addLog(`Path A: "${punctuated}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
+    sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency }, words)
   }, [discardBlob, setSpeechResult, setLatency, setInterimText, setInterimWords, setFinalWords, addLog, sendToGPT])
 
   const handleFallback = useCallback(async (confidence: number) => {
