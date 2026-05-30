@@ -7,9 +7,10 @@ import { useUIStore } from '@/store/uiStore'
 interface NavBarProps {
   logCount?: number
   onLogClick?: () => void
+  onSettingsClick?: () => void
 }
 
-export function NavBar({ logCount = 0, onLogClick }: NavBarProps) {
+export function NavBar({ logCount = 0, onLogClick, onSettingsClick }: NavBarProps) {
   const supabase = createClient()
   const router = useRouter()
   const [userName, setUserName] = useState<string | null>(null)
@@ -47,6 +48,11 @@ export function NavBar({ logCount = 0, onLogClick }: NavBarProps) {
           {onLogClick && (
             <button onClick={onLogClick} className="text-xs text-slate-500 hover:text-slate-300 transition-colors font-mono">
               [{logCount} logs]
+            </button>
+          )}
+          {onSettingsClick && (
+            <button onClick={onSettingsClick} className="text-xs text-slate-500 hover:text-white transition-colors">
+              ⚙️
             </button>
           )}
           {userName && <span className="text-xs text-slate-400">{userName}님</span>}

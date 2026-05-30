@@ -4,30 +4,145 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
 import { useConversation } from '@/hooks/useConversation'
-import { useStudentSession } from '@/hooks/useStudentSession'
+import { useStudentSession, type StudentSettings } from '@/hooks/useStudentSession'
 import { NavBar } from '@/components/common/NavBar'
-import { useAudioStore, CONFIDENCE_THRESHOLD } from '@/store/audioStore'
+import { useAudioStore } from '@/store/audioStore'
 import { useUIStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import type { WordResult } from '@/types'
 
-// 단어 confidence → 색상 표시 (IPA 없이)
-function WordConfidenceDisplay({ words }: { words: WordResult[] }) {
-  if (!words.length) return null
+// ── 설정 모달 ──────────────────────────────────────────
+function SettingsModal({
+  settings,
+  onUpdate,
+  onClose,
+}: {
+  settings: StudentSettings
+  onUpdate: (s: Partial<StudentSettings>) => Promise<void>
+  onClose: () => void
+}) {
+  const [local, setLocal] = useState(settings)
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    await onUpdate(local)
+    setSaving(false)
+    onClose()
+  }
+
   return (
-    <div className="flex flex-wrap gap-x-2 gap-y-1">
-      {words.map((w, i) => {
-        const color = w.confidence >= 0.9
-          ? 'text-emerald-400'
-          : w.confidence >= 0.7
-          ? 'text-amber-400'
-          : 'text-red-400'
-        return (
-          <span key={i} className={cn('text-sm font-medium', color)}>
-            {w.word}
-          </span>
-        )
-      })}
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-lg bg-slate-900 border border-slate-700/50 rounded-t-3xl p-6 space-y-6 animate-in slide-in-from-bottom-4 duration-300"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 헤더 */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-white font-semibold text-base">⚙️ 설정</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-sm">✕</button>
+        </div>
+
+        {/* AI 말하기 속도 */}
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-slate-300">🔊 AI 말하기 속도</p>
+          <div className="space-y-2">
+            {([
+              { value: 'slow',   label: '느림',  desc: '천천히 또렷하게' },
+              { value: 'normal', label: '보통',  desc: '일반적인 속도' },
+              { value: 'fast',   label: '빠름',  desc: '원어민 속도에 가깝게' },
+            ] as const).map((opt) => (
+              <label key={opt.value} className="flex items-center gap-3 cursor-pointer group">
+                <div className={cn(
+                  'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
+                  local.tts_speed === opt.value
+                    ? 'border-emerald-400 bg-emerald-400'
+                    : 'border-slate-600 group-hover:border-slate-400'
+                )}>
+                  {local.tts_speed === opt.value && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-900" />
+                  )}
+                </div>
+                <input
+                  type="radio"
+                  className="sr-only"
+                  checked={local.tts_speed === opt.value}
+                  onChange={() => setLocal(p => ({ ...p, tts_speed: opt.value }))}
+                />
+                <div>
+                  <span className="text-sm text-white">{opt.label}</span>
+                  <span className="text-xs text-slate-500 ml-2">{opt.desc}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* 인식 민감도 */}
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-slate-300">🎤 인식 민감도</p>
+          <div className="space-y-2">
+            {([
+              { value: 'low',    label: '낮음', desc: '소음이 많은 환경 (교실, 카페)' },
+              { value: 'normal', label: '보통', desc: '일반적인 환경' },
+              { value: 'high',   label: '높음', desc: '조용한 환경 (도서관, 집)' },
+            ] as const).map((opt) => (
+              <label key={opt.value} className="flex items-center gap-3 cursor-pointer group">
+                <div className={cn(
+                  'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
+                  local.stt_sensitivity === opt.value
+                    ? 'border-emerald-400 bg-emerald-400'
+                    : 'border-slate-600 group-hover:border-slate-400'
+                )}>
+                  {local.stt_sensitivity === opt.value && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-900" />
+                  )}
+                </div>
+                <input
+                  type="radio"
+                  className="sr-only"
+                  checked={local.stt_sensitivity === opt.value}
+                  onChange={() => setLocal(p => ({ ...p, stt_sensitivity: opt.value }))}
+                />
+                <div>
+                  <span className="text-sm text-white">{opt.label}</span>
+                  <span className="text-xs text-slate-500 ml-2">{opt.desc}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* 발화 피드백 표시 */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-300">📝 발화 피드백 표시</p>
+            <p className="text-xs text-slate-500 mt-0.5">말한 후 문법/유창성 점수 표시</p>
+          </div>
+          <button
+            onClick={() => setLocal(p => ({ ...p, show_feedback: !p.show_feedback }))}
+            className={cn(
+              'w-12 h-6 rounded-full transition-colors relative',
+              local.show_feedback ? 'bg-emerald-500' : 'bg-slate-600'
+            )}
+          >
+            <div className={cn(
+              'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform',
+              local.show_feedback ? 'translate-x-6' : 'translate-x-0.5'
+            )} />
+          </button>
+        </div>
+
+        {/* 저장 버튼 */}
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-2xl py-3 text-sm font-medium transition-colors"
+        >
+          {saving ? '저장 중...' : '저장'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -74,10 +189,16 @@ export default function StudentPage() {
     setInterimWords, setFinalWords,
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages } = useUIStore()
-  const { studentId, sessionId, studentNickname } = useStudentSession()
-  const { sendToGPT, isSpeaking, stopSpeaking } = useConversation({ sessionId, studentId, studentNickname })
+  const { studentId, sessionId, studentNickname, settings, updateSettings } = useStudentSession()
+  const { sendToGPT, isSpeaking, stopSpeaking } = useConversation({ sessionId, studentId, studentNickname, ttsSpeed: settings.tts_speed })
+  const [showSettings, setShowSettings] = useState(false)
 
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  // 인식 민감도 → confidence threshold
+  const confidenceThreshold = {
+    low: 0.70,
+    normal: 0.85,
+    high: 0.92,
+  }[settings.stt_sensitivity] ?? 0.85
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const [internalBlobUrl, setInternalBlobUrl] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -228,6 +349,7 @@ export default function StudentPage() {
     onError: handleError,
     onLog: (msg) => addLog(msg, 'info'),
     onStreamReady: handleStreamReady,
+    confidenceThreshold,
   })
 
   const handleMicStart = useCallback(async () => {
@@ -252,7 +374,7 @@ export default function StudentPage() {
 
   return (
     <main className="h-[100dvh] bg-slate-950 text-white flex flex-col overflow-hidden">
-      <NavBar logCount={logs.length} onLogClick={() => setLogDrawerOpen(!isLogDrawerOpen)} />
+      <NavBar logCount={logs.length} onLogClick={() => setLogDrawerOpen(!isLogDrawerOpen)} onSettingsClick={() => setShowSettings(true)} />
 
       {/* 배경 그라디언트 */}
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800 via-slate-950 to-black pointer-events-none" />
@@ -330,8 +452,8 @@ export default function StudentPage() {
                 )}
               </div>
 
-              {/* 인라인 피드백 — 학생 메시지 바로 아래 */}
-              {msg.role === 'student' && msg.feedback && (
+              {/* 인라인 피드백 — 학생 메시지 바로 아래, show_feedback ON일 때만 */}
+              {msg.role === 'student' && msg.feedback && settings.show_feedback && (
                 <div className="mt-1.5 max-w-[85%] w-full bg-slate-800/60 border border-slate-700/40 rounded-xl px-3 py-2 space-y-1.5">
                   {/* 점수 한 줄 요약 */}
                   <div className="flex items-center justify-between">
@@ -485,6 +607,15 @@ export default function StudentPage() {
           )}
         </div>
       </div>
+
+      {/* 설정 모달 */}
+      {showSettings && (
+        <SettingsModal
+          settings={settings}
+          onUpdate={updateSettings}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
 
       {/* 피드백은 대화 버블 인라인으로만 표시 — 오버레이 카드 제거 */}
 

@@ -11,6 +11,7 @@ interface DeepgramOptions {
   onError?: (error: string) => void
   onLog?: (msg: string) => void
   onStreamReady?: (stream: MediaStream) => void
+  confidenceThreshold?: number
 }
 
 export function useWebSpeech({
@@ -19,6 +20,7 @@ export function useWebSpeech({
   onError,
   onLog,
   onStreamReady,
+  confidenceThreshold = CONFIDENCE_THRESHOLD,
 }: DeepgramOptions) {
   const mrRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -32,6 +34,15 @@ export function useWebSpeech({
   const onLogRef = useRef(onLog)
   const onErrorRef = useRef(onError)
   const onStreamReadyRef = useRef(onStreamReady)
+  const confidenceThresholdRef = useRef(confidenceThreshold)
+
+  // ref 동기화
+  useEffect(() => { onFinalResultRef.current = onFinalResult }, [onFinalResult])
+  useEffect(() => { onFallbackRef.current = onFallback }, [onFallback])
+  useEffect(() => { onLogRef.current = onLog }, [onLog])
+  useEffect(() => { onErrorRef.current = onError }, [onError])
+  useEffect(() => { onStreamReadyRef.current = onStreamReady }, [onStreamReady])
+  useEffect(() => { confidenceThresholdRef.current = confidenceThreshold }, [confidenceThreshold])
 
   const startListening = useCallback(async () => {
     chunksRef.current = []
@@ -220,7 +231,7 @@ export function useWebSpeech({
         return
       }
 
-      if (confidence >= CONFIDENCE_THRESHOLD) {
+      if (confidence >= confidenceThresholdRef.current) {
         onLogRef.current?.('✅ Path A')
         onFinalResultRef.current?.(transcript, confidence, words)
       } else {

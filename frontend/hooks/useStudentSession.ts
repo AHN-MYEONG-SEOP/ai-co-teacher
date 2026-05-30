@@ -1,8 +1,19 @@
 'use client'
-
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+
+export interface StudentSettings {
+  tts_speed: 'slow' | 'normal' | 'fast'
+  stt_sensitivity: 'low' | 'normal' | 'high'
+  show_feedback: boolean
+}
+
+const DEFAULT_SETTINGS: StudentSettings = {
+  tts_speed: 'normal',
+  stt_sensitivity: 'normal',
+  show_feedback: true,
+}
 
 interface StudentSession {
   studentId: string | undefined
@@ -10,6 +21,8 @@ interface StudentSession {
   studentName: string | null
   studentNickname: string | null
   isLoggedIn: boolean
+  settings: StudentSettings
+  updateSettings: (settings: Partial<StudentSettings>) => Promise<void>
 }
 
 export function useStudentSession(): StudentSession {
@@ -20,45 +33,42 @@ export function useStudentSession(): StudentSession {
   const [studentNickname, setStudentNickname] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [settings, setSettings] = useState<StudentSettings>(DEFAULT_SETTINGS)
 
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-
       if (!user) {
         router.push('/login')
         return
       }
-
       setStudentId(user.id)
       setIsLoggedIn(true)
 
-      // nickname 포함해서 가져오기
       const { data: profile } = await supabase
         .from('profiles')
-        .select('name, nickname')
+        .select('name, nickname, tts_speed, stt_sensitivity, show_feedback')
         .eq('id', user.id)
         .single()
 
       if (profile) {
         setStudentName(profile.name)
-        setStudentNickname(profile.nickname || profile.name) // nickname 없으면 name 사용
+        setStudentNickname(profile.nickname || profile.name)
+        setSettings({
+          tts_speed: profile.tts_speed || 'normal',
+          stt_sensitivity: profile.stt_sensitivity || 'normal',
+          show_feedback: profile.show_feedback ?? true,
+        })
       }
 
       try {
         const { data, error } = await supabase
           .from('sessions')
-          .insert({
-            class_id: null,
-            started_at: new Date().toISOString(),
-          })
+          .insert({ class_id: null, started_at: new Date().toISOString() })
           .select('id')
           .single()
-
         if (!error && data) setSessionId(data.id)
-      } catch {
-        // 세션 생성 실패 무시
-      }
+      } catch { }
     }
 
     init()
@@ -71,10 +81,24 @@ export function useStudentSession(): StudentSession {
           .eq('id', sessionId)
       }
     }
-
     window.addEventListener('beforeunload', handleUnload)
     return () => window.removeEventListener('beforeunload', handleUnload)
   }, [])
 
-  return { studentId: studentId ?? undefined, sessionId, studentName, studentNickname, isLoggedIn }
+  // 설정 업데이트 — Supabase에 저장
+  const updateSettings = async (newSettings: Partial<StudentSettings>) => {
+    if (!studentId) return
+    const updated = { ...settings, ...newSettings }
+    setSettings(updated)
+    await supabase
+      .from('profiles')
+      .update({
+        tts_speed: updated.tts_speed,
+        stt_sensitivity: updated.stt_sensitivity,
+        show_feedback: updated.show_feedback,
+      })
+      .eq('id', studentId)
+  }
+
+  return { studentId: studentId ?? undefined, sessionId, studentName, studentNickname, isLoggedIn, settings, updateSettings }
 }

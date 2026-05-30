@@ -21,9 +21,12 @@ interface UseConversationProps {
   sessionId?: string | null
   studentId?: string
   studentNickname?: string | null
+  ttsSpeed?: 'slow' | 'normal' | 'fast'
 }
 
-export function useConversation({ sessionId, studentId, studentNickname }: UseConversationProps = {}) {
+const TTS_SPEED_MAP = { slow: 0.75, normal: 1.0, fast: 1.25 }
+
+export function useConversation({ sessionId, studentId, studentNickname, ttsSpeed = 'normal' }: UseConversationProps = {}) {
   const { addMessage, setAIResponding, updateMessageFeedback } = useUIStore()
   const { setAvatarStatus } = useAudioStore()
   const historyRef = useRef<Message[]>([])
@@ -31,6 +34,8 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackData | null>(null)
   const greetedRef = useRef(false)
+  const ttsSpeedRef = useRef(ttsSpeed)
+  useEffect(() => { ttsSpeedRef.current = ttsSpeed }, [ttsSpeed])
 
   const stopSpeaking = useCallback(() => {
     if (audioRef.current) {
@@ -59,6 +64,8 @@ export function useConversation({ sessionId, studentId, studentNickname }: UseCo
       }
       const audio = new Audio(url)
       audioRef.current = audio
+      // 속도 적용
+      audio.playbackRate = TTS_SPEED_MAP[ttsSpeedRef.current] ?? 1.0
 
       // 재생 완료까지 기다리는 Promise
       await new Promise<void>((resolve) => {
