@@ -42,20 +42,61 @@ export function useWebSpeech({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,   // 자동 음량 조절 추가
           channelCount: 1,
+          sampleRate: 16000,       // Deepgram 최적 샘플레이트
         }
       })
       streamRef.current = stream
       onLogRef.current?.('마이크 스트림 획득 성공')
 
-      // 스트림을 MediaRecorder와 공유
-      onStreamReadyRef.current?.(stream)
+      // Web Audio API 노이즈 제거 파이프라인
+      let processedStream = stream
+      try {
+        const audioCtx = new AudioContext({ sampleRate: 16000 })
+        const source = audioCtx.createMediaStreamSource(stream)
+
+        // 1. DynamicsCompressor — 소리 크기 압축 (큰 소음 억제)
+        const compressor = audioCtx.createDynamicsCompressor()
+        compressor.threshold.value = -30   // -30dB 이상만 압축
+        compressor.knee.value = 10
+        compressor.ratio.value = 8         // 8:1 압축비
+        compressor.attack.value = 0.003
+        compressor.release.value = 0.1
+
+        // 2. BiquadFilter — 고주파 소음 제거 (에어컨, 팬 소리 등)
+        const highPassFilter = audioCtx.createBiquadFilter()
+        highPassFilter.type = 'highpass'
+        highPassFilter.frequency.value = 80  // 80Hz 이하 저주파 제거
+
+        // 3. BiquadFilter — 저주파 험 제거
+        const lowPassFilter = audioCtx.createBiquadFilter()
+        lowPassFilter.type = 'lowpass'
+        lowPassFilter.frequency.value = 8000  // 8kHz 이상 고주파 제거
+
+        // 파이프라인 연결: source → highpass → lowpass → compressor → destination
+        const destination = audioCtx.createMediaStreamDestination()
+        source.connect(highPassFilter)
+        highPassFilter.connect(lowPassFilter)
+        lowPassFilter.connect(compressor)
+        compressor.connect(destination)
+
+        processedStream = destination.stream
+        onLogRef.current?.('Web Audio 노이즈 제거 파이프라인 적용')
+      } catch (audioErr) {
+        onLogRef.current?.(`Web Audio 파이프라인 실패 — 원본 스트림 사용: ${audioErr}`)
+        processedStream = stream
+      }
+
+      // 스트림을 MediaRecorder와 공유 (재생용)
+      onStreamReadyRef.current?.(stream)  // 재생용은 원본 스트림
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
 
-      const mr = new MediaRecorder(stream, { mimeType })
+      // 녹음은 처리된 스트림 사용
+      const mr = new MediaRecorder(processedStream, { mimeType })
       mr.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
@@ -113,6 +154,8 @@ export function useWebSpeech({
         smart_format: 'true',
         punctuate: 'true',
         utterances: 'true',
+        filler_words: 'false',     // 필러 단어 제거 (um, uh 등)
+        profanity_filter: 'false',
       })
 
       const res = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
