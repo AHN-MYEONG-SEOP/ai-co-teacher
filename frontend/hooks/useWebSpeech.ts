@@ -231,13 +231,9 @@ export function useWebSpeech({
         return
       }
 
-      if (confidence >= confidenceThresholdRef.current) {
-        onLogRef.current?.('✅ Path A')
-        onFinalResultRef.current?.(transcript, confidence, words)
-      } else {
-        onLogRef.current?.('⚠️ Path B — 부분 인식 텍스트 전달')
-        onFallbackRef.current?.(confidence, transcript)  // 텍스트도 전달
-      }
+      // confidence에 상관없이 항상 GPT로 전송
+      onLogRef.current?.(`✅ 전송: "${transcript}" (conf: ${confidence.toFixed(2)})`)
+      onFinalResultRef.current?.(transcript, confidence, words)
 
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
