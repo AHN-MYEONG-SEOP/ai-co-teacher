@@ -504,6 +504,25 @@ export default function StudentPage() {
 
   const isTouchRef = useRef(false)  // 터치 이벤트 감지 플래그
 
+  const replayTTS = useCallback(async (text: string) => {
+    if (isSpeaking) return
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice: 'nova' }),
+      })
+      if (!res.ok) return
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      const speedMap = { slow: 0.75, normal: 1.0, fast: 1.25 }
+      audio.playbackRate = speedMap[settings.tts_speed] ?? 1.0
+      audio.onended = () => URL.revokeObjectURL(url)
+      audio.play().catch(() => {})
+    } catch { }
+  }, [isSpeaking, settings.tts_speed])
+
   const handleMicStart = useCallback(async () => {
     if (!isSupported) { addLog('Web Speech API 미지원 브라우저', 'error'); return }
     if (isHolding) return
@@ -566,9 +585,22 @@ export default function StudentPage() {
                   ? 'bg-emerald-900/40 text-emerald-200 text-right border border-emerald-700/30'
                   : 'bg-violet-900/40 text-violet-200 border border-violet-700/30'
               )}>
-                <span className="text-xs opacity-50 block mb-1">
-                  {msg.role === 'student' ? '🧑 나' : '🤖 AI'}
-                </span>
+                {/* 헤더 — AI일 때 다시듣기 버튼 포함 */}
+                <div className={cn('flex items-center mb-1', msg.role === 'ai' ? 'justify-between' : 'justify-end')}>
+                  <span className="text-xs opacity-50">
+                    {msg.role === 'student' ? '🧑 나' : '🤖 AI'}
+                  </span>
+                  {msg.role === 'ai' && (
+                    <button
+                      onClick={() => replayTTS(msg.content)}
+                      disabled={isSpeaking}
+                      className="text-xs text-violet-400/60 hover:text-violet-300 disabled:opacity-30 transition-colors ml-2"
+                      title="다시 듣기"
+                    >
+                      🔁
+                    </button>
+                  )}
+                </div>
                 {/* 학생 메시지 — words 있으면 단어별 색상 표시 */}
                 {msg.role === 'student' && msg.words && msg.words.length > 0 ? (
                   <div className="flex flex-wrap gap-x-2 gap-y-1 justify-end">
