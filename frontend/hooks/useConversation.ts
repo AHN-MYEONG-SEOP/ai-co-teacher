@@ -48,6 +48,17 @@ export function useConversation({
   const [lessonPhase, setLessonPhase] = useState<LessonPhase>('greeting')
   const [progress, setProgress] = useState(0)
 
+  // 리포트 추적
+  const reportIdRef = useRef<string | null>(null)
+  const totalTurnsRef = useRef(0)
+  const correctTurnsRef = useRef(0)
+  const hintUsedCountRef = useRef(0)
+  const grammarScoresRef = useRef<number[]>([])
+  const fluencyScoresRef = useRef<number[]>([])
+  const vocabScoresRef = useRef<number[]>([])
+  const overallScoresRef = useRef<number[]>([])
+  const correctionsRef = useRef<string[]>([])
+
   // refs
   const ttsSpeedRef = useRef(ttsSpeed)
   const currentBookRef = useRef(currentBook)
@@ -133,8 +144,9 @@ export function useConversation({
         lessonPhaseRef.current = 'weather'
         setLessonPhase('weather')
 
-        // 학습 로그 저장
+        // 학습 로그 + 리포트 생성
         if (currentBookRef.current && currentUnitRef.current) {
+          // study_logs 저장
           fetch('/api/study-log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -145,6 +157,21 @@ export function useConversation({
               unit: currentUnitRef.current,
               unit_title: data.unitTitle || '',
             }),
+          })
+          // lesson_report 생성
+          fetch('/api/lesson-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'start',
+              student_id: studentId,
+              session_id: sessionId,
+              book: currentBookRef.current,
+              unit: currentUnitRef.current,
+              unit_title: data.unitTitle || '',
+            }),
+          }).then(r => r.json()).then(d => {
+            if (d.report_id) reportIdRef.current = d.report_id
           })
         }
 
@@ -163,8 +190,29 @@ export function useConversation({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentNickname])
 
-  // 로그 저장
-  const saveLog = useCallback(async (role: 'student' | 'ai', content: string, extra?: Record<string, unknown>) => {
+  // 페이지 종료 시 리포트 마무리
+  useEffect(() => {
+    return () => {
+      if (reportIdRef.current && totalTurnsRef.current > 0) {
+        fetch('/api/lesson-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'finish',
+            report_id: reportIdRef.current,
+            conversation_history: historyRef.current
+              .map(m => `${m.role}: ${m.content}`).join('\n'),
+            book: currentBookRef.current,
+            unit: currentUnitRef.current,
+            unit_title: '',
+            progress: 0,
+            corrections: correctionsRef.current.join(', '),
+          }),
+        })
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])role: 'student' | 'ai', content: string, extra?: Record<string, unknown>) => {
     try {
       await fetch('/api/log', {
         method: 'POST',
@@ -198,6 +246,39 @@ export function useConversation({
         const feedbackData = await res.json()
         setFeedback(feedbackData)
         updateMessageFeedback(studentMsgId, feedbackData)
+
+        // 점수 누적
+        if (feedbackData.grammar) grammarScoresRef.current.push(feedbackData.grammar)
+        if (feedbackData.fluency) fluencyScoresRef.current.push(feedbackData.fluency)
+        if (feedbackData.vocabulary) vocabScoresRef.current.push(feedbackData.vocabulary)
+        if (feedbackData.overall) overallScoresRef.current.push(feedbackData.overall)
+        if (feedbackData.correction) correctionsRef.current.push(feedbackData.correction)
+        if (meta?.hintUsed) hintUsedCountRef.current++
+
+        // 완성도 있는 답변 여부 (overall 70 이상)
+        if (feedbackData.overall >= 70) correctTurnsRef.current++
+        totalTurnsRef.current++
+
+        const avg = (arr: number[]) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : undefined
+
+        // report 업데이트
+        if (reportIdRef.current) {
+          fetch('/api/lesson-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update',
+              report_id: reportIdRef.current,
+              total_turns: totalTurnsRef.current,
+              correct_turns: correctTurnsRef.current,
+              hint_used_count: hintUsedCountRef.current,
+              avg_grammar: avg(grammarScoresRef.current),
+              avg_fluency: avg(fluencyScoresRef.current),
+              avg_vocabulary: avg(vocabScoresRef.current),
+              avg_overall: avg(overallScoresRef.current),
+            }),
+          })
+        }
         const logRes = await fetch('/api/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -253,7 +334,40 @@ export function useConversation({
 
       // 진행률 업데이트 (절대 낮아지지 않음)
       if (data.progress !== null && data.progress !== undefined) {
-        setProgress(prev => Math.max(prev, data.progress))
+        setProgress(prev => {
+          const newProgress = Math.max(prev, data.progress)
+          // report에 progress 저장
+          if (reportIdRef.current && newProgress > prev) {
+            fetch('/api/lesson-report', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'update',
+                report_id: reportIdRef.current,
+                progress: newProgress,
+              }),
+            })
+          }
+          // 100% 달성 시 최종 요약 생성
+          if (newProgress >= 100 && prev < 100 && reportIdRef.current) {
+            fetch('/api/lesson-report', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'finish',
+                report_id: reportIdRef.current,
+                conversation_history: historyRef.current
+                  .map(m => `${m.role}: ${m.content}`).join('\n'),
+                book: currentBookRef.current,
+                unit: currentUnitRef.current,
+                unit_title: '',
+                progress: newProgress,
+                corrections: correctionsRef.current.join(', '),
+              }),
+            })
+          }
+          return newProgress
+        })
       }
 
       // unit 변경 처리

@@ -27,6 +27,35 @@ interface RealtimeLog {
   created_at: string
 }
 
+interface LessonReport {
+  id: string
+  student_id: string
+  studied_at: string
+  seq: number
+  book: string
+  unit: number
+  unit_title: string | null
+  progress: number
+  total_turns: number
+  correct_turns: number
+  hint_used_count: number
+  avg_grammar: number | null
+  avg_fluency: number | null
+  avg_vocabulary: number | null
+  avg_overall: number | null
+  summary: string | null
+  issues: string | null
+  created_at: string
+}
+
+interface Student {
+  id: string
+  name: string
+  nickname: string | null
+  current_book: string | null
+  current_unit: number | null
+}
+
 interface NewStudent {
   name: string
   nickname: string
@@ -40,8 +69,11 @@ export default function TeacherDashboard() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [logs, setLogs] = useState<ConversationLog[]>([])
   const [realtimeLogs, setRealtimeLogs] = useState<RealtimeLog[]>([])
+  const [reports, setReports] = useState<LessonReport[]>([])
+  const [students, setStudents] = useState<Student[]>([])
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'students'>('realtime')
+  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'students'>('realtime')
   const [newStudent, setNewStudent] = useState<NewStudent>({ name: '', nickname: '', email: '', password: '' })
   const [createLoading, setCreateLoading] = useState(false)
   const [createMessage, setCreateMessage] = useState<{ text: string; ok: boolean } | null>(null)
@@ -85,7 +117,30 @@ export default function TeacherDashboard() {
     if (data) setLogs(data)
   }, [supabase])
 
+  const fetchStudents = useCallback(async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, name, nickname, current_book, current_unit')
+      .eq('role', 'student')
+      .order('name')
+    if (data) setStudents(data)
+  }, [supabase])
+
+  const fetchReports = useCallback(async (studentId?: string) => {
+    let query = supabase
+      .from('lesson_reports')
+      .select('*')
+      .order('studied_at', { ascending: false })
+      .order('seq', { ascending: false })
+      .limit(50)
+    if (studentId) query = query.eq('student_id', studentId)
+    const { data } = await query
+    if (data) setReports(data)
+  }, [supabase])
+
   useEffect(() => { fetchLogs() }, [fetchLogs])
+  useEffect(() => { fetchStudents() }, [fetchStudents])
+  useEffect(() => { fetchReports(selectedStudentId || undefined) }, [fetchReports, selectedStudentId])
 
   useEffect(() => {
     const channel = supabase
@@ -153,19 +208,85 @@ export default function TeacherDashboard() {
         </div>
 
         {/* 탭 */}
-        <div className="flex gap-2">
-          {(['realtime', 'history', 'students'] as const).map(tab => (
+        <div className="flex gap-2 flex-wrap">
+          {(['realtime', 'history', 'reports', 'students'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={cn('px-4 py-2 rounded-xl text-sm transition-colors',
                 activeTab === tab ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
               )}>
-              {tab === 'realtime' ? '🔴 실시간 모니터링' : tab === 'history' ? '📋 대화 기록' : '👨‍🎓 학생 관리'}
+              {tab === 'realtime' ? '🔴 실시간' : tab === 'history' ? '📋 대화기록' : tab === 'reports' ? '📊 학습이력' : '👨‍🎓 학생관리'}
             </button>
           ))}
-          <button onClick={fetchLogs} className="ml-auto px-4 py-2 rounded-xl text-sm bg-slate-800 text-slate-400 hover:text-white transition-colors">
+          <button onClick={() => { fetchLogs(); fetchReports(selectedStudentId || undefined) }} className="ml-auto px-4 py-2 rounded-xl text-sm bg-slate-800 text-slate-400 hover:text-white transition-colors">
             🔄 새로고침
           </button>
         </div>
+
+        {/* 학습 이력 */}
+        {activeTab === 'reports' && (
+          <div className="space-y-4">
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setSelectedStudentId(null)}
+                className={cn('px-3 py-1.5 rounded-xl text-xs transition-colors',
+                  !selectedStudentId ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                )}
+              >전체</button>
+              {students.map(s => (
+                <button key={s.id} onClick={() => setSelectedStudentId(s.id)}
+                  className={cn('px-3 py-1.5 rounded-xl text-xs transition-colors',
+                    selectedStudentId === s.id ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                  )}
+                >{s.name}</button>
+              ))}
+            </div>
+            {reports.length === 0 ? (
+              <div className="bg-slate-900/40 border border-slate-700/30 rounded-2xl p-8 text-center">
+                <p className="text-slate-500">학습 이력이 없습니다</p>
+              </div>
+            ) : reports.map(r => (
+              <div key={r.id} className="bg-slate-900/40 border border-slate-700/30 rounded-2xl p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">{r.studied_at}</span>
+                      <span className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full">#{r.seq}</span>
+                      <span className="text-xs text-slate-400">{students.find(s => s.id === r.student_id)?.name || ''}</span>
+                    </div>
+                    <p className="text-sm text-white font-medium mt-1">
+                      {r.book} · Unit {r.unit}{r.unit_title ? ` — ${r.unit_title}` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className={cn('text-lg font-bold',
+                      r.progress >= 80 ? 'text-emerald-400' : r.progress >= 50 ? 'text-amber-400' : 'text-slate-400'
+                    )}>{r.progress}%</span>
+                    <p className="text-xs text-slate-500">{r.correct_turns}/{r.total_turns}회 완성</p>
+                  </div>
+                </div>
+                {r.avg_overall && (
+                  <div className="flex gap-3 text-xs">
+                    <span className="text-slate-400">문법 <span className="text-white font-bold">{r.avg_grammar}</span></span>
+                    <span className="text-slate-400">유창성 <span className="text-white font-bold">{r.avg_fluency}</span></span>
+                    <span className="text-slate-400">어휘 <span className="text-white font-bold">{r.avg_vocabulary}</span></span>
+                    <span className="text-slate-400">종합 <span className={cn('font-bold',
+                      (r.avg_overall||0) >= 80 ? 'text-emerald-400' : (r.avg_overall||0) >= 60 ? 'text-amber-400' : 'text-red-400'
+                    )}>{r.avg_overall}</span></span>
+                    {r.hint_used_count > 0 && <span className="text-slate-500">💡 힌트 {r.hint_used_count}회</span>}
+                  </div>
+                )}
+                {r.summary && (
+                  <div className="bg-slate-800/50 rounded-xl px-3 py-2 space-y-1">
+                    <p className="text-xs text-slate-300 leading-relaxed">{r.summary}</p>
+                    {r.issues && r.issues !== '없음' && (
+                      <p className="text-xs text-amber-300/80 leading-relaxed whitespace-pre-line">{r.issues}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 실시간 */}
         {activeTab === 'realtime' && (
