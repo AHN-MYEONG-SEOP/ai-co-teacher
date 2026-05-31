@@ -273,8 +273,42 @@ Rules:
       }
     }
 
-    // 번역 — 항상 생성
-    let translation = ''
+    // 진행률 계산 (study phase에서만)
+    let progress: number | null = null
+    if (phase === 'study' && aiText && unitData) {
+      const progressRes = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are evaluating a student's lesson progress.
+Today's lesson: ${currentBook}, Unit ${currentUnit} - "${unitData.title || ''}"
+Target words: ${unitData.words}
+Objectives: ${unitData.objectives}
+Key patterns: ${unitData.sentence_patterns || ''}
+
+Based on the conversation history, evaluate how much of today's lesson the student has completed.
+Rules:
+- Only increase progress when student gives COMPLETE, CORRECT sentences
+- Incomplete answers (single words, fragments) = no increase
+- Correct full sentences using target vocabulary = increase
+- Return ONLY a single integer 0-100 representing cumulative progress
+- Never decrease the progress
+- Start from 0, reach 100 only when all target words and patterns have been practiced correctly`,
+          },
+          {
+            role: 'user',
+            content: `Conversation so far:\n${[...(messages || []), { role: 'user', content: studentText }, { role: 'assistant', content: aiText }]
+              .map((m: {role: string, content: string}) => `${m.role}: ${m.content}`)
+              .join('\n')}\n\nCurrent progress (0-100)?`,
+          },
+        ],
+        max_tokens: 5,
+        temperature: 0,
+      })
+      const raw = progressRes.choices[0]?.message?.content?.trim() || '0'
+      progress = Math.min(100, Math.max(0, parseInt(raw) || 0))
+    }
     if (aiText) {
       const translRes = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
@@ -288,7 +322,7 @@ Rules:
       translation = translRes.choices[0]?.message?.content || ''
     }
 
-    return NextResponse.json({ text: aiText, translation, choices, nextPhase, ...responseExtra, role: 'assistant' })
+    return NextResponse.json({ text: aiText, translation, choices, progress, nextPhase, ...responseExtra, role: 'assistant' })
 
   } catch (error) {
     console.error('GPT 오류:', error)

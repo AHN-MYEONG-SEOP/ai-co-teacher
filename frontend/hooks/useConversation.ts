@@ -46,6 +46,7 @@ export function useConversation({
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackData | null>(null)
   const [lessonPhase, setLessonPhase] = useState<LessonPhase>('greeting')
+  const [progress, setProgress] = useState(0)
 
   // refs
   const ttsSpeedRef = useRef(ttsSpeed)
@@ -250,6 +251,11 @@ export function useConversation({
         setLessonPhase(data.nextPhase)
       }
 
+      // 진행률 업데이트 (절대 낮아지지 않음)
+      if (data.progress !== null && data.progress !== undefined) {
+        setProgress(prev => Math.max(prev, data.progress))
+      }
+
       // unit 변경 처리
       if (data.newUnit && data.newUnit !== currentUnitRef.current) {
         const newUnit = data.newUnit
@@ -305,6 +311,6 @@ export function useConversation({
   return {
     sendToGPT, isSpeaking, stopSpeaking, feedback,
     clearFeedback: () => setFeedback(null),
-    lessonPhase,
+    lessonPhase, progress,
   }
 }

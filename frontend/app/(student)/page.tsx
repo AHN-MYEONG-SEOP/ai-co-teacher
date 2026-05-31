@@ -301,7 +301,7 @@ export default function StudentPage() {
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage } = useUIStore()
   const { studentId, sessionId, studentNickname, settings, updateSettings } = useStudentSession()
-  const { sendToGPT, isSpeaking, stopSpeaking } = useConversation({
+  const { sendToGPT, isSpeaking, stopSpeaking, progress } = useConversation({
     sessionId, studentId, studentNickname,
     ttsSpeed: settings.tts_speed,
     currentBook: settings.current_book,
@@ -724,6 +724,34 @@ export default function StudentPage() {
 
         {/* ③ 하단 컨트롤 영역 (고정) */}
         <div className="shrink-0 px-4 pb-4 pt-2 space-y-3">
+
+          {/* 진행률 바 — study phase에서만 표시 */}
+          {progress > 0 && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">
+                  📚 {settings.current_book} · Unit {settings.current_unit}
+                </span>
+                <span className={cn(
+                  'text-xs font-bold tabular-nums transition-colors',
+                  progress >= 80 ? 'text-emerald-400' :
+                  progress >= 50 ? 'text-amber-400' : 'text-slate-400'
+                )}>
+                  {progress}%
+                </span>
+              </div>
+              <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all duration-700 ease-out',
+                    progress >= 80 ? 'bg-emerald-500' :
+                    progress >= 50 ? 'bg-amber-500' : 'bg-violet-500'
+                  )}
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* 마이크 버튼 + 재생 버튼 */}
           <div className="flex items-center justify-center gap-6">
