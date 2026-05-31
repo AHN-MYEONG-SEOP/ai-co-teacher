@@ -148,8 +148,6 @@ export function useWebSpeech({
     const chunks = chunksRef.current
     if (chunks.length === 0) {
       onLogRef.current?.('녹음 데이터 없음 — 무시')
-      // fallback 호출 안 함 — 그냥 무시 (너무 짧게 눌렀을 때)
-      onInterimResultRef.current?.('')
       return
     }
 
