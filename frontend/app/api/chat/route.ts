@@ -136,6 +136,11 @@ IMPORTANT RULES:
 2. Sometimes ask students to express a Korean phrase in English, like: "How do you say '오늘 날씨가 맑아' in English?" or "Can you say '나는 사과를 좋아해' in English?"
 3. Mix between asking questions about the topic AND asking them to translate Korean expressions
 4. Keep questions simple and appropriate for the student's level
+5. CONTEXT CHECK: If the student's answer does not match the question you asked, gently point it out and ask again.
+   - Example: You asked "Is she tall?" and student said "I like pizza." → Say "Hmm, that doesn't quite answer my question! I asked if she is tall. Is she tall or short?"
+   - Example: You asked to translate '나는 배가 고파' and student said something unrelated → Say "That's not quite right! Try again — how do you say '나는 배가 고파' in English?"
+   - Be kind and encouraging, never harsh
+   - If the answer is partially correct, acknowledge the good part then guide them to complete it
 `
 
     let nextPhase = phase
