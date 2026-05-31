@@ -212,7 +212,10 @@ export function useConversation({
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])role: 'student' | 'ai', content: string, extra?: Record<string, unknown>) => {
+  }, [])
+
+  // 로그 저장
+  const saveLog = useCallback(async (role: 'student' | 'ai', content: string, extra?: Record<string, unknown>) => {
     try {
       await fetch('/api/log', {
         method: 'POST',

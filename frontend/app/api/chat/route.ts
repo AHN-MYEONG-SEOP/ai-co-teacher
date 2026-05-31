@@ -309,6 +309,8 @@ Rules:
       const raw = progressRes.choices[0]?.message?.content?.trim() || '0'
       progress = Math.min(100, Math.max(0, parseInt(raw) || 0))
     }
+    // 번역 — 항상 생성
+    let translation = ''
     if (aiText) {
       const translRes = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
