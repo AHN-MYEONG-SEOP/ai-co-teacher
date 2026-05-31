@@ -130,6 +130,12 @@ Example: "Good morning, Minho! Today is Monday, June 3rd. How's the weather toda
 Current time: ${timeStr}
 ${levelGuide}
 Never use Korean. Keep responses SHORT (1-2 sentences max).
+
+IMPORTANT RULES:
+1. Always end your response with a question — never end with a statement
+2. Sometimes ask students to express a Korean phrase in English, like: "How do you say '오늘 날씨가 맑아' in English?" or "Can you say '나는 사과를 좋아해' in English?"
+3. Mix between asking questions about the topic AND asking them to translate Korean expressions
+4. Keep questions simple and appropriate for the student's level
 `
 
     let nextPhase = phase
@@ -212,11 +218,13 @@ Key patterns: ${unitData.sentence_patterns || ''}
 Grammar: ${unitData.grammar || ''}
 
 Teaching rules:
+- ALWAYS end with a question (never a statement)
+- Alternate between: asking about lesson content, asking to translate Korean → English
+- Korean → English examples: "How do you say '${unitData.words.split(',')[0]?.trim()}' in a sentence?", "Can you say '나는 ${unitData.words.split(',')[1]?.trim() || '...'}이 있어' in English?"
 - Use target words naturally in questions
 - Ask ONE question at a time
-- Gently correct mistakes: say the correct form, then ask again
-- Praise good answers briefly ("Great!" "Good job!")
-- Keep building on student's answers
+- Gently correct mistakes: say the correct form first, then ask again
+- Praise briefly ("Great!" "Good job!") then ask next question
 - ${levelGuide}` : ''
     }
 
@@ -235,7 +243,7 @@ Teaching rules:
 
     const aiText = response.choices[0]?.message?.content || ''
 
-    // 선택지 생성 (study, review, confirm_unit phase에서만)
+    // 선택지 생성
     let choices: string[] = []
     if (['study', 'review', 'confirm_unit', 'weather'].includes(phase) && aiText) {
       const choicesRes = await openai.chat.completions.create({
@@ -243,17 +251,19 @@ Teaching rules:
         messages: [
           {
             role: 'system',
-            content: `Generate 3 short answer choices for this teacher's question.
+            content: `Generate 3 short English answer choices for this teacher's question.
 ${levelGuide}
 Rules:
-- Each choice max 5 words
-- Make them natural and varied (yes/no/different answer)
+- Each choice max 6 words
+- Make them natural and varied
+- If teacher asked to translate Korean → English, give 3 English translation options
+- If yes/no question, include yes and no variants
 - Respond ONLY with JSON array: ["choice1", "choice2", "choice3"]
 - No other text`,
           },
-          { role: 'user', content: `Teacher said: "${aiText}"\nGenerate 3 student response choices.` },
+          { role: 'user', content: `Teacher: "${aiText}"\nGenerate 3 student response choices.` },
         ],
-        max_tokens: 60,
+        max_tokens: 80,
         temperature: 0.7,
       })
       try {

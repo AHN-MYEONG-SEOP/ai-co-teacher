@@ -186,8 +186,8 @@ export function useConversation({
     addMessage({ id: studentMsgId, role: 'student', content: studentText, createdAt: new Date().toISOString(), words })
     historyRef.current.push({ role: 'user', content: studentText })
 
-    // 피드백 요청 (study phase에서만)
-    if (lessonPhaseRef.current === 'study') {
+    // 피드백 요청 (greeting 제외 모든 phase)
+    if (lessonPhaseRef.current !== 'greeting') {
       fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
