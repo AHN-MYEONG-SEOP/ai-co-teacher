@@ -46,8 +46,12 @@ export function useWebSpeech({
 
   const startListening = useCallback(async () => {
     chunksRef.current = []
+    const t0 = performance.now()
+    console.group('🎤 [MIC] startListening')
+    console.log('① chunksRef 초기화')
 
     try {
+      console.log('② getUserMedia 요청 중...')
       onLogRef.current?.('마이크 스트림 요청 중...')
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -55,37 +59,46 @@ export function useWebSpeech({
           noiseSuppression: true,
           autoGainControl: true,
           channelCount: 1,
-          // sampleRate 강제 지정 제거 — 기기 기본값 사용 (스마트폰 호환성)
         }
       })
       streamRef.current = stream
+      const tracks = stream.getAudioTracks()
+      const settings = tracks[0]?.getSettings()
+      console.log(`③ 마이크 스트림 획득 성공 (+${(performance.now()-t0).toFixed(0)}ms)`)
+      console.log('   트랙:', tracks[0]?.label || 'unknown')
+      console.log('   설정:', JSON.stringify({
+        sampleRate: settings?.sampleRate,
+        channelCount: settings?.channelCount,
+        echoCancellation: settings?.echoCancellation,
+        noiseSuppression: settings?.noiseSuppression,
+      }))
       onLogRef.current?.('마이크 스트림 획득 성공')
 
       // Web Audio API 노이즈 제거 파이프라인
       let processedStream = stream
       try {
+        console.log('④ Web Audio 파이프라인 구성 중...')
         const audioCtx = new AudioContext({ sampleRate: 16000 })
         const source = audioCtx.createMediaStreamSource(stream)
 
-        // 1. DynamicsCompressor — 소리 크기 압축 (큰 소음 억제)
         const compressor = audioCtx.createDynamicsCompressor()
-        compressor.threshold.value = -30   // -30dB 이상만 압축
+        compressor.threshold.value = -30
         compressor.knee.value = 10
-        compressor.ratio.value = 8         // 8:1 압축비
+        compressor.ratio.value = 8
         compressor.attack.value = 0.003
         compressor.release.value = 0.1
+        console.log('   DynamicsCompressor: threshold=-30dB, ratio=8:1')
 
-        // 2. BiquadFilter — 고주파 소음 제거 (에어컨, 팬 소리 등)
         const highPassFilter = audioCtx.createBiquadFilter()
         highPassFilter.type = 'highpass'
-        highPassFilter.frequency.value = 80  // 80Hz 이하 저주파 제거
+        highPassFilter.frequency.value = 80
+        console.log('   HighPassFilter: 80Hz 이하 제거')
 
-        // 3. BiquadFilter — 저주파 험 제거
         const lowPassFilter = audioCtx.createBiquadFilter()
         lowPassFilter.type = 'lowpass'
-        lowPassFilter.frequency.value = 8000  // 8kHz 이상 고주파 제거
+        lowPassFilter.frequency.value = 8000
+        console.log('   LowPassFilter: 8kHz 이상 제거')
 
-        // 파이프라인 연결: source → highpass → lowpass → compressor → destination
         const destination = audioCtx.createMediaStreamDestination()
         source.connect(highPassFilter)
         highPassFilter.connect(lowPassFilter)
@@ -93,27 +106,40 @@ export function useWebSpeech({
         compressor.connect(destination)
 
         processedStream = destination.stream
+        console.log(`   파이프라인 연결 완료: source→highpass→lowpass→compressor→destination`)
         onLogRef.current?.('Web Audio 노이즈 제거 파이프라인 적용')
       } catch (audioErr) {
+        console.warn('   Web Audio 파이프라인 실패 — 원본 스트림 사용:', audioErr)
         onLogRef.current?.(`Web Audio 파이프라인 실패 — 원본 스트림 사용: ${audioErr}`)
         processedStream = stream
       }
 
-      // 스트림을 MediaRecorder와 공유 (재생용)
-      onStreamReadyRef.current?.(stream)  // 재생용은 원본 스트림
+      onStreamReadyRef.current?.(stream)
+      console.log('⑤ onStreamReady 호출 (재생용 원본 스트림 공유)')
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      console.log(`⑥ MediaRecorder mimeType: ${mimeType}`)
 
-      // 녹음은 처리된 스트림 사용
       const mr = new MediaRecorder(processedStream, { mimeType })
+      let chunkCount = 0
       mr.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data)
+          chunkCount++
+          if (chunkCount % 10 === 0) {
+            const totalSize = chunksRef.current.reduce((a, b) => a + b.size, 0)
+            console.log(`   청크 누적: ${chunkCount}개, 총 ${(totalSize/1024).toFixed(1)}KB`)
+          }
+        }
       }
       mr.start(100)
       mrRef.current = mr
       setIsListening(true)
+      console.log(`⑦ MediaRecorder.start(100ms) — 녹음 시작! (+${(performance.now()-t0).toFixed(0)}ms)`)
+      console.log('✅ startListening 완료')
+      console.groupEnd()
       onLogRef.current?.('녹음 시작 — 말씀하세요')
 
     } catch (err) {

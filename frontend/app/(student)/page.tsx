@@ -526,13 +526,20 @@ export default function StudentPage() {
   const handleMicStart = useCallback(async () => {
     if (!isSupported) { addLog('Web Speech API 미지원 브라우저', 'error'); return }
     if (isHolding) return
+    console.group('🎤 [PAGE] handleMicStart')
+    console.log('① isHolding = true')
     startTimeRef.current = Date.now()
     sentRef.current = false
-    hintUsedRef.current = seenHints.size > 0  // 힌트 봤는지 체크
+    console.log('② sentRef = false (중복 전송 방지 초기화)')
+    hintUsedRef.current = seenHints.size > 0
+    console.log(`③ hintUsedRef = ${hintUsedRef.current} (힌트 본 메시지 수: ${seenHints.size})`)
     setIsHolding(true)
     setAvatarStatus('listening')
     setInterimText('Coty가 당신의 말을 듣고 있습니다.')
     setInterimWords([])
+    console.log('④ avatarStatus = listening, interimText 설정')
+    console.log('⑤ startListening() 호출 →')
+    console.groupEnd()
     addLog('마이크 시작', 'info')
     startListening()
   }, [isSupported, isHolding, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog, seenHints])
