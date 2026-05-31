@@ -7,169 +7,221 @@ export const dynamic = 'force-dynamic'
 const curriculum = curriculumData as {
   level_order: string[]
   curriculum: Record<string, Record<string, Record<string, {
-    unit: number
-    title?: string
-    words: string
-    objectives: string
-    sentence_patterns?: string
-    grammar?: string
+    unit: number; title?: string; words: string
+    objectives: string; sentence_patterns?: string; grammar?: string
   }>>>
 }
 
 function getUnitData(book: string, unit: number) {
   for (const level of Object.values(curriculum.curriculum)) {
-    if (level[book]?.[String(unit)]) {
-      return level[book][String(unit)]
-    }
+    if (level[book]?.[String(unit)]) return level[book][String(unit)]
   }
   return null
 }
 
-function getPrevStudyInfo(book: string, unit: number) {
-  // 이전 unit 찾기
+function getPrevUnitData(book: string, unit: number) {
   for (const level of Object.values(curriculum.curriculum)) {
     if (!level[book]) continue
     const units = Object.keys(level[book]).map(Number).sort((a, b) => a - b)
     const idx = units.indexOf(unit)
-    if (idx > 0) {
-      const prevUnit = units[idx - 1]
-      return level[book][String(prevUnit)]
-    }
+    if (idx > 0) return level[book][String(units[idx - 1])]
   }
   return null
 }
 
-function getSystemPrompt() {
+function getKSTInfo() {
   const now = new Date()
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
-  const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일']
-  const dateStr = `${kst.getUTCFullYear()}년 ${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일 ${days[kst.getUTCDay()]}`
-  const hours = kst.getUTCHours()
-  const minutes = String(kst.getUTCMinutes()).padStart(2, '0')
-  const ampm = hours < 12 ? '오전' : '오후'
-  const h12 = hours % 12 || 12
-  const timeStr = `${ampm} ${h12}:${minutes} (KST)`
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                  'July', 'August', 'September', 'October', 'November', 'December']
+  return {
+    dayName: days[kst.getUTCDay()],
+    monthName: months[kst.getUTCMonth()],
+    date: kst.getUTCDate(),
+    hours: kst.getUTCHours(),
+  }
+}
 
-  return `You are an enthusiastic and encouraging English teacher for Korean students. Your name is "Coty" (코티 선생님).
-Current date and time: ${dateStr} ${timeStr}
-Guidelines:
-- Keep responses SHORT (1-3 sentences max) for natural conversation flow
-- Use simple, clear English appropriate for intermediate learners
-- Be warm, encouraging, and positive
-- If the student speaks in Korean, understand their meaning and respond in English only
-- If the student makes a grammar mistake, gently correct it naturally in your response
-- Ask follow-up questions to keep the conversation going
-- Always respond in English only, regardless of what language the student uses
-- You know the current date and time — use it naturally when relevant`
+function getGreeting(hours: number) {
+  if (hours < 12) return 'Good morning'
+  if (hours < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
+// 교재 레벨에 맞는 언어 수준 지시
+function getLevelGuide(book: string): string {
+  if (book.includes('Phonics') || book.includes('Builder')) {
+    return 'Use very simple words. Short sentences only (3-5 words). Like talking to a 6-7 year old child.'
+  }
+  if (book.includes('Challenger')) {
+    return 'Use simple sentences. Like talking to a 8-9 year old. Keep it fun and easy.'
+  }
+  if (book.includes('Explorer')) {
+    return 'Use clear sentences. Like talking to a 10-11 year old.'
+  }
+  return 'Use natural sentences appropriate for middle school level.'
 }
 
 export async function POST(req: NextRequest) {
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const { messages, studentText, withTranslation, currentBook, currentUnit } = await req.json()
+    const { messages, studentText, withTranslation, currentBook, currentUnit, phase } = await req.json()
 
     if (!studentText) {
-      return NextResponse.json({ error: 'studentText is required' }, { status: 400 })
+      return NextResponse.json({ error: 'studentText required' }, { status: 400 })
     }
 
-    // ── 인사말 ──────────────────────────────────────────
+    const { dayName, monthName, date, hours } = getKSTInfo()
+    const greeting = getGreeting(hours)
+    const levelGuide = getLevelGuide(currentBook || '')
+    const unitData = currentBook && currentUnit ? getUnitData(currentBook, currentUnit) : null
+    const prevData = currentBook && currentUnit ? getPrevUnitData(currentBook, currentUnit) : null
+
+    // ── 1단계: 인사 + 날씨 질문 ─────────────────────────
     if (studentText.startsWith('__GREETING__:')) {
       const nickname = studentText.replace('__GREETING__:', '').trim()
-      const unitData = currentBook && currentUnit ? getUnitData(currentBook, currentUnit) : null
-      const prevData = currentBook && currentUnit ? getPrevStudyInfo(currentBook, currentUnit) : null
 
-      const now = new Date()
-      const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-      const months = ['January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December']
-      const dayName = days[kst.getUTCDay()]
-      const monthName = months[kst.getUTCMonth()]
-      const date = kst.getUTCDate()
-      const hours = kst.getUTCHours()
-      const greeting = hours < 12 ? 'Good morning' : hours < 18 ? 'Good afternoon' : 'Good evening'
+      const prompt = `You are Coty, a friendly English teacher for Korean elementary students.
+${levelGuide}
 
-      const greetingPrompt = `You are Coty, a warm and enthusiastic English teacher for Korean students.
-Today is ${dayName}, ${monthName} ${date}.
+Say hi to ${nickname} with today's date (${dayName}, ${monthName} ${date}).
+Then ask ONE simple question about the weather.
+Max 2 short sentences. Never use Korean.
 
-Generate a natural greeting and lesson introduction for ${nickname} following this EXACT sequence:
-1. Greet with their name and today's day/date (1 sentence)
-2. Ask about the weather today (1 sentence)  
-3. ${prevData ? `Brief review mention: "Last time we studied '${prevData.title || ''}' with words like ${prevData.words.split(',').slice(0,3).join(', ')}. Do you remember any?" (1-2 sentences)` : 'Skip review (first lesson)'}
-4. Announce today's lesson: "${currentBook ? `Today we're going to study ${currentBook}${unitData ? `, Unit ${currentUnit} - '${unitData.title || ''}'` : ''}!` : "Let's practice English today!"}" (1 sentence)
-5. ${unitData ? `Introduce 2-3 key words from: ${unitData.words.split(',').slice(0,5).join(', ')} (1 sentence)` : ''}
-6. Ask: "Would you like to review last lesson first, or shall we start today's new lesson?" (give clear two choices)
+Example: "Good morning, Minho! Today is Monday, June 3rd. How's the weather today?"`
 
-Keep it natural, warm, and under 7 sentences total. Never use Korean.`
-
-      const response = await openai.chat.completions.create({
+      const res = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: greetingPrompt },
-          { role: 'user', content: `Generate the greeting for ${nickname}.` },
-        ],
-        max_tokens: 200,
-        temperature: 0.8,
-      })
-      const greetingText = response.choices[0]?.message?.content ||
-        `${greeting}, ${nickname}! How's the weather today? Let's practice English!`
-      return NextResponse.json({
-        text: greetingText,
-        unitTitle: unitData?.title || '',
-        role: 'assistant'
-      })
-    }
-
-    // ── 인식 불명확 되묻기 ──────────────────────────────
-    if (studentText.startsWith('__CLARIFY__:')) {
-      const partialText = studentText.replace('__CLARIFY__:', '').trim()
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are Coty, an English teacher. Ask the student to clarify naturally in 1 sentence. Reference what you heard if possible. Be warm. Never use Korean.`,
-          },
-          { role: 'user', content: `I partially heard: "${partialText}". Ask to clarify.` },
-        ],
+        messages: [{ role: 'system', content: prompt }, { role: 'user', content: 'Generate greeting.' }],
         max_tokens: 60,
         temperature: 0.7,
       })
       return NextResponse.json({
-        text: response.choices[0]?.message?.content || "Sorry, I didn't catch that. Could you say it again?",
-        role: 'assistant'
+        text: res.choices[0]?.message?.content || `${greeting}, ${nickname}! How's the weather today?`,
+        unitTitle: unitData?.title || '',
+        nextPhase: 'weather',
+        role: 'assistant',
       })
     }
 
-    // ── 일반 대화 ────────────────────────────────────────
-    // 교재 컨텍스트를 시스템 프롬프트에 추가
-    let curriculumContext = ''
-    if (currentBook && currentUnit) {
-      const unitData = getUnitData(currentBook, currentUnit)
-      const prevData = getPrevStudyInfo(currentBook, currentUnit)
-      if (unitData) {
-        curriculumContext = `
-
-Current lesson: ${currentBook}, Unit ${currentUnit}${unitData.title ? ` - "${unitData.title}"` : ''}
-Target words: ${unitData.words}
-Objectives: ${unitData.objectives}
-${unitData.sentence_patterns ? `Key sentence patterns: ${unitData.sentence_patterns}` : ''}
-${unitData.grammar ? `Grammar focus: ${unitData.grammar}` : ''}
-${prevData ? `Previous lesson: Unit ${prevData.unit} - "${prevData.title || ''}" (words: ${prevData.words.split(',').slice(0,5).join(', ')})` : ''}
-
-Teaching guidelines:
-- If student chooses "review": go back to previous lesson content and practice those words/patterns
-- If student chooses "new lesson" or "continue": teach today's target words through natural conversation
-- Guide the student to naturally use target words and sentence patterns
-- Ask questions that encourage use of today's vocabulary
-- Gently correct mistakes and model correct usage`
-      }
+    // ── 인식 불명확 되묻기 ───────────────────────────────
+    if (studentText.startsWith('__CLARIFY__:')) {
+      const partial = studentText.replace('__CLARIFY__:', '').trim()
+      const res = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: `You are Coty. Ask to repeat in 1 simple sentence. ${levelGuide} Never use Korean.` },
+          { role: 'user', content: `Heard: "${partial}". Ask to clarify.` },
+        ],
+        max_tokens: 40,
+        temperature: 0.7,
+      })
+      return NextResponse.json({ text: res.choices[0]?.message?.content || "Can you say that again?", role: 'assistant' })
     }
 
-    const systemPrompt = getSystemPrompt() + curriculumContext
+    // ── phase별 대화 처리 ────────────────────────────────
+    const now = new Date()
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+    const days_ko = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일']
+    const timeStr = `${days_ko[kst.getUTCDay()]} ${kst.getUTCHours()}시`
+
+    let systemContent = `You are Coty, a friendly English teacher for Korean elementary students.
+Current time: ${timeStr}
+${levelGuide}
+Never use Korean. Keep responses SHORT (1-2 sentences max).
+`
+
+    let nextPhase = phase
+    let responseExtra = {}
+
+    // phase별 지시
+    if (phase === 'weather') {
+      // 날씨 답변 받은 후 → 복습 시작
+      const reviewPrompt = prevData
+        ? `Student answered about weather. React briefly (1 sentence).
+Then say: "Last time we learned about '${prevData.title || ''}'. Let's review!"
+Then ask ONE simple question using these words: ${prevData.words.split(',').slice(0, 4).join(', ')}
+Use sentence patterns like: ${prevData.sentence_patterns?.split('\n')[0] || ''}
+Keep it very simple for elementary students.`
+        : `Student answered about weather. React briefly.
+Then say "Let's start today's lesson!" and move to study phase.`
+
+      systemContent += reviewPrompt
+      nextPhase = prevData ? 'review' : 'confirm_unit'
+
+    } else if (phase === 'review') {
+      // 복습 Q&A 진행 (2-3번 후 → confirm_unit으로)
+      const reviewCount = messages.filter((m: {role: string}) => m.role === 'user').length
+      systemContent += `You are reviewing Unit ${currentUnit ? currentUnit - 1 : ''}: "${prevData?.title || ''}".
+Review words: ${prevData?.words || ''}
+Key patterns: ${prevData?.sentence_patterns || ''}
+
+${reviewCount >= 3
+  ? `Good review! Now tell student: "Good job! Now let's check today's lesson."
+     Then say: "Today we'll study ${currentBook}, Unit ${currentUnit}${unitData?.title ? ` - '${unitData.title}'` : ''}. Is that right?"
+     nextPhase should be confirm_unit.`
+  : `Ask ONE simple review question. Use the vocabulary and patterns from the previous lesson.
+     Keep questions very simple (for ${levelGuide.includes('6-7') ? '6-7' : '8-10'} year olds).`}
+`
+      if (reviewCount >= 3) nextPhase = 'confirm_unit'
+
+    } else if (phase === 'confirm_unit') {
+      // Unit 확인 → 맞으면 study, 틀리면 물어보기
+      const studentLower = studentText.toLowerCase()
+      const isYes = ['yes', 'yeah', 'ok', 'okay', 'sure', 'right', 'yep', '네', '응', '맞아'].some(w => studentLower.includes(w))
+      const isNo = ['no', 'nope', 'wrong', 'different', '아니', '아니요', '틀려'].some(w => studentLower.includes(w))
+
+      if (isYes) {
+        systemContent += `Student confirmed today's lesson: ${currentBook}, Unit ${currentUnit} - "${unitData?.title || ''}".
+Say "Great! Let's start!" and introduce the first 2-3 words from: ${unitData?.words.split(',').slice(0, 3).join(', ')}.
+Ask a simple question using one of these words.`
+        nextPhase = 'study'
+
+      } else if (isNo) {
+        // 학생이 다른 unit을 원함 - 어떤 unit인지 물어보기
+        systemContent += `Student wants a different lesson. Ask: "Which unit would you like to study? Tell me the unit number."`
+        nextPhase = 'confirm_unit'
+
+      } else {
+        // 숫자가 있으면 unit 변경
+        const unitMatch = studentText.match(/\d+/)
+        if (unitMatch) {
+          const requestedUnit = parseInt(unitMatch[0])
+          const requestedData = getUnitData(currentBook || '', requestedUnit)
+          if (requestedData) {
+            systemContent += `Student wants Unit ${requestedUnit}${requestedData.title ? ` - "${requestedData.title}"` : ''}.
+Say "OK! Let's study Unit ${requestedUnit}!" and introduce first words: ${requestedData.words.split(',').slice(0, 3).join(', ')}.`
+            nextPhase = 'study'
+            responseExtra = { newUnit: requestedUnit, newBook: currentBook }
+          } else {
+            systemContent += `Unit ${requestedUnit} not found. Ask student to choose a valid unit number.`
+          }
+        } else {
+          systemContent += `Not sure what student wants. Confirm today's lesson: Unit ${currentUnit} - "${unitData?.title || ''}". Ask yes or no.`
+        }
+      }
+
+    } else {
+      // study phase — 교재 내용으로 대화
+      systemContent += unitData ? `
+Current lesson: ${currentBook}, Unit ${currentUnit} - "${unitData.title || ''}"
+Target words: ${unitData.words}
+Objectives: ${unitData.objectives}
+Key patterns: ${unitData.sentence_patterns || ''}
+Grammar: ${unitData.grammar || ''}
+
+Teaching rules:
+- Use target words naturally in questions
+- Ask ONE question at a time
+- Gently correct mistakes: say the correct form, then ask again
+- Praise good answers briefly ("Great!" "Good job!")
+- Keep building on student's answers
+- ${levelGuide}` : ''
+    }
 
     const conversationMessages = [
-      { role: 'system' as const, content: systemPrompt },
+      { role: 'system' as const, content: systemContent },
       ...(messages || []),
       { role: 'user' as const, content: studentText },
     ]
@@ -177,33 +229,36 @@ Teaching guidelines:
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: conversationMessages,
-      max_tokens: 150,
-      temperature: 0.8,
+      max_tokens: 100,
+      temperature: 0.7,
     })
 
     const aiText = response.choices[0]?.message?.content || ''
 
+    // 번역
     if (withTranslation && aiText) {
-      const translationRes = await openai.chat.completions.create({
+      const translRes = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: '다음 영어 문장을 자연스러운 한국어로 번역해줘. 번역문만 출력하고 다른 말은 하지 마.' },
+          { role: 'system', content: '영어를 자연스러운 한국어로 번역. 번역만 출력.' },
           { role: 'user', content: aiText },
         ],
-        max_tokens: 150,
+        max_tokens: 100,
         temperature: 0.3,
       })
       return NextResponse.json({
         text: aiText,
-        translation: translationRes.choices[0]?.message?.content || '',
-        role: 'assistant'
+        translation: translRes.choices[0]?.message?.content || '',
+        nextPhase,
+        ...responseExtra,
+        role: 'assistant',
       })
     }
 
-    return NextResponse.json({ text: aiText, role: 'assistant' })
+    return NextResponse.json({ text: aiText, nextPhase, ...responseExtra, role: 'assistant' })
 
   } catch (error) {
-    console.error('GPT API 오류:', error)
+    console.error('GPT 오류:', error)
     return NextResponse.json({ error: 'GPT API 오류' }, { status: 500 })
   }
 }

@@ -259,6 +259,9 @@ export default function StudentPage() {
     showTranslation: settings.show_translation,
     currentBook: settings.current_book,
     currentUnit: settings.current_unit,
+    onBookUnitChange: (book, unit) => {
+      updateSettings({ current_book: book, current_unit: unit })
+    },
   })
   const [showSettings, setShowSettings] = useState(false)
 

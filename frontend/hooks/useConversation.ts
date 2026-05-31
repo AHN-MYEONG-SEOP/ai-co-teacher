@@ -25,26 +25,45 @@ interface UseConversationProps {
   showTranslation?: boolean
   currentBook?: string
   currentUnit?: number
+  onBookUnitChange?: (book: string, unit: number) => void
 }
+
+// 대화 단계
+type LessonPhase = 'greeting' | 'weather' | 'review' | 'confirm_unit' | 'study'
 
 const TTS_SPEED_MAP = { slow: 0.75, normal: 1.0, fast: 1.25 }
 
-export function useConversation({ sessionId, studentId, studentNickname, ttsSpeed = 'normal', showTranslation = false, currentBook, currentUnit }: UseConversationProps = {}) {
+export function useConversation({
+  sessionId, studentId, studentNickname,
+  ttsSpeed = 'normal', showTranslation = false,
+  currentBook, currentUnit,
+  onBookUnitChange,
+}: UseConversationProps = {}) {
   const { addMessage, setAIResponding, updateMessageFeedback } = useUIStore()
   const { setAvatarStatus } = useAudioStore()
   const historyRef = useRef<Message[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackData | null>(null)
-  const greetedRef = useRef(false)
+  const [lessonPhase, setLessonPhase] = useState<LessonPhase>('greeting')
+
+  // refs
   const ttsSpeedRef = useRef(ttsSpeed)
   const showTranslationRef = useRef(showTranslation)
   const currentBookRef = useRef(currentBook)
   const currentUnitRef = useRef(currentUnit)
+  const lessonPhaseRef = useRef<LessonPhase>('greeting')
+  const onBookUnitChangeRef = useRef(onBookUnitChange)
+
   useEffect(() => { ttsSpeedRef.current = ttsSpeed }, [ttsSpeed])
   useEffect(() => { showTranslationRef.current = showTranslation }, [showTranslation])
   useEffect(() => { currentBookRef.current = currentBook }, [currentBook])
   useEffect(() => { currentUnitRef.current = currentUnit }, [currentUnit])
+  useEffect(() => { onBookUnitChangeRef.current = onBookUnitChange }, [onBookUnitChange])
+
+  const addMessageRef = useRef(addMessage)
+  const speakRef = useRef<(text: string) => Promise<void>>(async () => {})
+  useEffect(() => { addMessageRef.current = addMessage }, [addMessage])
 
   const stopSpeaking = useCallback(() => {
     if (audioRef.current) {
@@ -73,27 +92,11 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
       }
       const audio = new Audio(url)
       audioRef.current = audio
-      // 속도 적용
       audio.playbackRate = TTS_SPEED_MAP[ttsSpeedRef.current] ?? 1.0
-
-      // 재생 완료까지 기다리는 Promise
       await new Promise<void>((resolve) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(url)
-          setIsSpeaking(false)
-          setAvatarStatus('idle')
-          resolve()
-        }
-        audio.onerror = () => {
-          setIsSpeaking(false)
-          setAvatarStatus('idle')
-          resolve()
-        }
-        audio.play().catch(() => {
-          setIsSpeaking(false)
-          setAvatarStatus('idle')
-          resolve()
-        })
+        audio.onended = () => { URL.revokeObjectURL(url); setIsSpeaking(false); setAvatarStatus('idle'); resolve() }
+        audio.onerror = () => { setIsSpeaking(false); setAvatarStatus('idle'); resolve() }
+        audio.play().catch(() => { setIsSpeaking(false); setAvatarStatus('idle'); resolve() })
       })
     } catch {
       setIsSpeaking(false)
@@ -101,26 +104,14 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
     }
   }, [setAvatarStatus])
 
-  // addMessage, speak를 ref로 저장 (useEffect 의존성에서 제거)
-  const addMessageRef = useRef(addMessage)
-  const speakRef = useRef(speak)
-  useEffect(() => { addMessageRef.current = addMessage }, [addMessage])
   useEffect(() => { speakRef.current = speak }, [speak])
 
-  // 인사말 — studentNickname이 처음 설정될 때 한 번만
+  // 인사말 — 날씨 질문만 (짧게!)
   useEffect(() => {
     if (!studentNickname) return
     const greetedKey = `greeted_${studentNickname}`
     if (sessionStorage.getItem(greetedKey)) return
     sessionStorage.setItem(greetedKey, '1')
-
-    // 즉시 환영 텍스트 표시 (TTS 없이)
-    addMessageRef.current({
-      id: 'welcome',
-      role: 'ai',
-      content: 'AI Co-Teacher 오신 것을 환영합니다. 🎙️',
-      createdAt: new Date().toISOString(),
-    })
 
     const timer = setTimeout(async () => {
       try {
@@ -130,48 +121,59 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
           body: JSON.stringify({
             messages: [],
             studentText: `__GREETING__:${studentNickname}`,
-            currentBook,
-            currentUnit,
+            currentBook: currentBookRef.current,
+            currentUnit: currentUnitRef.current,
+            phase: 'greeting',
           }),
         })
         if (!res.ok) throw new Error()
         const data = await res.json()
         const greetingText = data.text
+
         historyRef.current.push({ role: 'assistant', content: greetingText })
+        lessonPhaseRef.current = 'weather'
+        setLessonPhase('weather')
 
         // 학습 로그 저장
-        if (currentBook && currentUnit) {
+        if (currentBookRef.current && currentUnitRef.current) {
           fetch('/api/study-log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               student_id: studentId,
               session_id: sessionId,
-              book: currentBook,
-              unit: currentUnit,
+              book: currentBookRef.current,
+              unit: currentUnitRef.current,
               unit_title: data.unitTitle || '',
             }),
           })
         }
 
-        fetch('/api/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId || null, student_id: studentId || null, ai_text: greetingText }),
-        })
         await speakRef.current(greetingText)
         addMessageRef.current({ id: 'greeting', role: 'ai', content: greetingText, createdAt: new Date().toISOString() })
       } catch {
-        const fallback = `Hi ${studentNickname}! Great to see you. Are you ready to practice your English today?`
+        const fallback = `Hi ${studentNickname}! How's the weather today?`
         historyRef.current.push({ role: 'assistant', content: fallback })
+        lessonPhaseRef.current = 'weather'
+        setLessonPhase('weather')
         await speakRef.current(fallback)
         addMessageRef.current({ id: 'greeting', role: 'ai', content: fallback, createdAt: new Date().toISOString() })
       }
     }, 300)
-
-    // cleanup 없음 — 타이머 취소 안 함
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentNickname])
+
+  // 로그 저장
+  const saveLog = useCallback(async (role: 'student' | 'ai', content: string, extra?: Record<string, unknown>) => {
+    try {
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId || null, student_id: studentId || null, role, content, ...extra }),
+      })
+    } catch { }
+  }, [sessionId, studentId])
 
   const sendToGPT = useCallback(async (
     studentText: string,
@@ -181,28 +183,22 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
     let resolveLogId: (id: string | null) => void = () => {}
     const logIdPromise = new Promise<string | null>((resolve) => { resolveLogId = resolve })
 
-    // 1. 학생 메시지 UI 추가 (words 포함)
+    // 학생 메시지 UI 추가
     const studentMsgId = Date.now().toString()
     addMessage({ id: studentMsgId, role: 'student', content: studentText, createdAt: new Date().toISOString(), words })
     historyRef.current.push({ role: 'user', content: studentText })
 
-    // 2. 피드백 + 학생 발화 로그 저장 (병렬, log_id 반환)
-    const feedbackPromise = (async () => {
-      try {
-        const res = await fetch('/api/feedback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: studentText,
-            conversationHistory: historyRef.current.slice(-6),
-          }),
-        })
+    // 피드백 요청 (study phase에서만)
+    if (lessonPhaseRef.current === 'study') {
+      fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: studentText, conversationHistory: historyRef.current.slice(-6) }),
+      }).then(async (res) => {
         if (!res.ok) { resolveLogId(null); return }
         const feedbackData = await res.json()
         setFeedback(feedbackData)
         updateMessageFeedback(studentMsgId, feedbackData)
-
-        // 학생 발화 row 저장 → log_id 획득
         const logRes = await fetch('/api/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -223,12 +219,11 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
         })
         const logData = await logRes.json()
         resolveLogId(logData.log_id || null)
-      } catch {
-        resolveLogId(null)
-      }
-    })()
+      }).catch(() => resolveLogId(null))
+    } else {
+      resolveLogId(null)
+    }
 
-    // 3. GPT 응답 요청 (피드백과 병렬)
     setAIResponding(true)
     setAvatarStatus('processing')
 
@@ -242,6 +237,7 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
           withTranslation: showTranslationRef.current,
           currentBook: currentBookRef.current,
           currentUnit: currentUnitRef.current,
+          phase: lessonPhaseRef.current,
         }),
       })
       if (!res.ok) throw new Error('GPT 응답 실패')
@@ -249,12 +245,36 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
       const aiText = data.text
       const translation = data.translation || ''
 
-      // TTS 먼저 재생 — 듣기 연습
+      // phase 업데이트
+      if (data.nextPhase && data.nextPhase !== lessonPhaseRef.current) {
+        lessonPhaseRef.current = data.nextPhase
+        setLessonPhase(data.nextPhase)
+      }
+
+      // unit 변경 처리
+      if (data.newUnit && data.newUnit !== currentUnitRef.current) {
+        const newUnit = data.newUnit
+        const newBook = data.newBook || currentBookRef.current || ''
+        currentUnitRef.current = newUnit
+        currentBookRef.current = newBook
+        onBookUnitChangeRef.current?.(newBook, newUnit)
+        // DB 업데이트
+        fetch('/api/study-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            student_id: studentId,
+            session_id: sessionId,
+            book: newBook,
+            unit: newUnit,
+          }),
+        })
+      }
+
       historyRef.current.push({ role: 'assistant', content: aiText })
       setAIResponding(false)
       await speak(aiText)
 
-      // 재생 완료 후 텍스트 + 번역 표시
       addMessageRef.current({
         id: (Date.now() + 1).toString(),
         role: 'ai',
@@ -263,7 +283,7 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
         createdAt: new Date().toISOString(),
       })
 
-      // 4. log_id 기다렸다가 ai_text 업데이트
+      // 로그 저장
       const logId = await logIdPromise
       if (logId) {
         fetch('/api/log', {
@@ -271,17 +291,8 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ log_id: logId, ai_text: aiText }),
         })
-      } else {
-        fetch('/api/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            session_id: sessionId || null,
-            student_id: studentId || null,
-            student_text: studentText,
-            ai_text: aiText,
-          }),
-        })
+      } else if (lessonPhaseRef.current !== 'study') {
+        saveLog('ai', aiText)
       }
 
     } catch {
@@ -289,9 +300,11 @@ export function useConversation({ sessionId, studentId, studentNickname, ttsSpee
       setAvatarStatus('idle')
       resolveLogId!(null)
     }
+  }, [addMessage, setAIResponding, setAvatarStatus, speak, updateMessageFeedback, sessionId, studentId, saveLog])
 
-    await feedbackPromise
-  }, [addMessage, setAIResponding, setAvatarStatus, speak, updateMessageFeedback, sessionId, studentId])
-
-  return { sendToGPT, isSpeaking, stopSpeaking, feedback, clearFeedback: () => setFeedback(null) }
+  return {
+    sendToGPT, isSpeaking, stopSpeaking, feedback,
+    clearFeedback: () => setFeedback(null),
+    lessonPhase,
+  }
 }
