@@ -280,6 +280,7 @@ export function useConversation({
         role: 'ai',
         content: aiText,
         translation: translation || undefined,
+        choices: data.choices?.length ? data.choices : undefined,
         createdAt: new Date().toISOString(),
       })
 

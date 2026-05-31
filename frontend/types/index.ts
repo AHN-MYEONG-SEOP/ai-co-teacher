@@ -42,7 +42,8 @@ export interface ConversationMessage {
   createdAt: string
   feedback?: MessageFeedback
   words?: WordResult[]
-  translation?: string   // AI 메시지 한국어 번역
+  translation?: string
+  choices?: string[]   // AI가 제시하는 선택지
 }
 // Supabase 테이블 타입
 export interface Profile {

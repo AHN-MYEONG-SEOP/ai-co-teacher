@@ -140,10 +140,16 @@ export function useWebSpeech({
     // 스트림 종료
     streamRef.current?.getTracks().forEach((t) => t.stop())
 
+    // 청크가 없으면 잠시 기다려봄 (타이밍 문제 대응)
+    if (chunksRef.current.length === 0) {
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
+
     const chunks = chunksRef.current
     if (chunks.length === 0) {
-      onLogRef.current?.('녹음 데이터 없음 — 재시도 요청')
-      onFallbackRef.current?.(0)
+      onLogRef.current?.('녹음 데이터 없음 — 무시')
+      // fallback 호출 안 함 — 그냥 무시 (너무 짧게 눌렀을 때)
+      onInterimResultRef.current?.('')
       return
     }
 

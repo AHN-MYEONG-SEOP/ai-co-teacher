@@ -562,7 +562,24 @@ export default function StudentPage() {
                 )}
               </div>
 
-              {/* 인라인 피드백 — 학생 메시지 바로 아래, show_feedback ON일 때만 */}
+                {/* AI 메시지 선택지 버튼 */}
+                {msg.role === 'ai' && msg.choices && msg.choices.length > 0 && (
+                  <div className="flex flex-wrap gap-2 max-w-[85%] mt-1">
+                    {msg.choices.map((choice, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          if (isSpeaking) return
+                          sendToGPT(choice, { sttPath: 'A', confidence: 1, latencyMs: 0 })
+                        }}
+                        disabled={isSpeaking}
+                        className="bg-violet-800/60 hover:bg-violet-700/80 border border-violet-600/40 text-violet-200 text-xs px-3 py-1.5 rounded-full transition-colors disabled:opacity-40"
+                      >
+                        {choice}
+                      </button>
+                    ))}
+                  </div>
+                )}
               {msg.role === 'student' && msg.feedback && settings.show_feedback && (
                 <div className="mt-1.5 max-w-[85%] w-full bg-slate-800/60 border border-slate-700/40 rounded-xl px-3 py-2 space-y-1.5">
                   {/* 점수 한 줄 요약 */}

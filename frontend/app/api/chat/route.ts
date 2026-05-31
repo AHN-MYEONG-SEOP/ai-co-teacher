@@ -235,6 +235,35 @@ Teaching rules:
 
     const aiText = response.choices[0]?.message?.content || ''
 
+    // 선택지 생성 (study, review, confirm_unit phase에서만)
+    let choices: string[] = []
+    if (['study', 'review', 'confirm_unit', 'weather'].includes(phase) && aiText) {
+      const choicesRes = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `Generate 3 short answer choices for this teacher's question.
+${levelGuide}
+Rules:
+- Each choice max 5 words
+- Make them natural and varied (yes/no/different answer)
+- Respond ONLY with JSON array: ["choice1", "choice2", "choice3"]
+- No other text`,
+          },
+          { role: 'user', content: `Teacher said: "${aiText}"\nGenerate 3 student response choices.` },
+        ],
+        max_tokens: 60,
+        temperature: 0.7,
+      })
+      try {
+        const raw = choicesRes.choices[0]?.message?.content || '[]'
+        choices = JSON.parse(raw.replace(/```json|```/g, '').trim())
+      } catch {
+        choices = []
+      }
+    }
+
     // 번역
     if (withTranslation && aiText) {
       const translRes = await openai.chat.completions.create({
@@ -249,13 +278,14 @@ Teaching rules:
       return NextResponse.json({
         text: aiText,
         translation: translRes.choices[0]?.message?.content || '',
+        choices,
         nextPhase,
         ...responseExtra,
         role: 'assistant',
       })
     }
 
-    return NextResponse.json({ text: aiText, nextPhase, ...responseExtra, role: 'assistant' })
+    return NextResponse.json({ text: aiText, choices, nextPhase, ...responseExtra, role: 'assistant' })
 
   } catch (error) {
     console.error('GPT 오류:', error)
