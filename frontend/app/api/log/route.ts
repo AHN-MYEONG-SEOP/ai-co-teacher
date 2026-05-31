@@ -15,11 +15,11 @@ export async function POST(req: NextRequest) {
       student_text, ai_text,
       stt_path, confidence, latency_ms,
       grammar, fluency, vocabulary, overall, correction, tip,
-      log_id,  // 기존 row 업데이트용
+      hint_used,
+      log_id,
     } = await req.json()
 
     if (log_id) {
-      // AI 응답이 왔을 때 기존 row에 ai_text 업데이트
       const { error } = await supabase
         .from('conversation_logs')
         .update({ ai_text })
@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true })
 
     } else {
-      // 학생 발화 → 새 row 생성
       const { data, error } = await supabase
         .from('conversation_logs')
         .insert({
@@ -49,6 +48,7 @@ export async function POST(req: NextRequest) {
           overall: overall || null,
           correction: correction || null,
           tip: tip || null,
+          hint_used: hint_used ?? false,
         })
         .select('id')
         .single()

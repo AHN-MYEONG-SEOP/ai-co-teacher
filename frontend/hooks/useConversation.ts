@@ -15,6 +15,7 @@ interface ConversationMeta {
   sttPath?: string
   confidence?: number
   latencyMs?: number
+  hintUsed?: boolean
 }
 
 interface UseConversationProps {
@@ -22,7 +23,6 @@ interface UseConversationProps {
   studentId?: string
   studentNickname?: string | null
   ttsSpeed?: 'slow' | 'normal' | 'fast'
-  showTranslation?: boolean
   currentBook?: string
   currentUnit?: number
   onBookUnitChange?: (book: string, unit: number) => void
@@ -35,7 +35,7 @@ const TTS_SPEED_MAP = { slow: 0.75, normal: 1.0, fast: 1.25 }
 
 export function useConversation({
   sessionId, studentId, studentNickname,
-  ttsSpeed = 'normal', showTranslation = false,
+  ttsSpeed = 'normal',
   currentBook, currentUnit,
   onBookUnitChange,
 }: UseConversationProps = {}) {
@@ -49,14 +49,12 @@ export function useConversation({
 
   // refs
   const ttsSpeedRef = useRef(ttsSpeed)
-  const showTranslationRef = useRef(showTranslation)
   const currentBookRef = useRef(currentBook)
   const currentUnitRef = useRef(currentUnit)
   const lessonPhaseRef = useRef<LessonPhase>('greeting')
   const onBookUnitChangeRef = useRef(onBookUnitChange)
 
   useEffect(() => { ttsSpeedRef.current = ttsSpeed }, [ttsSpeed])
-  useEffect(() => { showTranslationRef.current = showTranslation }, [showTranslation])
   useEffect(() => { currentBookRef.current = currentBook }, [currentBook])
   useEffect(() => { currentUnitRef.current = currentUnit }, [currentUnit])
   useEffect(() => { onBookUnitChangeRef.current = onBookUnitChange }, [onBookUnitChange])
@@ -209,6 +207,7 @@ export function useConversation({
             stt_path: meta?.sttPath,
             confidence: meta?.confidence,
             latency_ms: meta?.latencyMs,
+            hint_used: meta?.hintUsed ?? false,
             grammar: feedbackData.grammar,
             fluency: feedbackData.fluency,
             vocabulary: feedbackData.vocabulary,
@@ -234,7 +233,7 @@ export function useConversation({
         body: JSON.stringify({
           messages: historyRef.current.slice(-10),
           studentText,
-          withTranslation: showTranslationRef.current,
+          withTranslation: true,  // 항상 번역 요청
           currentBook: currentBookRef.current,
           currentUnit: currentUnitRef.current,
           phase: lessonPhaseRef.current,

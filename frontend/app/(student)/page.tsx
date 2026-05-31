@@ -136,26 +136,6 @@ function SettingsModal({
           </div>
         </div>
 
-        {/* AI 한국어 번역 표시 */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-300">🇰🇷 AI 한국어 번역 표시</p>
-            <p className="text-xs text-slate-500 mt-0.5">AI가 한 말을 한국어로 번역해서 보여줌</p>
-          </div>
-          <button
-            onClick={() => setLocal(p => ({ ...p, show_translation: !p.show_translation }))}
-            className={cn(
-              'w-12 h-6 rounded-full transition-colors relative',
-              local.show_translation ? 'bg-emerald-500' : 'bg-slate-600'
-            )}
-          >
-            <div className={cn(
-              'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform',
-              local.show_translation ? 'translate-x-6' : 'translate-x-0.5'
-            )} />
-          </button>
-        </div>
-
         {/* 발화 피드백 표시 */}
         <div className="flex items-center justify-between">
           <div>
@@ -237,6 +217,74 @@ function WordConfidenceDisplay({ words }: { words: WordResult[] }) {
   )
 }
 
+// ── 힌트 박스 컴포넌트 ─────────────────────────────────
+function HintBox({
+  msgId,
+  choices,
+  onHintSeen,
+  alreadySeen,
+}: {
+  msgId: string
+  choices: string[]
+  onHintSeen: (id: string) => void
+  alreadySeen: boolean
+}) {
+  const [visible, setVisible] = useState(alreadySeen)
+
+  const handleShow = () => {
+    setVisible(true)
+    onHintSeen(msgId)
+  }
+
+  return (
+    <div className="max-w-[85%] mt-1.5">
+      {!visible ? (
+        <button
+          onClick={handleShow}
+          className="text-xs text-slate-500 hover:text-slate-300 border border-slate-700/50 hover:border-slate-500 rounded-full px-3 py-1 transition-colors"
+        >
+          💡 힌트 보기
+        </button>
+      ) : (
+        <div className="space-y-1">
+          <p className="text-xs text-slate-500 mb-1">💡 힌트 (말로 대답해보세요!)</p>
+          <div className="flex flex-wrap gap-1.5">
+            {choices.map((choice, i) => (
+              <span
+                key={i}
+                className="bg-slate-800/80 border border-slate-600/40 text-slate-300 text-xs px-3 py-1.5 rounded-full select-none"
+              >
+                {choice}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── 번역 박스 컴포넌트 ─────────────────────────────────
+function TranslationBox({ translation }: { translation: string }) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <div className="mt-1">
+      {!visible ? (
+        <button
+          onClick={() => setVisible(true)}
+          className="text-xs text-slate-500 hover:text-slate-300 border border-slate-700/50 hover:border-slate-500 rounded-full px-3 py-1 transition-colors"
+        >
+          🇰🇷 번역 보기
+        </button>
+      ) : (
+        <p className="text-xs text-violet-300/70 border-t border-violet-700/30 pt-2 mt-1 leading-relaxed">
+          {translation}
+        </p>
+      )}
+    </div>
+  )
+}
+
 interface LogEntry {
   id: number
   time: string
@@ -256,7 +304,6 @@ export default function StudentPage() {
   const { sendToGPT, isSpeaking, stopSpeaking } = useConversation({
     sessionId, studentId, studentNickname,
     ttsSpeed: settings.tts_speed,
-    showTranslation: settings.show_translation,
     currentBook: settings.current_book,
     currentUnit: settings.current_unit,
     onBookUnitChange: (book, unit) => {
@@ -272,6 +319,8 @@ export default function StudentPage() {
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [isHolding, setIsHolding] = useState(false)
+  const [seenHints, setSeenHints] = useState<Set<string>>(new Set())
+  const hintUsedRef = useRef(false)  // 현재 발화에서 힌트 봤는지
   const startTimeRef = useRef<number>(0)
   const logIdRef = useRef(0)
   const sentRef = useRef(false)  // 중복 전송 방지 플래그
@@ -340,7 +389,6 @@ export default function StudentPage() {
     if (sentRef.current) return
     sentRef.current = true
 
-    // 텍스트 정제 — 첫 글자 대문자, 마지막 문장부호 추가
     const normalized = text.trim()
     const capitalized = normalized.charAt(0).toUpperCase() + normalized.slice(1)
     const punctuated = /[.?!]$/.test(capitalized) ? capitalized : capitalized + '.'
@@ -353,7 +401,9 @@ export default function StudentPage() {
     if (words) setFinalWords(words)
     discardBlob()
     addLog(`Path A: "${punctuated}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
-    sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency }, words)
+    sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current }, words)
+    // 답변 후 힌트 상태 초기화
+    setSeenHints(new Set())
   }, [discardBlob, setSpeechResult, setLatency, setInterimText, setInterimWords, setFinalWords, addLog, sendToGPT])
 
   const handleFallback = useCallback(async (confidence: number, partialText?: string) => {
@@ -456,16 +506,17 @@ export default function StudentPage() {
 
   const handleMicStart = useCallback(async () => {
     if (!isSupported) { addLog('Web Speech API 미지원 브라우저', 'error'); return }
-    if (isHolding) return  // 이미 누르고 있는 경우 무시
+    if (isHolding) return
     startTimeRef.current = Date.now()
     sentRef.current = false
+    hintUsedRef.current = seenHints.size > 0  // 힌트 봤는지 체크
     setIsHolding(true)
     setAvatarStatus('listening')
     setInterimText('Coty가 당신의 말을 듣고 있습니다.')
     setInterimWords([])
     addLog('마이크 시작', 'info')
     startListening()
-  }, [isSupported, isHolding, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog])
+  }, [isSupported, isHolding, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog, seenHints])
 
   const handleMicStop = useCallback(async () => {
     if (!isHolding) return  // 이미 중지된 경우 무시
@@ -554,31 +605,20 @@ export default function StudentPage() {
                 ) : (
                   <span>{msg.content}</span>
                 )}
-                {/* AI 메시지 — 한국어 번역 */}
+                {/* AI 메시지 — 한국어 번역 버튼 */}
                 {msg.role === 'ai' && msg.translation && (
-                  <p className="text-xs text-violet-300/70 mt-2 pt-2 border-t border-violet-700/30">
-                    {msg.translation}
-                  </p>
+                  <TranslationBox translation={msg.translation} />
                 )}
               </div>
 
-                {/* AI 메시지 선택지 버튼 */}
+                {/* AI 메시지 — 힌트 버튼 */}
                 {msg.role === 'ai' && msg.choices && msg.choices.length > 0 && (
-                  <div className="flex flex-wrap gap-2 max-w-[85%] mt-1">
-                    {msg.choices.map((choice, i) => (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          if (isSpeaking) return
-                          sendToGPT(choice, { sttPath: 'A', confidence: 1, latencyMs: 0 })
-                        }}
-                        disabled={isSpeaking}
-                        className="bg-violet-800/60 hover:bg-violet-700/80 border border-violet-600/40 text-violet-200 text-xs px-3 py-1.5 rounded-full transition-colors disabled:opacity-40"
-                      >
-                        {choice}
-                      </button>
-                    ))}
-                  </div>
+                  <HintBox
+                    msgId={msg.id}
+                    choices={msg.choices}
+                    onHintSeen={(msgId) => setSeenHints(prev => new Set(prev).add(msgId))}
+                    alreadySeen={seenHints.has(msg.id)}
+                  />
                 )}
               {msg.role === 'student' && msg.feedback && settings.show_feedback && (
                 <div className="mt-1.5 max-w-[85%] w-full bg-slate-800/60 border border-slate-700/40 rounded-xl px-3 py-2 space-y-1.5">

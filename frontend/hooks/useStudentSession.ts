@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 export interface StudentSettings {
   tts_speed: 'slow' | 'normal' | 'fast'
   show_feedback: boolean
-  show_translation: boolean
   current_book: string
   current_unit: number
 }
@@ -14,7 +13,6 @@ export interface StudentSettings {
 const DEFAULT_SETTINGS: StudentSettings = {
   tts_speed: 'normal',
   show_feedback: true,
-  show_translation: false,
   current_book: 'STARLAND Phonics 1 Single Letters',
   current_unit: 1,
 }
@@ -51,7 +49,7 @@ export function useStudentSession(): StudentSession {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('name, nickname, tts_speed, show_feedback, show_translation, current_book, current_unit')
+        .select('name, nickname, tts_speed, show_feedback, current_book, current_unit')
         .eq('id', user.id)
         .single()
 
@@ -61,7 +59,6 @@ export function useStudentSession(): StudentSession {
         setSettings({
           tts_speed: profile.tts_speed || 'normal',
           show_feedback: profile.show_feedback ?? true,
-          show_translation: profile.show_translation ?? false,
           current_book: profile.current_book || 'STARLAND Phonics 1 Single Letters',
           current_unit: profile.current_unit || 1,
         })
@@ -101,7 +98,6 @@ export function useStudentSession(): StudentSession {
       .update({
         tts_speed: updated.tts_speed,
         show_feedback: updated.show_feedback,
-        show_translation: updated.show_translation,
         current_book: updated.current_book,
         current_unit: updated.current_unit,
       })

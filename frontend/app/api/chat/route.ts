@@ -264,8 +264,9 @@ Rules:
       }
     }
 
-    // 번역
-    if (withTranslation && aiText) {
+    // 번역 — 항상 생성
+    let translation = ''
+    if (aiText) {
       const translRes = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
@@ -275,17 +276,10 @@ Rules:
         max_tokens: 100,
         temperature: 0.3,
       })
-      return NextResponse.json({
-        text: aiText,
-        translation: translRes.choices[0]?.message?.content || '',
-        choices,
-        nextPhase,
-        ...responseExtra,
-        role: 'assistant',
-      })
+      translation = translRes.choices[0]?.message?.content || ''
     }
 
-    return NextResponse.json({ text: aiText, choices, nextPhase, ...responseExtra, role: 'assistant' })
+    return NextResponse.json({ text: aiText, translation, choices, nextPhase, ...responseExtra, role: 'assistant' })
 
   } catch (error) {
     console.error('GPT 오류:', error)
