@@ -609,12 +609,26 @@ export default function StudentPage() {
   const { config: audioConfig, setConfig: setAudioConfig, resetConfig: resetAudioConfig, hydrate: hydrateAudioConfig } = useAudioConfigStore()
   useEffect(() => { hydrateAudioConfig() }, [hydrateAudioConfig])
 
-  // 오늘 Unit의 target 단어 — Deepgram keyword boosting(문맥 힌트)으로 전달
+  // Deepgram keyword boosting(문맥 힌트)으로 전달할 단어들 모으기:
+  //   ① 오늘 Unit의 target 단어  ② 시나리오 stage 타깃  ③ AI가 방금 던진 질문 속 핵심어
+  // 학생이 다음에 말할 가능성이 높은 단어를 미리 알려줘 연음/뭉갠 발음 인식을 보완한다.
   const { getUnitData } = useCurriculum()
   const unitForKeywords = getUnitData(settings.current_book, settings.current_unit)
-  const sttKeywords = unitForKeywords?.words
+  // 흔한 기능어는 부스트해도 도움이 안 되고 오인식만 늘리므로 제외
+  const STT_STOPWORDS = new Set([
+    'the','and','for','you','your','are','was','were','this','that','with','what','how','who',
+    'where','when','why','can','will','did','does','have','has','had','not','but','about',
+    'they','them','his','her','she','him','our','out','from','into','its','too','let','lets','okay',
+  ])
+  const tokenize = (s: string): string[] =>
+    (s.toLowerCase().match(/[a-z']{3,}/g) || []).filter(w => !STT_STOPWORDS.has(w))
+  const unitWords = unitForKeywords?.words
     ? unitForKeywords.words.split(',').map(w => w.trim()).filter(Boolean)
     : []
+  const stageWords = (progressState?.stages || []).flatMap(s => tokenize(s.target))
+  const lastAiText = [...messages].reverse().find(m => m.role === 'ai')?.content || ''
+  const aiWords = tokenize(lastAiText)
+  const sttKeywords = [...unitWords, ...stageWords, ...aiWords]
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null)
