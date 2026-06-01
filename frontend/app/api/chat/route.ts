@@ -63,6 +63,37 @@ function getLevelGuide(book: string): string {
   return 'Use natural sentences appropriate for middle school level.'
 }
 
+// AI 질문에 대한 학생 답변 선택지 3개 생성 (힌트 버튼용) — 모든 phase 공통
+async function generateChoices(openai: OpenAI, aiText: string, levelGuide: string): Promise<string[]> {
+  if (!aiText) return []
+  try {
+    const res = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Generate 3 short English answer choices for this teacher's question.
+${levelGuide}
+Rules:
+- Each choice max 6 words
+- Make them natural and varied
+- If teacher asked to translate Korean → English, give 3 English translation options
+- If yes/no question, include yes and no variants
+- Respond ONLY with JSON array: ["choice1", "choice2", "choice3"]
+- No other text`,
+        },
+        { role: 'user', content: `Teacher: "${aiText}"\nGenerate 3 student response choices.` },
+      ],
+      max_tokens: 80,
+      temperature: 0.7,
+    })
+    const raw = res.choices[0]?.message?.content || '[]'
+    return JSON.parse(raw.replace(/```json|```/g, '').trim())
+  } catch {
+    return []
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -97,9 +128,12 @@ Example: "Good morning, Minho! Today is Monday, June 3rd. How's the weather toda
         max_tokens: 60,
         temperature: 0.7,
       })
+      const greetingText = res.choices[0]?.message?.content || `${greeting}, ${nickname}! How's the weather today?`
+      const choices = await generateChoices(openai, greetingText, levelGuide)
       return NextResponse.json({
-        text: res.choices[0]?.message?.content || `${greeting}, ${nickname}! How's the weather today?`,
+        text: greetingText,
         unitTitle: unitData?.title || '',
+        choices,
         nextPhase: 'weather',
         role: 'assistant',
       })
@@ -247,36 +281,8 @@ Teaching rules:
 
     const aiText = response.choices[0]?.message?.content || ''
 
-    // 선택지 생성
-    let choices: string[] = []
-    if (['study', 'review', 'confirm_unit', 'weather'].includes(phase) && aiText) {
-      const choicesRes = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `Generate 3 short English answer choices for this teacher's question.
-${levelGuide}
-Rules:
-- Each choice max 6 words
-- Make them natural and varied
-- If teacher asked to translate Korean → English, give 3 English translation options
-- If yes/no question, include yes and no variants
-- Respond ONLY with JSON array: ["choice1", "choice2", "choice3"]
-- No other text`,
-          },
-          { role: 'user', content: `Teacher: "${aiText}"\nGenerate 3 student response choices.` },
-        ],
-        max_tokens: 80,
-        temperature: 0.7,
-      })
-      try {
-        const raw = choicesRes.choices[0]?.message?.content || '[]'
-        choices = JSON.parse(raw.replace(/```json|```/g, '').trim())
-      } catch {
-        choices = []
-      }
-    }
+    // 선택지 생성 — 모든 phase에서 항상 힌트 제공
+    const choices = await generateChoices(openai, aiText, levelGuide)
 
     // 진행률 계산 (study phase에서만)
     let progress: number | null = null
