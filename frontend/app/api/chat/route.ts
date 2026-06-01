@@ -227,10 +227,15 @@ Teaching rules:
 - ${levelGuide}` : ''
     }
 
+    // 호출자(useConversation)가 이미 현재 학생 발화를 messages 끝에 push해서 보내므로
+    // 여기서 또 붙이면 동일 발화가 중복 전달된다 → 마지막 메시지가 현재 발화면 재추가하지 않음
+    const history = messages || []
+    const last = history[history.length - 1]
+    const alreadyHasCurrent = last?.role === 'user' && last?.content === studentText
     const conversationMessages = [
       { role: 'system' as const, content: systemContent },
-      ...(messages || []),
-      { role: 'user' as const, content: studentText },
+      ...history,
+      ...(alreadyHasCurrent ? [] : [{ role: 'user' as const, content: studentText }]),
     ]
 
     const response = await openai.chat.completions.create({
@@ -298,7 +303,7 @@ Rules:
           },
           {
             role: 'user',
-            content: `Conversation so far:\n${[...(messages || []), { role: 'user', content: studentText }, { role: 'assistant', content: aiText }]
+            content: `Conversation so far:\n${[...conversationMessages.slice(1), { role: 'assistant', content: aiText }]
               .map((m: {role: string, content: string}) => `${m.role}: ${m.content}`)
               .join('\n')}\n\nCurrent progress (0-100)?`,
           },

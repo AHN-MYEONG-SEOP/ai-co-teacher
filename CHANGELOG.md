@@ -74,6 +74,7 @@
 ## 변경 이력
 
 ### 2026-06
+- 학생 발화 중복 전달 버그 수정 (chat route): useConversation이 이미 messages 끝에 현재 발화를 넣어 보내는데 route에서 또 append → GPT가 같은 말을 두 번 본 문제. 대화 메시지 + 진행률 계산 입력 양쪽 수정
 - 빠른 탭 녹음 유실 race condition 수정 (useWebSpeech: start/stop 동기화)
 - lesson_reports 테이블 추가 (날짜별 seq 포함)
 - hint_used 컬럼 conversation_logs에 추가
