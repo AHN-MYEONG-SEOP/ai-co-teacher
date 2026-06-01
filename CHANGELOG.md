@@ -74,6 +74,7 @@
 ## 변경 이력
 
 ### 2026-06
+- 배포 버전 표시 추가: `frontend/lib/version.ts`의 `APP_VERSION`(일자.순번)을 NavBar 상단에 표시 → 배포 반영 여부 확인용. **배포할 때마다 순번 갱신 필수**
 - 학생 발화 중복 전달 버그 수정 (chat route): useConversation이 이미 messages 끝에 현재 발화를 넣어 보내는데 route에서 또 append → GPT가 같은 말을 두 번 본 문제. 대화 메시지 + 진행률 계산 입력 양쪽 수정
 - 빠른 탭 녹음 유실 race condition 수정 (useWebSpeech: start/stop 동기화)
 - lesson_reports 테이블 추가 (날짜별 seq 포함)

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useUIStore } from '@/store/uiStore'
+import { APP_VERSION } from '@/lib/version'
 
 interface NavBarProps {
   logCount?: number
@@ -43,6 +44,9 @@ export function NavBar({ logCount = 0, onLogClick, onSettingsClick }: NavBarProp
         <div className="flex items-center gap-2">
           <span className="text-lg">🎙️</span>
           <span className="text-sm font-bold text-white">AI Co-Teacher</span>
+          <span className="text-[10px] text-slate-500 font-mono px-1.5 py-0.5 rounded bg-slate-800/60 border border-slate-700/50">
+            v{APP_VERSION}
+          </span>
         </div>
         <div className="flex items-center gap-3">
           {onLogClick && (
