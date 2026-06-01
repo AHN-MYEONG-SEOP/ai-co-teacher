@@ -56,18 +56,22 @@ export function useMediaRecorder({ onBlobReady, onBlobSaved }: MediaRecorderHook
 
   // Path A: 신뢰도 충족 → Blob 저장 (스트림은 useWebSpeech가 종료)
   const discardBlob = useCallback(() => {
-    if (!mediaRecorderRef.current) return
-    mediaRecorderRef.current.onstop = () => {
+    const mr = mediaRecorderRef.current
+    if (!mr) return
+    const save = () => {
       if (chunksRef.current.length > 0) {
-        const blob = new Blob(chunksRef.current, {
-          type: mediaRecorderRef.current?.mimeType || 'audio/webm',
-        })
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' })
         _saveBlob(blob)
       }
       chunksRef.current = []
     }
-    if (mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop()
+    if (mr.state === 'recording') {
+      mr.onstop = save
+      mr.stop()
+    } else {
+      // useWebSpeech가 공유 스트림 트랙을 먼저 종료해 recorder가 이미 inactive인 경우:
+      // onstop이 다시 안 터지므로 모아둔 청크로 즉시 저장 (원본 재생 누락 버그 수정)
+      save()
     }
     setIsRecording(false)
   }, [_saveBlob])
