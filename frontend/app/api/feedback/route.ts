@@ -41,7 +41,14 @@ Respond ONLY with a JSON object (no markdown, no backticks):
     })
 
     const raw = response.choices[0]?.message?.content || '{}'
-    const feedback = JSON.parse(raw)
+    // gpt-4o-mini가 ```json … ``` 으로 감싸는 경우가 있어 마크다운 펜스를 제거 후 파싱
+    let feedback
+    try {
+      feedback = JSON.parse(raw.replace(/```json|```/g, '').trim())
+    } catch {
+      console.error('Feedback JSON 파싱 실패. raw:', raw)
+      return NextResponse.json({ error: 'Feedback 파싱 실패' }, { status: 500 })
+    }
     return NextResponse.json(feedback)
 
   } catch (error) {

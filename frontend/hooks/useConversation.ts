@@ -245,7 +245,11 @@ export function useConversation({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: studentText, conversationHistory: historyRef.current.slice(-6) }),
       }).then(async (res) => {
-        if (!res.ok) { resolveLogId(null); return }
+        if (!res.ok) {
+          console.error(`❌ 피드백 요청 실패: ${res.status}`)
+          resolveLogId(null)
+          return
+        }
         const feedbackData = await res.json()
         setFeedback(feedbackData)
         updateMessageFeedback(studentMsgId, feedbackData)
@@ -303,7 +307,7 @@ export function useConversation({
         })
         const logData = await logRes.json()
         resolveLogId(logData.log_id || null)
-      }).catch(() => resolveLogId(null))
+      }).catch((err) => { console.error('❌ 피드백 처리 오류:', err); resolveLogId(null) })
     } else {
       resolveLogId(null)
     }
