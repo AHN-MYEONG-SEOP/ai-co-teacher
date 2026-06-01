@@ -78,7 +78,8 @@
 ## 변경 이력
 
 ### 2026-06
-- **Deepgram 모델 `nova-2-conversationalai`로 변경** — 연음/구어체 인식 향상 목적. `useWebSpeech.ts`의 Deepgram listen `model` 파라미터 교체. ⚠️ 처음 `nova-2-conversational`로 넣었더니 존재하지 않는 모델명이라 Deepgram이 **403** 반환 → 정식 변형명 `nova-2-conversationalai`(끝에 `ai`)로 정정
+- **Deepgram `nova-2`로 복귀 + keyword boosting(문맥 힌트) 도입** (v2026-06-01.10): conversational 변형 모델은 인식 품질이 오히려 떨어져 기본 `nova-2`로 되돌림. 대신 **연음/구어체 인식 보완**을 위해 오늘 Unit의 target 단어를 Deepgram `keywords` 파라미터(keyword boosting, `word:2`)로 전달 → 발음이 다소 뭉개져도 해당 단어로 인식될 확률↑. `useWebSpeech`에 `keywords` 옵션 추가, 학생 화면이 `useCurriculum.getUnitData`로 현재 Unit 단어를 추출해 주입 (최대 80개, `,`/`/` 분리·중복 제거)
+- ~~Deepgram 모델 `nova-2-conversationalai`로 변경~~ → 인식 저하로 롤백. (그 전 `nova-2-conversational`은 존재하지 않는 모델명이라 **403** 발생했던 이력)
 - **개인화 학습 시스템 v3.0 도입 (페르소나 + 시나리오 + 자연 사용 기반 진도율)** — `LEARNING_SYSTEM_DESIGN.md` 기준 구현 (v2026-06-01.9):
   - **페르소나 API** `/api/persona` (GET 조회 / POST 누적 merge). 배열=합집합, 객체=재귀병합, free_facts 합집합. 별도 호출 없이 chat 응답의 `persona_update`로 자동 누적
   - **시나리오 API** `/api/lesson-scenario` (POST generate / GET 조회 / POST `?action=update_progress`). 로그인 직후 백그라운드로 GPT가 오늘 Unit + 페르소나 기반 수업 시나리오 생성 → `lesson_scenarios`에 저장. 같은 book/unit ready 시나리오는 중복 생성 방지(재사용), 새로 생성 시 이전 ready는 expired 처리, 24시간 만료

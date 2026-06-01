@@ -14,6 +14,8 @@ interface DeepgramOptions {
   onStreamReady?: (stream: MediaStream) => void
   confidenceThreshold?: number
   processingConfig?: AudioProcessingConfig
+  // 오늘 배우는 target 단어들 — Deepgram keyword boosting(문맥 힌트)에 사용
+  keywords?: string[]
 }
 
 export function useWebSpeech({
@@ -24,6 +26,7 @@ export function useWebSpeech({
   onStreamReady,
   confidenceThreshold = CONFIDENCE_THRESHOLD,
   processingConfig = DEFAULT_AUDIO_CONFIG,
+  keywords = [],
 }: DeepgramOptions) {
   const mrRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -51,6 +54,7 @@ export function useWebSpeech({
   const onStreamReadyRef = useRef(onStreamReady)
   const confidenceThresholdRef = useRef(confidenceThreshold)
   const processingConfigRef = useRef(processingConfig)
+  const keywordsRef = useRef(keywords)
 
   // ref 동기화
   useEffect(() => { onFinalResultRef.current = onFinalResult }, [onFinalResult])
@@ -60,6 +64,7 @@ export function useWebSpeech({
   useEffect(() => { onStreamReadyRef.current = onStreamReady }, [onStreamReady])
   useEffect(() => { confidenceThresholdRef.current = confidenceThreshold }, [confidenceThreshold])
   useEffect(() => { processingConfigRef.current = processingConfig }, [processingConfig])
+  useEffect(() => { keywordsRef.current = keywords }, [keywords])
 
   // 가공본 blob을 재생용 URL로 저장 (이전 URL은 즉시 revoke — 1개만 유지, 누수 방지)
   const saveProcessedBlob = useCallback((blob: Blob) => {
@@ -324,13 +329,29 @@ export function useWebSpeech({
 
       const params = new URLSearchParams({
         language: 'multi',
-        model: 'nova-2-conversationalai',
+        model: 'nova-2',
         smart_format: 'true',
         punctuate: 'true',
         utterances: 'true',
         filler_words: 'false',
         profanity_filter: 'false',
       })
+
+      // 문맥 힌트 — 오늘 배우는 target 단어를 keyword boosting으로 전달.
+      // 발음이 다소 뭉개져도 해당 단어로 인식될 확률이 올라간다 (연음 인식 보완).
+      // 형식: keywords=word:intensifier (intensifier 클수록 강하게 부스트)
+      const kw = Array.from(new Set(
+        (keywordsRef.current || [])
+          .flatMap((w) => w.split(/[,/]/))            // "soccer, ball" → ["soccer","ball"]
+          .map((w) => w.trim().replace(/\s+/g, ' '))
+          .filter((w) => w.length >= 2 && w.length <= 30)
+      )).slice(0, 80)                                  // 과다 전송 방지
+      for (const word of kw) {
+        params.append('keywords', `${word}:2`)
+      }
+      if (kw.length > 0) {
+        console.log(`⑧-1 keyword boosting: ${kw.length}개 (${kw.slice(0, 6).join(', ')}${kw.length > 6 ? '...' : ''})`)
+      }
 
       const dgStart = performance.now()
       const res = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {

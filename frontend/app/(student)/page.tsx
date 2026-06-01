@@ -609,6 +609,13 @@ export default function StudentPage() {
   const { config: audioConfig, setConfig: setAudioConfig, resetConfig: resetAudioConfig, hydrate: hydrateAudioConfig } = useAudioConfigStore()
   useEffect(() => { hydrateAudioConfig() }, [hydrateAudioConfig])
 
+  // 오늘 Unit의 target 단어 — Deepgram keyword boosting(문맥 힌트)으로 전달
+  const { getUnitData } = useCurriculum()
+  const unitForKeywords = getUnitData(settings.current_book, settings.current_unit)
+  const sttKeywords = unitForKeywords?.words
+    ? unitForKeywords.words.split(',').map(w => w.trim()).filter(Boolean)
+    : []
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [logs, setLogs] = useState<LogEntry[]>([])
@@ -790,6 +797,7 @@ export default function StudentPage() {
     onLog: (msg) => addLog(msg, 'info'),
     onStreamReady: handleStreamReady,
     processingConfig: audioConfig,
+    keywords: sttKeywords,
   })
 
   const isTouchRef = useRef(false)  // 터치 이벤트 감지 플래그
