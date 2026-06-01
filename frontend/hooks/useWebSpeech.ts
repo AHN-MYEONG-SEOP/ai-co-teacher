@@ -324,7 +324,7 @@ export function useWebSpeech({
 
       const params = new URLSearchParams({
         language: 'multi',
-        model: 'nova-2-conversational',
+        model: 'nova-2-conversationalai',
         smart_format: 'true',
         punctuate: 'true',
         utterances: 'true',
