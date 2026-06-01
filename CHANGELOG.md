@@ -74,6 +74,10 @@
 ## 변경 이력
 
 ### 2026-06
+- 오디오 가공 진단 기능 추가:
+  - 재생 버튼 2개 — **원본**(필터 미적용 raw 마이크) / **가공본**(Deepgram에 실제 전송된 음성). 인식 실패(conf 0.00) 원인이 마이크인지 가공 과다인지 귀로 진단 가능
+  - 🎛️ 오디오 가공 설정 모달 — HighPass/LowPass/Compressor + 브라우저 내장 처리(echo/noise/gain)를 토글·슬라이더로 조절, localStorage 저장 (`store/audioConfigStore.ts`)
+  - `useWebSpeech`가 설정값으로 Web Audio 파이프라인을 동적 구성하고 가공본 blob을 재생용으로 노출 (`lastProcessedBlobUrl`)
 - 커밋 메시지 제목에 `(v{APP_VERSION})` 표기 규칙 추가 → Vercel 배포 목록에서 버전 식별
 - 배포 버전 표시 추가: `frontend/lib/version.ts`의 `APP_VERSION`(일자.순번)을 NavBar 상단에 표시 → 배포 반영 여부 확인용. **배포할 때마다 순번 갱신 필수**
 - 학생 발화 중복 전달 버그 수정 (chat route): useConversation이 이미 messages 끝에 현재 발화를 넣어 보내는데 route에서 또 append → GPT가 같은 말을 두 번 본 문제. 대화 메시지 + 진행률 계산 입력 양쪽 수정

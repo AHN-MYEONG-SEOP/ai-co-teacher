@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CONFIDENCE_THRESHOLD } from '@/store/audioStore'
+import { DEFAULT_AUDIO_CONFIG, type AudioProcessingConfig } from '@/store/audioConfigStore'
 import type { WordResult } from '@/types'
 
 interface DeepgramOptions {
@@ -12,6 +13,7 @@ interface DeepgramOptions {
   onLog?: (msg: string) => void
   onStreamReady?: (stream: MediaStream) => void
   confidenceThreshold?: number
+  processingConfig?: AudioProcessingConfig
 }
 
 export function useWebSpeech({
@@ -21,6 +23,7 @@ export function useWebSpeech({
   onLog,
   onStreamReady,
   confidenceThreshold = CONFIDENCE_THRESHOLD,
+  processingConfig = DEFAULT_AUDIO_CONFIG,
 }: DeepgramOptions) {
   const mrRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -29,6 +32,8 @@ export function useWebSpeech({
   const startPromiseRef = useRef<Promise<void> | null>(null)
   const stopRequestedRef = useRef(false)
   const [isListening, setIsListening] = useState(false)
+  // Deepgram에 실제로 전송한 "가공본" 재생용 URL (원본과 비교 진단용)
+  const [lastProcessedBlobUrl, setLastProcessedBlobUrl] = useState<string | null>(null)
   const isSupported = true
 
   // 콜백 ref
@@ -38,6 +43,7 @@ export function useWebSpeech({
   const onErrorRef = useRef(onError)
   const onStreamReadyRef = useRef(onStreamReady)
   const confidenceThresholdRef = useRef(confidenceThreshold)
+  const processingConfigRef = useRef(processingConfig)
 
   // ref 동기화
   useEffect(() => { onFinalResultRef.current = onFinalResult }, [onFinalResult])
@@ -46,6 +52,19 @@ export function useWebSpeech({
   useEffect(() => { onErrorRef.current = onError }, [onError])
   useEffect(() => { onStreamReadyRef.current = onStreamReady }, [onStreamReady])
   useEffect(() => { confidenceThresholdRef.current = confidenceThreshold }, [confidenceThreshold])
+  useEffect(() => { processingConfigRef.current = processingConfig }, [processingConfig])
+
+  // 가공본 blob을 재생용 URL로 저장 (이전 URL은 즉시 revoke — 1개만 유지, 누수 방지)
+  const saveProcessedBlob = useCallback((blob: Blob) => {
+    setLastProcessedBlobUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      try {
+        return URL.createObjectURL(blob)
+      } catch {
+        return null
+      }
+    })
+  }, [])
 
   const startListening = useCallback(async () => {
     stopRequestedRef.current = false
@@ -58,14 +77,15 @@ export function useWebSpeech({
     console.group('🎤 [MIC] startListening')
     console.log('① chunksRef 초기화')
 
+    const cfg = processingConfigRef.current
     try {
       console.log('② getUserMedia 요청 중...')
       onLogRef.current?.('마이크 스트림 요청 중...')
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+          echoCancellation: cfg.echoCancellation,
+          noiseSuppression: cfg.noiseSuppression,
+          autoGainControl: cfg.autoGainControl,
           channelCount: 1,
         }
       })
@@ -82,40 +102,60 @@ export function useWebSpeech({
       }))
       onLogRef.current?.('마이크 스트림 획득 성공')
 
-      // Web Audio API 노이즈 제거 파이프라인
+      // Web Audio API 노이즈 제거 파이프라인 — 설정값(cfg)으로 노드를 동적 구성
       let processedStream = stream
       try {
         console.log('④ Web Audio 파이프라인 구성 중...')
         const audioCtx = new AudioContext({ sampleRate: 16000 })
         const source = audioCtx.createMediaStreamSource(stream)
+        let node: AudioNode = source
+        const applied: string[] = []
 
-        const compressor = audioCtx.createDynamicsCompressor()
-        compressor.threshold.value = -30
-        compressor.knee.value = 10
-        compressor.ratio.value = 8
-        compressor.attack.value = 0.003
-        compressor.release.value = 0.1
-        console.log('   DynamicsCompressor: threshold=-30dB, ratio=8:1')
+        if (cfg.highpass.enabled) {
+          const highPassFilter = audioCtx.createBiquadFilter()
+          highPassFilter.type = 'highpass'
+          highPassFilter.frequency.value = cfg.highpass.freq
+          node.connect(highPassFilter)
+          node = highPassFilter
+          applied.push(`highpass ${cfg.highpass.freq}Hz`)
+          console.log(`   HighPassFilter: ${cfg.highpass.freq}Hz 이하 제거`)
+        }
 
-        const highPassFilter = audioCtx.createBiquadFilter()
-        highPassFilter.type = 'highpass'
-        highPassFilter.frequency.value = 80
-        console.log('   HighPassFilter: 80Hz 이하 제거')
+        if (cfg.lowpass.enabled) {
+          const lowPassFilter = audioCtx.createBiquadFilter()
+          lowPassFilter.type = 'lowpass'
+          lowPassFilter.frequency.value = cfg.lowpass.freq
+          node.connect(lowPassFilter)
+          node = lowPassFilter
+          applied.push(`lowpass ${cfg.lowpass.freq}Hz`)
+          console.log(`   LowPassFilter: ${cfg.lowpass.freq}Hz 이상 제거`)
+        }
 
-        const lowPassFilter = audioCtx.createBiquadFilter()
-        lowPassFilter.type = 'lowpass'
-        lowPassFilter.frequency.value = 8000
-        console.log('   LowPassFilter: 8kHz 이상 제거')
+        if (cfg.compressor.enabled) {
+          const compressor = audioCtx.createDynamicsCompressor()
+          compressor.threshold.value = cfg.compressor.threshold
+          compressor.knee.value = cfg.compressor.knee
+          compressor.ratio.value = cfg.compressor.ratio
+          compressor.attack.value = cfg.compressor.attack
+          compressor.release.value = cfg.compressor.release
+          node.connect(compressor)
+          node = compressor
+          applied.push(`compressor ${cfg.compressor.ratio}:1`)
+          console.log(`   DynamicsCompressor: threshold=${cfg.compressor.threshold}dB, ratio=${cfg.compressor.ratio}:1`)
+        }
 
-        const destination = audioCtx.createMediaStreamDestination()
-        source.connect(highPassFilter)
-        highPassFilter.connect(lowPassFilter)
-        lowPassFilter.connect(compressor)
-        compressor.connect(destination)
-
-        processedStream = destination.stream
-        console.log(`   파이프라인 연결 완료: source→highpass→lowpass→compressor→destination`)
-        onLogRef.current?.('Web Audio 노이즈 제거 파이프라인 적용')
+        if (applied.length === 0) {
+          // 모든 가공 OFF → 원본 그대로 전송
+          processedStream = stream
+          console.log('   가공 노드 없음 — 원본 스트림 사용')
+          onLogRef.current?.('오디오 가공 없음 (원본 전송)')
+        } else {
+          const destination = audioCtx.createMediaStreamDestination()
+          node.connect(destination)
+          processedStream = destination.stream
+          console.log(`   파이프라인 연결 완료: ${applied.join(' → ')}`)
+          onLogRef.current?.(`오디오 가공 적용: ${applied.join(', ')}`)
+        }
       } catch (audioErr) {
         console.warn('   Web Audio 파이프라인 실패 — 원본 스트림 사용:', audioErr)
         onLogRef.current?.(`Web Audio 파이프라인 실패 — 원본 스트림 사용: ${audioErr}`)
@@ -219,6 +259,8 @@ export function useWebSpeech({
     const mimeType = mrRef.current?.mimeType || 'audio/webm'
     const blob = new Blob(chunks, { type: mimeType })
     chunksRef.current = []
+    // Deepgram에 전송하는 "가공본"을 재생용으로 보관 (원본과 청취 비교 진단용)
+    saveProcessedBlob(blob)
     console.log(`⑤ Blob 생성: ${(blob.size/1024).toFixed(1)}KB, type=${blob.type}`)
     console.log(`⑥ Deepgram 전송 시작... (+${(performance.now()-t1).toFixed(0)}ms)`)
     onLogRef.current?.(`Deepgram 전송 중... (${(blob.size / 1024).toFixed(1)}KB)`)
@@ -339,5 +381,5 @@ export function useWebSpeech({
     }
   }, [])
 
-  return { isSupported, isListening, startListening, stopListening }
+  return { isSupported, isListening, startListening, stopListening, lastProcessedBlobUrl }
 }

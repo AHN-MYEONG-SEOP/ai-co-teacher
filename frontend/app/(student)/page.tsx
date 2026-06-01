@@ -9,6 +9,7 @@ import { useCurriculum } from '@/hooks/useCurriculum'
 import { NavBar } from '@/components/common/NavBar'
 import { useAudioStore } from '@/store/audioStore'
 import { useUIStore } from '@/store/uiStore'
+import { useAudioConfigStore, type AudioProcessingConfig } from '@/store/audioConfigStore'
 import { cn } from '@/lib/utils'
 import type { WordResult } from '@/types'
 
@@ -169,6 +170,201 @@ function SettingsModal({
   )
 }
 
+// ── 녹음 재생 버튼 (원본 / 가공본 공용) ──────────────
+function PlaybackButton({
+  url,
+  label,
+  accent = 'bg-emerald-600 hover:bg-emerald-700',
+}: {
+  url: string | null
+  label: string
+  accent?: string
+}) {
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [playing, setPlaying] = useState(false)
+
+  // 언마운트(새 녹음 → key로 리마운트) 시 재생 중이던 오디오 정지
+  useEffect(() => () => { audioRef.current?.pause() }, [])
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <button
+        onClick={async () => {
+          if (!url) return
+          if (playing && audioRef.current) {
+            audioRef.current.pause()
+            audioRef.current.currentTime = 0
+            setPlaying(false)
+            return
+          }
+          try {
+            const audio = new Audio(url)
+            audioRef.current = audio
+            audio.onended = () => setPlaying(false)
+            audio.onerror = () => setPlaying(false)
+            setPlaying(true)
+            await audio.play()
+          } catch (e) {
+            console.error('재생 실패:', e)
+            setPlaying(false)
+          }
+        }}
+        disabled={!url}
+        className={cn(
+          'w-14 h-14 rounded-full flex items-center justify-center text-xl',
+          'transition-all duration-200 shadow-lg select-none',
+          url
+            ? playing
+              ? `${accent} text-white`
+              : 'bg-slate-700 hover:bg-slate-600 text-white'
+            : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+        )}
+        title={`${label} 재생`}
+      >
+        {playing ? '⏹️' : '▶️'}
+      </button>
+      <span className={cn('text-[10px]', url ? 'text-slate-400' : 'text-slate-600')}>{label}</span>
+    </div>
+  )
+}
+
+// 가공 설정 모달용 토글/슬라이더 (모듈 레벨 — 렌더 중 컴포넌트 생성 방지)
+function ConfigToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={cn('w-11 h-6 rounded-full transition-colors relative shrink-0', on ? 'bg-emerald-500' : 'bg-slate-600')}
+    >
+      <div className={cn('absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform', on ? 'translate-x-5' : 'translate-x-0.5')} />
+    </button>
+  )
+}
+
+function ConfigSlider({ label, value, min, max, step, unit, onChange, disabled }: {
+  label: string; value: number; min: number; max: number; step: number; unit: string
+  onChange: (v: number) => void; disabled?: boolean
+}) {
+  return (
+    <div className={cn('space-y-1', disabled && 'opacity-40 pointer-events-none')}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-slate-400">{label}</span>
+        <span className="text-xs text-emerald-400 font-mono">{value}{unit}</span>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-emerald-500"
+      />
+    </div>
+  )
+}
+
+// ── 🎛️ 오디오 가공 설정 모달 ──────────────────────────
+function AudioProcessingModal({
+  config,
+  onApply,
+  onReset,
+  onClose,
+}: {
+  config: AudioProcessingConfig
+  onApply: (c: AudioProcessingConfig) => void
+  onReset: () => void
+  onClose: () => void
+}) {
+  const [local, setLocal] = useState<AudioProcessingConfig>(config)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-lg bg-slate-900 border border-slate-700/50 rounded-t-3xl p-6 space-y-5 animate-in slide-in-from-bottom-4 duration-300 max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-white font-semibold text-base">🎛️ 오디오 가공 설정</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-sm">✕</button>
+        </div>
+        <p className="text-xs text-slate-500 -mt-2">
+          Deepgram에 보내는 음성의 가공 정도입니다. 변경값은 <span className="text-slate-400">다음 녹음부터</span> 적용돼요.
+          가공본 ▶️로 들어보며 조절하세요.
+        </p>
+
+        {/* 브라우저 내장 처리 */}
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-slate-300">🎙️ 마이크 입력 (브라우저 내장)</p>
+          {([
+            { key: 'echoCancellation', label: '에코 제거', desc: '스피커 소리 되울림 억제' },
+            { key: 'noiseSuppression', label: '노이즈 억제', desc: '배경 소음 제거' },
+            { key: 'autoGainControl', label: '자동 음량 조절', desc: '작은 소리 증폭' },
+          ] as const).map((opt) => (
+            <div key={opt.key} className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-white">{opt.label}</p>
+                <p className="text-xs text-slate-500">{opt.desc}</p>
+              </div>
+              <ConfigToggle on={local[opt.key]} onToggle={() => setLocal(p => ({ ...p, [opt.key]: !p[opt.key] }))} />
+            </div>
+          ))}
+        </div>
+
+        {/* HighPass */}
+        <div className="space-y-2 border-t border-slate-800 pt-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-slate-300">🔈 HighPass (저음 제거)</p>
+            <ConfigToggle on={local.highpass.enabled} onToggle={() => setLocal(p => ({ ...p, highpass: { ...p.highpass, enabled: !p.highpass.enabled } }))} />
+          </div>
+          <ConfigSlider label="차단 주파수" value={local.highpass.freq} min={20} max={400} step={10} unit="Hz"
+            disabled={!local.highpass.enabled}
+            onChange={(v) => setLocal(p => ({ ...p, highpass: { ...p.highpass, freq: v } }))} />
+        </div>
+
+        {/* LowPass */}
+        <div className="space-y-2 border-t border-slate-800 pt-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-slate-300">🔉 LowPass (고음 제거)</p>
+            <ConfigToggle on={local.lowpass.enabled} onToggle={() => setLocal(p => ({ ...p, lowpass: { ...p.lowpass, enabled: !p.lowpass.enabled } }))} />
+          </div>
+          <ConfigSlider label="차단 주파수" value={local.lowpass.freq} min={2000} max={16000} step={500} unit="Hz"
+            disabled={!local.lowpass.enabled}
+            onChange={(v) => setLocal(p => ({ ...p, lowpass: { ...p.lowpass, freq: v } }))} />
+        </div>
+
+        {/* Compressor */}
+        <div className="space-y-2 border-t border-slate-800 pt-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-slate-300">🎚️ Compressor (소음 억제)</p>
+            <ConfigToggle on={local.compressor.enabled} onToggle={() => setLocal(p => ({ ...p, compressor: { ...p.compressor, enabled: !p.compressor.enabled } }))} />
+          </div>
+          <ConfigSlider label="Threshold" value={local.compressor.threshold} min={-100} max={0} step={1} unit="dB"
+            disabled={!local.compressor.enabled}
+            onChange={(v) => setLocal(p => ({ ...p, compressor: { ...p.compressor, threshold: v } }))} />
+          <ConfigSlider label="Ratio" value={local.compressor.ratio} min={1} max={20} step={1} unit=":1"
+            disabled={!local.compressor.enabled}
+            onChange={(v) => setLocal(p => ({ ...p, compressor: { ...p.compressor, ratio: v } }))} />
+          <ConfigSlider label="Knee" value={local.compressor.knee} min={0} max={40} step={1} unit="dB"
+            disabled={!local.compressor.enabled}
+            onChange={(v) => setLocal(p => ({ ...p, compressor: { ...p.compressor, knee: v } }))} />
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={onReset}
+            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl py-3 text-sm font-medium transition-colors"
+          >
+            기본값 복원
+          </button>
+          <button
+            onClick={() => { onApply(local); onClose() }}
+            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3 text-sm font-medium transition-colors"
+          >
+            적용
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── 상단 상태 인디케이터 (아바타 대체 — 공간 최소화) ──
 function StatusBar({ status }: { status: string }) {
   const STATUS_LABEL: Record<string, string> = {
@@ -311,11 +507,13 @@ export default function StudentPage() {
     },
   })
   const [showSettings, setShowSettings] = useState(false)
+  const [showAudioSettings, setShowAudioSettings] = useState(false)
 
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  // 오디오 가공 설정 (localStorage 유지) — useWebSpeech 파이프라인에 전달
+  const { config: audioConfig, setConfig: setAudioConfig, resetConfig: resetAudioConfig, hydrate: hydrateAudioConfig } = useAudioConfigStore()
+  useEffect(() => { hydrateAudioConfig() }, [hydrateAudioConfig])
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
-  const [internalBlobUrl, setInternalBlobUrl] = useState<string | null>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [isHolding, setIsHolding] = useState(false)
@@ -374,11 +572,6 @@ export default function StudentPage() {
     onBlobReady: handleBlobReady,
     onBlobSaved: handleBlobSaved,
   })
-
-  useEffect(() => {
-    setInternalBlobUrl(lastBlobUrl)
-    setIsPlaying(false)
-  }, [lastBlobUrl])
 
   const handleInterim = useCallback((text: string, words?: WordResult[]) => {
     setInterimText(text)
@@ -493,13 +686,14 @@ export default function StudentPage() {
     startRecording(stream)
   }, [startRecording])
 
-  const { isSupported, isListening, startListening, stopListening } = useWebSpeech({
+  const { isSupported, isListening, startListening, stopListening, lastProcessedBlobUrl } = useWebSpeech({
     onInterimResult: handleInterim,
     onFinalResult: handleFinalResult,
     onFallback: handleFallback,
     onError: handleError,
     onLog: (msg) => addLog(msg, 'info'),
     onStreamReady: handleStreamReady,
+    processingConfig: audioConfig,
   })
 
   const isTouchRef = useRef(false)  // 터치 이벤트 감지 플래그
@@ -760,44 +954,10 @@ export default function StudentPage() {
             </div>
           )}
 
-          {/* 마이크 버튼 + 재생 버튼 */}
+          {/* 마이크 버튼 + 재생 버튼 (원본 / 가공본 비교) */}
           <div className="flex items-center justify-center gap-6">
-            {/* 녹음 재생 버튼 */}
-            <button
-              onClick={async () => {
-                if (!internalBlobUrl) return
-                if (isPlaying && audioRef.current) {
-                  audioRef.current.pause()
-                  audioRef.current.currentTime = 0
-                  setIsPlaying(false)
-                  return
-                }
-                try {
-                  const audio = new Audio(internalBlobUrl)
-                  audioRef.current = audio
-                  audio.onended = () => setIsPlaying(false)
-                  audio.onerror = () => setIsPlaying(false)
-                  setIsPlaying(true)
-                  await audio.play()
-                } catch (e) {
-                  console.error('재생 실패:', e)
-                  setIsPlaying(false)
-                }
-              }}
-              disabled={!internalBlobUrl}
-              className={cn(
-                'w-14 h-14 rounded-full flex items-center justify-center text-xl',
-                'transition-all duration-200 shadow-lg select-none',
-                internalBlobUrl
-                  ? isPlaying
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    : 'bg-slate-700 hover:bg-slate-600 text-white'
-                  : 'bg-slate-800 text-slate-600 cursor-not-allowed'
-              )}
-              title="마지막 녹음 재생"
-            >
-              {isPlaying ? '⏹️' : '▶️'}
-            </button>
+            {/* 원본 녹음 재생 — 필터 거치지 않은 raw 마이크 */}
+            <PlaybackButton key={lastBlobUrl ?? 'raw'} url={lastBlobUrl} label="원본" />
 
             {/* 메인 마이크 버튼 — 크게 */}
             <button
@@ -845,13 +1005,22 @@ export default function StudentPage() {
               {isHolding ? '🎙️' : '🎤'}
             </button>
 
-            {/* 균형용 여백 */}
-            <div className="w-14 h-14" />
+            {/* 가공본 재생 — Deepgram에 실제로 전송된 음성 */}
+            <PlaybackButton key={lastProcessedBlobUrl ?? 'proc'} url={lastProcessedBlobUrl} label="가공본" accent="bg-violet-600 hover:bg-violet-700" />
           </div>
 
           <p className="text-xs text-slate-500 text-center">
             {isHolding ? '손을 떼면 전송됩니다' : '누르고 있는 동안 말하세요 (Push-to-Talk)'}
           </p>
+
+          <div className="flex justify-center">
+            <button
+              onClick={() => setShowAudioSettings(true)}
+              className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1"
+            >
+              🎛️ 오디오 가공 설정
+            </button>
+          </div>
 
           {saveMessage && (
             <div className={cn(
@@ -872,6 +1041,16 @@ export default function StudentPage() {
           settings={settings}
           onUpdate={updateSettings}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {/* 오디오 가공 설정 모달 */}
+      {showAudioSettings && (
+        <AudioProcessingModal
+          config={audioConfig}
+          onApply={setAudioConfig}
+          onReset={resetAudioConfig}
+          onClose={() => setShowAudioSettings(false)}
         />
       )}
 
