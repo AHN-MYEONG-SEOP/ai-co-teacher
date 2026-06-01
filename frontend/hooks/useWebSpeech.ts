@@ -28,11 +28,17 @@ export function useWebSpeech({
   const mrRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
+  // 예열된 가공 스트림 (세션 내내 유지) + 빌드 시 설정 키 + 진행 중 prepare promise
+  const processedStreamRef = useRef<MediaStream | null>(null)
+  const preparedKeyRef = useRef<string | null>(null)
+  const preparePromiseRef = useRef<Promise<void> | null>(null)
   const chunksRef = useRef<Blob[]>([])
   // 빠른 탭(준비 완료 전 손 뗌) race 방지용
   const startPromiseRef = useRef<Promise<void> | null>(null)
   const stopRequestedRef = useRef(false)
   const [isListening, setIsListening] = useState(false)
+  // 마이크 예열 완료 여부 (UI에서 "준비 중" 표시 등에 사용 가능)
+  const [isReady, setIsReady] = useState(false)
   // Deepgram에 실제로 전송한 "가공본" 재생용 URL (원본과 비교 진단용)
   const [lastProcessedBlobUrl, setLastProcessedBlobUrl] = useState<string | null>(null)
   const isSupported = true
@@ -67,9 +73,7 @@ export function useWebSpeech({
     })
   }, [])
 
-  // 이전 녹음 자원 완전 정리 (녹음기 정지 + 스트림 트랙 종료 + AudioContext close)
-  // AudioContext가 누적/suspended되면 가공 스트림이 무음이 되어 "녹음 데이터 없음"이 발생하므로
-  // 마이크를 누를 때마다 호출해 깨끗한 상태에서 시작한다.
+  // 오디오 자원 완전 해제 (언마운트 또는 설정 변경에 따른 재빌드 시에만)
   const teardownAudio = useCallback(() => {
     try {
       if (mrRef.current && mrRef.current.state !== 'inactive') mrRef.current.stop()
@@ -77,123 +81,137 @@ export function useWebSpeech({
     mrRef.current = null
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
+    processedStreamRef.current = null
     if (audioCtxRef.current) {
       audioCtxRef.current.close().catch(() => {})
       audioCtxRef.current = null
     }
+    preparedKeyRef.current = null
+    setIsReady(false)
   }, [])
 
-  const startListening = useCallback(async () => {
-    stopRequestedRef.current = false
-    // 마이크 누름 = 초기화: 직전에 남아있을 수 있는 오디오 자원을 먼저 정리
-    teardownAudio()
-    // startListening 완료 시점을 stopListening이 기다릴 수 있도록 promise 노출
-    let resolveStart: () => void = () => {}
-    startPromiseRef.current = new Promise<void>((r) => { resolveStart = r })
-
-    chunksRef.current = []
-    const t0 = performance.now()
-    console.group('🎤 [MIC] startListening')
-    console.log('① chunksRef 초기화')
-
+  // 마이크 스트림 + Web Audio 파이프라인을 "예열"한다.
+  // 한 번 준비하면 세션 내내 유지(warm)되어, 마이크를 누르면 getUserMedia 지연 없이
+  // 즉시 녹음을 시작할 수 있다 → 발화 앞부분 잘림 방지.
+  const prepare = useCallback((): Promise<void> => {
     const cfg = processingConfigRef.current
-    try {
-      console.log('② getUserMedia 요청 중...')
-      onLogRef.current?.('마이크 스트림 요청 중...')
+    const key = JSON.stringify(cfg)
+    const trackLive = streamRef.current?.getAudioTracks()[0]?.readyState === 'live'
+
+    // 이미 따뜻하고 설정도 동일 → resume만 보장하고 즉시 반환
+    if (trackLive && audioCtxRef.current && processedStreamRef.current && preparedKeyRef.current === key) {
+      return audioCtxRef.current.state === 'suspended'
+        ? audioCtxRef.current.resume()
+        : Promise.resolve()
+    }
+    // 준비가 진행 중이면 그 promise 재사용 (중복 getUserMedia 방지)
+    if (preparePromiseRef.current) return preparePromiseRef.current
+
+    const p = (async () => {
+      // 트랙이 죽었거나(기기 변경 등) 설정이 바뀌었으면 깨끗이 정리 후 재구성
+      teardownAudio()
+      console.group('🔥 [MIC] prepare (예열)')
+      onLogRef.current?.('마이크 예열 중...')
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: cfg.echoCancellation,
           noiseSuppression: cfg.noiseSuppression,
           autoGainControl: cfg.autoGainControl,
           channelCount: 1,
-        }
+        },
       })
       streamRef.current = stream
-      const tracks = stream.getAudioTracks()
-      const settings = tracks[0]?.getSettings()
-      console.log(`③ 마이크 스트림 획득 성공 (+${(performance.now()-t0).toFixed(0)}ms)`)
-      console.log('   트랙:', tracks[0]?.label || 'unknown')
-      console.log('   설정:', JSON.stringify({
-        sampleRate: settings?.sampleRate,
-        channelCount: settings?.channelCount,
-        echoCancellation: settings?.echoCancellation,
-        noiseSuppression: settings?.noiseSuppression,
-      }))
-      onLogRef.current?.('마이크 스트림 획득 성공')
+      console.log('마이크 스트림 획득:', stream.getAudioTracks()[0]?.label || 'unknown')
 
-      // Web Audio API 노이즈 제거 파이프라인 — 설정값(cfg)으로 노드를 동적 구성
+      // Web Audio 파이프라인 구성 (설정값 기반)
       let processedStream = stream
       try {
-        console.log('④ Web Audio 파이프라인 구성 중...')
         const audioCtx = new AudioContext({ sampleRate: 16000 })
         audioCtxRef.current = audioCtx
-        // autoplay 정책으로 suspended 상태면 가공 스트림이 무음이 되므로 명시적으로 resume
-        if (audioCtx.state === 'suspended') {
-          await audioCtx.resume()
-          console.log(`   AudioContext resume됨 (state: ${audioCtx.state})`)
-        }
+        if (audioCtx.state === 'suspended') await audioCtx.resume()
         const source = audioCtx.createMediaStreamSource(stream)
         let node: AudioNode = source
         const applied: string[] = []
 
         if (cfg.highpass.enabled) {
-          const highPassFilter = audioCtx.createBiquadFilter()
-          highPassFilter.type = 'highpass'
-          highPassFilter.frequency.value = cfg.highpass.freq
-          node.connect(highPassFilter)
-          node = highPassFilter
+          const hp = audioCtx.createBiquadFilter()
+          hp.type = 'highpass'; hp.frequency.value = cfg.highpass.freq
+          node.connect(hp); node = hp
           applied.push(`highpass ${cfg.highpass.freq}Hz`)
-          console.log(`   HighPassFilter: ${cfg.highpass.freq}Hz 이하 제거`)
         }
-
         if (cfg.lowpass.enabled) {
-          const lowPassFilter = audioCtx.createBiquadFilter()
-          lowPassFilter.type = 'lowpass'
-          lowPassFilter.frequency.value = cfg.lowpass.freq
-          node.connect(lowPassFilter)
-          node = lowPassFilter
+          const lp = audioCtx.createBiquadFilter()
+          lp.type = 'lowpass'; lp.frequency.value = cfg.lowpass.freq
+          node.connect(lp); node = lp
           applied.push(`lowpass ${cfg.lowpass.freq}Hz`)
-          console.log(`   LowPassFilter: ${cfg.lowpass.freq}Hz 이상 제거`)
         }
-
         if (cfg.compressor.enabled) {
-          const compressor = audioCtx.createDynamicsCompressor()
-          compressor.threshold.value = cfg.compressor.threshold
-          compressor.knee.value = cfg.compressor.knee
-          compressor.ratio.value = cfg.compressor.ratio
-          compressor.attack.value = cfg.compressor.attack
-          compressor.release.value = cfg.compressor.release
-          node.connect(compressor)
-          node = compressor
+          const comp = audioCtx.createDynamicsCompressor()
+          comp.threshold.value = cfg.compressor.threshold
+          comp.knee.value = cfg.compressor.knee
+          comp.ratio.value = cfg.compressor.ratio
+          comp.attack.value = cfg.compressor.attack
+          comp.release.value = cfg.compressor.release
+          node.connect(comp); node = comp
           applied.push(`compressor ${cfg.compressor.ratio}:1`)
-          console.log(`   DynamicsCompressor: threshold=${cfg.compressor.threshold}dB, ratio=${cfg.compressor.ratio}:1`)
         }
 
         if (applied.length === 0) {
-          // 모든 가공 OFF → 원본 그대로 전송
           processedStream = stream
-          console.log('   가공 노드 없음 — 원본 스트림 사용')
           onLogRef.current?.('오디오 가공 없음 (원본 전송)')
         } else {
           const destination = audioCtx.createMediaStreamDestination()
           node.connect(destination)
           processedStream = destination.stream
-          console.log(`   파이프라인 연결 완료: ${applied.join(' → ')}`)
-          onLogRef.current?.(`오디오 가공 적용: ${applied.join(', ')}`)
+          onLogRef.current?.(`오디오 가공 준비: ${applied.join(', ')}`)
         }
       } catch (audioErr) {
-        console.warn('   Web Audio 파이프라인 실패 — 원본 스트림 사용:', audioErr)
-        onLogRef.current?.(`Web Audio 파이프라인 실패 — 원본 스트림 사용: ${audioErr}`)
+        console.warn('Web Audio 파이프라인 실패 — 원본 사용:', audioErr)
+        onLogRef.current?.(`Web Audio 실패 — 원본 사용: ${audioErr}`)
         processedStream = stream
       }
 
-      onStreamReadyRef.current?.(stream)
-      console.log('⑤ onStreamReady 호출 (재생용 원본 스트림 공유)')
+      processedStreamRef.current = processedStream
+      preparedKeyRef.current = key
+      setIsReady(true)
+      console.log('✅ 예열 완료 — 마이크 대기 (즉시 녹음 가능)')
+      console.groupEnd()
+    })()
+
+    preparePromiseRef.current = p
+    p.catch((err) => {
+      onLogRef.current?.(`❌ 마이크 예열 실패: ${err}`)
+      onErrorRef.current?.(`마이크 접근 실패: ${err}`)
+    }).finally(() => { preparePromiseRef.current = null })
+    return p
+  }, [teardownAudio])
+
+  // 마운트 시 즉시 예열 → 첫 녹음부터 지연 없음. 언마운트 시 자원 해제.
+  useEffect(() => {
+    prepare().catch(() => {})
+    return () => { teardownAudio() }
+  }, [prepare, teardownAudio])
+
+  const startListening = useCallback(async () => {
+    stopRequestedRef.current = false
+    let resolveStart: () => void = () => {}
+    startPromiseRef.current = new Promise<void>((r) => { resolveStart = r })
+    chunksRef.current = []
+    const t0 = performance.now()
+    console.group('🎤 [MIC] startListening')
+
+    try {
+      // 예열돼 있으면 즉시(수 ms), 아니면(첫 사용/설정 변경/트랙 종료) 여기서 준비
+      await prepare()
+      const processedStream = processedStreamRef.current
+      if (!processedStream || !streamRef.current) throw new Error('오디오 스트림 준비 실패')
+
+      // 원본 스트림 공유 → 원본 녹음기(useMediaRecorder)도 이 시점에 녹음 시작
+      onStreamReadyRef.current?.(streamRef.current)
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
-      console.log(`⑥ MediaRecorder mimeType: ${mimeType}`)
 
       const mr = new MediaRecorder(processedStream, { mimeType })
       let chunkCount = 0
@@ -203,12 +221,7 @@ export function useWebSpeech({
           chunksRef.current.push(e.data)
           chunkCount++
           totalBytes += e.data.size
-          console.log(
-            `🔴 청크 #${String(chunkCount).padStart(3,'0')} | ` +
-            `크기: ${e.data.size}B | ` +
-            `누적: ${chunkCount}개 / ${(totalBytes/1024).toFixed(1)}KB | ` +
-            `경과: ${(performance.now()-t0).toFixed(0)}ms`
-          )
+          console.log(`🔴 청크 #${String(chunkCount).padStart(3,'0')} | ${e.data.size}B | 누적 ${(totalBytes/1024).toFixed(1)}KB | +${(performance.now()-t0).toFixed(0)}ms`)
         } else {
           console.warn(`⚠️ 빈 청크 #${chunkCount+1} — size=0`)
         }
@@ -216,19 +229,18 @@ export function useWebSpeech({
       mr.start(100)
       mrRef.current = mr
       setIsListening(true)
-      console.log(`⑦ MediaRecorder.start(100ms) — 녹음 시작! (+${(performance.now()-t0).toFixed(0)}ms)`)
-      console.log('✅ startListening 완료')
+      console.log(`✅ 녹음 시작! (+${(performance.now()-t0).toFixed(0)}ms — 예열 상태면 즉시)`)
       console.groupEnd()
       onLogRef.current?.('녹음 시작 — 말씀하세요')
-
     } catch (err) {
-      onLogRef.current?.(`❌ 마이크 접근 실패: ${err}`)
+      console.groupEnd()
+      onLogRef.current?.(`❌ 녹음 시작 실패: ${err}`)
       onErrorRef.current?.(`마이크 접근 실패: ${err}`)
       setIsListening(false)
     } finally {
       resolveStart()
     }
-  }, [teardownAudio])
+  }, [prepare])
 
   const stopListening = useCallback(async () => {
     const t1 = performance.now()
@@ -260,13 +272,9 @@ export function useWebSpeech({
       mrRef.current.stop()
     })
 
-    // 스트림 종료 + AudioContext close (누적 방지)
-    streamRef.current?.getTracks().forEach((t) => t.stop())
-    if (audioCtxRef.current) {
-      audioCtxRef.current.close().catch(() => {})
-      audioCtxRef.current = null
-    }
-    console.log('③ 스트림 트랙 종료 + AudioContext close')
+    // 스트림/AudioContext는 종료하지 않고 유지(warm) → 다음 녹음 즉시 시작
+    // (자원 해제는 언마운트 시 teardownAudio에서)
+    console.log('③ 녹음기만 정지 — 스트림/AudioContext는 예열 유지')
 
     // 청크가 없으면 잠시 기다려봄 (타이밍 문제 대응)
     if (chunksRef.current.length === 0) {
@@ -410,5 +418,5 @@ export function useWebSpeech({
     }
   }, [])
 
-  return { isSupported, isListening, startListening, stopListening, lastProcessedBlobUrl }
+  return { isSupported, isListening, isReady, startListening, stopListening, lastProcessedBlobUrl }
 }
