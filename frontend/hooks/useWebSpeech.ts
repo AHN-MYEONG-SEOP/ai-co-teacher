@@ -27,6 +27,7 @@ export function useWebSpeech({
 }: DeepgramOptions) {
   const mrRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const audioCtxRef = useRef<AudioContext | null>(null)
   const chunksRef = useRef<Blob[]>([])
   // 빠른 탭(준비 완료 전 손 뗌) race 방지용
   const startPromiseRef = useRef<Promise<void> | null>(null)
@@ -66,8 +67,26 @@ export function useWebSpeech({
     })
   }, [])
 
+  // 이전 녹음 자원 완전 정리 (녹음기 정지 + 스트림 트랙 종료 + AudioContext close)
+  // AudioContext가 누적/suspended되면 가공 스트림이 무음이 되어 "녹음 데이터 없음"이 발생하므로
+  // 마이크를 누를 때마다 호출해 깨끗한 상태에서 시작한다.
+  const teardownAudio = useCallback(() => {
+    try {
+      if (mrRef.current && mrRef.current.state !== 'inactive') mrRef.current.stop()
+    } catch { /* ignore */ }
+    mrRef.current = null
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {})
+      audioCtxRef.current = null
+    }
+  }, [])
+
   const startListening = useCallback(async () => {
     stopRequestedRef.current = false
+    // 마이크 누름 = 초기화: 직전에 남아있을 수 있는 오디오 자원을 먼저 정리
+    teardownAudio()
     // startListening 완료 시점을 stopListening이 기다릴 수 있도록 promise 노출
     let resolveStart: () => void = () => {}
     startPromiseRef.current = new Promise<void>((r) => { resolveStart = r })
@@ -107,6 +126,12 @@ export function useWebSpeech({
       try {
         console.log('④ Web Audio 파이프라인 구성 중...')
         const audioCtx = new AudioContext({ sampleRate: 16000 })
+        audioCtxRef.current = audioCtx
+        // autoplay 정책으로 suspended 상태면 가공 스트림이 무음이 되므로 명시적으로 resume
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume()
+          console.log(`   AudioContext resume됨 (state: ${audioCtx.state})`)
+        }
         const source = audioCtx.createMediaStreamSource(stream)
         let node: AudioNode = source
         const applied: string[] = []
@@ -203,7 +228,7 @@ export function useWebSpeech({
     } finally {
       resolveStart()
     }
-  }, [])
+  }, [teardownAudio])
 
   const stopListening = useCallback(async () => {
     const t1 = performance.now()
@@ -235,9 +260,13 @@ export function useWebSpeech({
       mrRef.current.stop()
     })
 
-    // 스트림 종료
+    // 스트림 종료 + AudioContext close (누적 방지)
     streamRef.current?.getTracks().forEach((t) => t.stop())
-    console.log('③ 스트림 트랙 종료')
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {})
+      audioCtxRef.current = null
+    }
+    console.log('③ 스트림 트랙 종료 + AudioContext close')
 
     // 청크가 없으면 잠시 기다려봄 (타이밍 문제 대응)
     if (chunksRef.current.length === 0) {

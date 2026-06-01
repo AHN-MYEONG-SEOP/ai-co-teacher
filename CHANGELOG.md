@@ -74,6 +74,7 @@
 ## 변경 이력
 
 ### 2026-06
+- **"녹음 데이터 없음" 반복 버그 수정 (AudioContext 누수)**: `useWebSpeech`가 매 녹음마다 `new AudioContext()`를 만들고 close/resume하지 않아, 컨텍스트가 누적되거나 suspended되면 가공 스트림이 무음 → 청크 0개가 되던 문제. 마이크 누를 때 이전 오디오 자원을 정리(`teardownAudio`)하고 컨텍스트를 `resume()`, stopListening에서 `close()` 추가
 - **힌트 버튼 항상 표시**: choices 생성을 특정 phase(study/review/confirm_unit/weather) 조건에서 모든 phase로 확장 + greeting(인사/날씨) 메시지에도 힌트 추가. `generateChoices` 헬퍼로 통합 (clarify 되묻기는 제외)
 - **원본 재생 버튼 미동작 버그 수정**: useWebSpeech가 공유 스트림 트랙을 먼저 종료해 useMediaRecorder의 녹음기가 이미 `inactive` 상태가 되면 `discardBlob`의 `onstop`이 안 터져 원본 blob이 저장되지 않던 문제. inactive인 경우 모아둔 청크로 즉시 저장하도록 수정
 - 오디오 가공 진단 기능 추가:
