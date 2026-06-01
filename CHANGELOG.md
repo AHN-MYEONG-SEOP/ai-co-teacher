@@ -78,6 +78,7 @@
 ## 변경 이력
 
 ### 2026-06
+- **Deepgram 모델 `nova-2-conversational`로 변경** — 연음/구어체 인식 향상 목적. `useWebSpeech.ts`의 Deepgram listen 호출 `model` 파라미터만 교체 (`nova-2` → `nova-2-conversational`)
 - **개인화 학습 시스템 v3.0 도입 (페르소나 + 시나리오 + 자연 사용 기반 진도율)** — `LEARNING_SYSTEM_DESIGN.md` 기준 구현 (v2026-06-01.9):
   - **페르소나 API** `/api/persona` (GET 조회 / POST 누적 merge). 배열=합집합, 객체=재귀병합, free_facts 합집합. 별도 호출 없이 chat 응답의 `persona_update`로 자동 누적
   - **시나리오 API** `/api/lesson-scenario` (POST generate / GET 조회 / POST `?action=update_progress`). 로그인 직후 백그라운드로 GPT가 오늘 Unit + 페르소나 기반 수업 시나리오 생성 → `lesson_scenarios`에 저장. 같은 book/unit ready 시나리오는 중복 생성 방지(재사용), 새로 생성 시 이전 ready는 expired 처리, 24시간 만료
