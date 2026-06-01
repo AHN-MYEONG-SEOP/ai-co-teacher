@@ -25,6 +25,9 @@ export function useWebSpeech({
   const mrRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  // 빠른 탭(준비 완료 전 손 뗌) race 방지용
+  const startPromiseRef = useRef<Promise<void> | null>(null)
+  const stopRequestedRef = useRef(false)
   const [isListening, setIsListening] = useState(false)
   const isSupported = true
 
@@ -45,6 +48,11 @@ export function useWebSpeech({
   useEffect(() => { confidenceThresholdRef.current = confidenceThreshold }, [confidenceThreshold])
 
   const startListening = useCallback(async () => {
+    stopRequestedRef.current = false
+    // startListening 완료 시점을 stopListening이 기다릴 수 있도록 promise 노출
+    let resolveStart: () => void = () => {}
+    startPromiseRef.current = new Promise<void>((r) => { resolveStart = r })
+
     chunksRef.current = []
     const t0 = performance.now()
     console.group('🎤 [MIC] startListening')
@@ -124,14 +132,20 @@ export function useWebSpeech({
 
       const mr = new MediaRecorder(processedStream, { mimeType })
       let chunkCount = 0
+      let totalBytes = 0
       mr.ondataavailable = (e) => {
         if (e.data.size > 0) {
           chunksRef.current.push(e.data)
           chunkCount++
-          if (chunkCount % 10 === 0) {
-            const totalSize = chunksRef.current.reduce((a, b) => a + b.size, 0)
-            console.log(`   청크 누적: ${chunkCount}개, 총 ${(totalSize/1024).toFixed(1)}KB`)
-          }
+          totalBytes += e.data.size
+          console.log(
+            `🔴 청크 #${String(chunkCount).padStart(3,'0')} | ` +
+            `크기: ${e.data.size}B | ` +
+            `누적: ${chunkCount}개 / ${(totalBytes/1024).toFixed(1)}KB | ` +
+            `경과: ${(performance.now()-t0).toFixed(0)}ms`
+          )
+        } else {
+          console.warn(`⚠️ 빈 청크 #${chunkCount+1} — size=0`)
         }
       }
       mr.start(100)
@@ -146,33 +160,58 @@ export function useWebSpeech({
       onLogRef.current?.(`❌ 마이크 접근 실패: ${err}`)
       onErrorRef.current?.(`마이크 접근 실패: ${err}`)
       setIsListening(false)
+    } finally {
+      resolveStart()
     }
   }, [])
 
   const stopListening = useCallback(async () => {
+    const t1 = performance.now()
+    console.group('🛑 [MIC] stopListening')
+    console.log('① MediaRecorder 정지 요청')
     onLogRef.current?.('녹음 종료 — Deepgram 전송 중...')
     setIsListening(false)
+    stopRequestedRef.current = true
+
+    // 빠른 탭: startListening이 아직 진행 중이면 녹음기 준비가 끝날 때까지 대기
+    // (대기하지 않으면 mrRef가 비어 청크 없이 종료되고, 녹음기가 백그라운드에 남는다)
+    if (startPromiseRef.current) {
+      console.log('   startListening 완료 대기 중... (race 방지)')
+      await startPromiseRef.current
+      startPromiseRef.current = null
+    }
 
     // MediaRecorder 정지 후 Blob 수집
     await new Promise<void>((resolve) => {
       if (!mrRef.current || mrRef.current.state === 'inactive') {
+        console.log('   MediaRecorder 이미 inactive')
         resolve()
         return
       }
-      mrRef.current.onstop = () => resolve()
+      mrRef.current.onstop = () => {
+        console.log(`② MediaRecorder.stop() 완료 (+${(performance.now()-t1).toFixed(0)}ms)`)
+        resolve()
+      }
       mrRef.current.stop()
     })
 
     // 스트림 종료
     streamRef.current?.getTracks().forEach((t) => t.stop())
+    console.log('③ 스트림 트랙 종료')
 
     // 청크가 없으면 잠시 기다려봄 (타이밍 문제 대응)
     if (chunksRef.current.length === 0) {
+      console.warn('⚠️ 청크 없음 — 200ms 대기 후 재확인')
       await new Promise(resolve => setTimeout(resolve, 200))
     }
 
     const chunks = chunksRef.current
+    const totalSize = chunks.reduce((a, b) => a + b.size, 0)
+    console.log(`④ 청크 수집 완료: ${chunks.length}개 / ${(totalSize/1024).toFixed(1)}KB`)
+
     if (chunks.length === 0) {
+      console.warn('❌ 최종 청크 없음 — 무시')
+      console.groupEnd()
       onLogRef.current?.('녹음 데이터 없음 — 무시')
       return
     }
@@ -180,7 +219,8 @@ export function useWebSpeech({
     const mimeType = mrRef.current?.mimeType || 'audio/webm'
     const blob = new Blob(chunks, { type: mimeType })
     chunksRef.current = []
-
+    console.log(`⑤ Blob 생성: ${(blob.size/1024).toFixed(1)}KB, type=${blob.type}`)
+    console.log(`⑥ Deepgram 전송 시작... (+${(performance.now()-t1).toFixed(0)}ms)`)
     onLogRef.current?.(`Deepgram 전송 중... (${(blob.size / 1024).toFixed(1)}KB)`)
 
     try {
@@ -192,15 +232,17 @@ export function useWebSpeech({
       }, 30000)
 
       // 서버에서 토큰 발급
+      console.log('⑦ Deepgram 토큰 요청 중...')
       const tokenRes = await fetch('/api/deepgram-token', { signal: controller.signal })
       if (!tokenRes.ok) {
+        console.error('❌ Deepgram 토큰 발급 실패')
         clearTimeout(timeoutId)
         onFallbackRef.current?.(0)
         return
       }
       const { token } = await tokenRes.json()
+      console.log('⑧ 토큰 발급 완료 → Deepgram API 전송 중...')
 
-      // Deepgram HTTP API로 전송
       const params = new URLSearchParams({
         language: 'multi',
         model: 'nova-2',
@@ -211,6 +253,7 @@ export function useWebSpeech({
         profanity_filter: 'false',
       })
 
+      const dgStart = performance.now()
       const res = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
         method: 'POST',
         headers: {
@@ -222,8 +265,10 @@ export function useWebSpeech({
       })
 
       clearTimeout(timeoutId)
+      console.log(`⑨ Deepgram 응답 수신 (${(performance.now()-dgStart).toFixed(0)}ms) — status: ${res.status}`)
 
       if (!res.ok) {
+        console.error(`❌ Deepgram API 오류: ${res.status}`)
         onLogRef.current?.(`Deepgram API 오류: ${res.status} — 재시도 요청`)
         onFallbackRef.current?.(0)
         return
@@ -234,6 +279,7 @@ export function useWebSpeech({
       const alternative = channel?.alternatives?.[0]
 
       if (!alternative) {
+        console.warn('⚠️ 인식 결과 없음 (alternative 없음)')
         onLogRef.current?.('인식 결과 없음')
         onFallbackRef.current?.(0)
         return
@@ -253,25 +299,43 @@ export function useWebSpeech({
         end: w.end,
       }))
 
+      console.log(`⑩ 인식 결과:`)
+      console.log(`   transcript: "${transcript}"`)
+      console.log(`   confidence: ${(confidence * 100).toFixed(1)}%`)
+      console.log(`   단어 수: ${words.length}개`)
+      if (words.length > 0) {
+        console.table(words.map(w => ({
+          word: w.word,
+          confidence: `${(w.confidence * 100).toFixed(0)}%`,
+          start: `${w.start.toFixed(2)}s`,
+          end: `${w.end.toFixed(2)}s`,
+        })))
+      }
       onLogRef.current?.(`인식 완료: "${transcript}" (conf: ${confidence.toFixed(2)})`)
 
       if (!transcript.trim()) {
+        console.warn('⚠️ 빈 텍스트 — 재시도 요청')
+        console.groupEnd()
         onLogRef.current?.('빈 텍스트 — 재시도 요청')
         onFallbackRef.current?.(0)
         return
       }
 
-      // confidence에 상관없이 항상 GPT로 전송
+      console.log(`✅ GPT로 전송: "${transcript}"`)
+      console.groupEnd()
       onLogRef.current?.(`✅ 전송: "${transcript}" (conf: ${confidence.toFixed(2)})`)
       onFinalResultRef.current?.(transcript, confidence, words)
 
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
+        console.warn('⏱️ Deepgram 타임아웃')
         onLogRef.current?.('⏱️ 타임아웃 — 재시도 요청')
       } else {
+        console.error('❌ Deepgram 오류:', err)
         onLogRef.current?.(`❌ Deepgram 오류: ${err}`)
       }
-      onFallbackRef.current?.(0)  // 항상 fallback으로 처리 → 재시도 안내
+      console.groupEnd()
+      onFallbackRef.current?.(0)
     }
   }, [])
 
