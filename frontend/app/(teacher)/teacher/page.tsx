@@ -56,6 +56,45 @@ interface Student {
   current_unit: number | null
 }
 
+interface ProgressStage {
+  type: string
+  target: string
+  weight: number
+  min_uses: number
+  current_count: number
+  completed: boolean
+  usage_log: string[]
+}
+
+interface ScenarioRow {
+  id: string
+  student_id: string
+  book: string
+  unit: number
+  unit_title: string | null
+  progress_state: { progress: number; stages: ProgressStage[] } | null
+  status: string
+  updated_at: string
+}
+
+interface PersonaRow {
+  id: string
+  student_id: string
+  family_members: Record<string, unknown> | null
+  school_life: Record<string, unknown> | null
+  food_preferences: Record<string, unknown> | null
+  hobbies: Record<string, unknown> | null
+  nature: Record<string, unknown> | null
+  appearance: Record<string, unknown> | null
+  personality: Record<string, unknown> | null
+  daily_life: Record<string, unknown> | null
+  future: Record<string, unknown> | null
+  environment: Record<string, unknown> | null
+  learning_patterns: Record<string, unknown> | null
+  free_facts: string[] | null
+  updated_at: string
+}
+
 interface NewStudent {
   name: string
   nickname: string
@@ -67,13 +106,16 @@ export default function TeacherDashboard() {
   const supabase = createClient()
   const router = useRouter()
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [teacherId, setTeacherId] = useState<string | null>(null)
   const [logs, setLogs] = useState<ConversationLog[]>([])
   const [realtimeLogs, setRealtimeLogs] = useState<RealtimeLog[]>([])
   const [reports, setReports] = useState<LessonReport[]>([])
   const [students, setStudents] = useState<Student[]>([])
+  const [scenarios, setScenarios] = useState<ScenarioRow[]>([])
+  const [personas, setPersonas] = useState<PersonaRow[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'students'>('realtime')
+  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students'>('realtime')
   const [newStudent, setNewStudent] = useState<NewStudent>({ name: '', nickname: '', email: '', password: '' })
   const [createLoading, setCreateLoading] = useState(false)
   const [createMessage, setCreateMessage] = useState<{ text: string; ok: boolean } | null>(null)
@@ -103,6 +145,7 @@ export default function TeacherDashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUserEmail(user.email || null)
+      setTeacherId(user.id)
       setLoading(false)
     }
     checkAuth()
@@ -117,14 +160,55 @@ export default function TeacherDashboard() {
     if (data) setLogs(data)
   }, [supabase])
 
+  // 학생별 최신 시나리오(진행률) 조회
+  const fetchScenarios = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return
+    const { data } = await supabase
+      .from('lesson_scenarios')
+      .select('id, student_id, book, unit, unit_title, progress_state, status, updated_at')
+      .in('student_id', ids)
+      .in('status', ['ready', 'used'])
+      .order('updated_at', { ascending: false })
+    // 학생당 가장 최근 1개만 유지
+    const latest = new Map<string, ScenarioRow>()
+    for (const row of (data || []) as ScenarioRow[]) {
+      if (!latest.has(row.student_id)) latest.set(row.student_id, row)
+    }
+    setScenarios(Array.from(latest.values()))
+  }, [supabase])
+
+  // 학생별 페르소나 조회
+  const fetchPersonas = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return
+    const { data } = await supabase
+      .from('student_personas')
+      .select('*')
+      .in('student_id', ids)
+    if (data) setPersonas(data)
+  }, [supabase])
+
+  // 본인 반 학생만 조회: teacher_id → classes → profiles
   const fetchStudents = useCallback(async () => {
+    if (!teacherId) return
+    const { data: myClasses } = await supabase
+      .from('classes')
+      .select('id')
+      .eq('teacher_id', teacherId)
+    const classIds = (myClasses || []).map(c => c.id)
+    if (classIds.length === 0) { setStudents([]); return }
     const { data } = await supabase
       .from('profiles')
       .select('id, name, nickname, current_book, current_unit')
       .eq('role', 'student')
+      .in('class_id', classIds)
       .order('name')
-    if (data) setStudents(data)
-  }, [supabase])
+    if (data) {
+      setStudents(data)
+      const ids = data.map(s => s.id)
+      fetchScenarios(ids)
+      fetchPersonas(ids)
+    }
+  }, [supabase, teacherId, fetchScenarios, fetchPersonas])
 
   const fetchReports = useCallback(async (studentId?: string) => {
     let query = supabase
@@ -154,6 +238,19 @@ export default function TeacherDashboard() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [supabase, fetchLogs])
+
+  // 수업 진행률 실시간 갱신 (lesson_scenarios 변경)
+  useEffect(() => {
+    const ids = students.map(s => s.id)
+    if (ids.length === 0) return
+    const channel = supabase
+      .channel('lesson_scenarios_realtime')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'lesson_scenarios',
+      }, () => { fetchScenarios(ids) })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [supabase, students, fetchScenarios])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -209,15 +306,15 @@ export default function TeacherDashboard() {
 
         {/* 탭 */}
         <div className="flex gap-2 flex-wrap">
-          {(['realtime', 'history', 'reports', 'students'] as const).map(tab => (
+          {(['realtime', 'history', 'reports', 'personas', 'students'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={cn('px-4 py-2 rounded-xl text-sm transition-colors',
                 activeTab === tab ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
               )}>
-              {tab === 'realtime' ? '🔴 실시간' : tab === 'history' ? '📋 대화기록' : tab === 'reports' ? '📊 학습이력' : '👨‍🎓 학생관리'}
+              {tab === 'realtime' ? '🔴 실시간' : tab === 'history' ? '📋 대화기록' : tab === 'reports' ? '📊 학습이력' : tab === 'personas' ? '👤 페르소나' : '👨‍🎓 학생관리'}
             </button>
           ))}
-          <button onClick={() => { fetchLogs(); fetchReports(selectedStudentId || undefined) }} className="ml-auto px-4 py-2 rounded-xl text-sm bg-slate-800 text-slate-400 hover:text-white transition-colors">
+          <button onClick={() => { fetchLogs(); fetchReports(selectedStudentId || undefined); const ids = students.map(s => s.id); fetchScenarios(ids); fetchPersonas(ids) }} className="ml-auto px-4 py-2 rounded-xl text-sm bg-slate-800 text-slate-400 hover:text-white transition-colors">
             🔄 새로고침
           </button>
         </div>
@@ -291,7 +388,52 @@ export default function TeacherDashboard() {
         {/* 실시간 */}
         {activeTab === 'realtime' && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
+            {/* 수업 진행률 */}
+            <div className="space-y-2">
+              <span className="text-sm text-slate-400">📚 수업 진행률 ({students.length}명)</span>
+              {students.length === 0 ? (
+                <div className="bg-slate-900/40 border border-slate-700/30 rounded-2xl p-4 text-center">
+                  <p className="text-slate-500 text-sm">담당 반에 배정된 학생이 없습니다</p>
+                </div>
+              ) : students.map(s => {
+                const sc = scenarios.find(x => x.student_id === s.id)
+                const prog = sc?.progress_state?.progress ?? 0
+                const stages = sc?.progress_state?.stages ?? []
+                return (
+                  <div key={s.id} className="bg-slate-900/40 border border-slate-700/30 rounded-2xl p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-sm text-white font-medium">{s.name}</span>
+                        <span className="text-xs text-slate-500 ml-2 truncate">
+                          {sc ? `${sc.book} U${sc.unit}${sc.unit_title ? `-${sc.unit_title}` : ''}` : '시나리오 준비 전'}
+                        </span>
+                      </div>
+                      <span className={cn('text-sm font-bold tabular-nums shrink-0',
+                        prog >= 80 ? 'text-emerald-400' : prog >= 50 ? 'text-amber-400' : 'text-slate-400'
+                      )}>{prog}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div className={cn('h-full rounded-full transition-all duration-700',
+                        prog >= 80 ? 'bg-emerald-500' : prog >= 50 ? 'bg-amber-500' : 'bg-violet-500'
+                      )} style={{ width: `${prog}%` }} />
+                    </div>
+                    {stages.length > 0 && (
+                      <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                        {stages.slice(0, 10).map((st, i) => (
+                          <span key={i} className={cn('text-xs',
+                            st.completed ? 'text-emerald-400' : st.current_count > 0 ? 'text-amber-400' : 'text-slate-600'
+                          )}>
+                            {st.target}{st.completed ? '✅' : st.current_count > 0 ? `🔄${st.current_count}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               <span className="text-sm text-slate-400">실시간 대화 스트림</span>
             </div>
@@ -341,6 +483,64 @@ export default function TeacherDashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* 페르소나 */}
+        {activeTab === 'personas' && (
+          <div className="space-y-4">
+            {students.length === 0 ? (
+              <div className="bg-slate-900/40 border border-slate-700/30 rounded-2xl p-8 text-center">
+                <p className="text-slate-500">담당 반에 배정된 학생이 없습니다</p>
+              </div>
+            ) : students.map(s => {
+              const p = personas.find(x => x.student_id === s.id)
+              const fmt = (obj: Record<string, unknown> | null | undefined): string => {
+                if (!obj || Object.keys(obj).length === 0) return ''
+                return Object.entries(obj)
+                  .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)}`)
+                  .join(' · ')
+              }
+              const rows: { label: string; value: string }[] = [
+                { label: '관심사', value: fmt(p?.hobbies) },
+                { label: '가족', value: fmt(p?.family_members) },
+                { label: '음식', value: fmt(p?.food_preferences) },
+                { label: '학교생활', value: fmt(p?.school_life) },
+                { label: '반려/자연', value: fmt(p?.nature) },
+                { label: '성향', value: fmt(p?.personality) },
+                { label: '꿈', value: fmt(p?.future) },
+                { label: '취약점', value: p?.learning_patterns ? fmt({ ...(p.learning_patterns as Record<string, unknown>) }) : '' },
+              ].filter(r => r.value)
+              const facts = p?.free_facts || []
+              return (
+                <div key={s.id} className="bg-slate-900/40 border border-slate-700/30 rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-white font-medium">{s.name}</span>
+                    {p?.updated_at && (
+                      <span className="text-xs text-slate-500">업데이트: {new Date(p.updated_at).toLocaleDateString('ko-KR')}</span>
+                    )}
+                  </div>
+                  {rows.length === 0 && facts.length === 0 ? (
+                    <p className="text-xs text-slate-500">아직 수집된 페르소나 정보가 없습니다</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {rows.map(r => (
+                        <div key={r.label} className="flex gap-2 text-xs">
+                          <span className="text-slate-500 shrink-0 w-16">{r.label}</span>
+                          <span className="text-slate-200">{r.value}</span>
+                        </div>
+                      ))}
+                      {facts.length > 0 && (
+                        <div className="flex gap-2 text-xs">
+                          <span className="text-slate-500 shrink-0 w-16">알려진 사실</span>
+                          <span className="text-slate-200">{facts.join(' · ')}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 

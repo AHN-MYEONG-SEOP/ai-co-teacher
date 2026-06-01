@@ -46,6 +46,10 @@
 
 ### 최근 추가된 기능
 
+- [x] 개인화 학습 시스템 v3.0 — 페르소나 자동 구축(`student_personas`) + 수업 시나리오 자동 생성(`lesson_scenarios`) + 자연 사용 3회 기반 진도율
+- [x] `/api/persona`, `/api/lesson-scenario` 엔드포인트 추가
+- [x] 학생 📊 진행 상황 모달 (단어/패턴별 달성 현황)
+- [x] 교사 대시보드 — 반별 학생 필터 + 실시간 수업 진행률 + 👤 페르소나 탭
 - [x] Deepgram HTTP Blob STT (WebSocket → HTTP 전환)
 - [x] Web Audio 노이즈 제거 파이프라인
 - [x] 단계별 대화 흐름 (greeting→weather→review→confirm_unit→study)
@@ -74,6 +78,13 @@
 ## 변경 이력
 
 ### 2026-06
+- **개인화 학습 시스템 v3.0 도입 (페르소나 + 시나리오 + 자연 사용 기반 진도율)** — `LEARNING_SYSTEM_DESIGN.md` 기준 구현 (v2026-06-01.9):
+  - **페르소나 API** `/api/persona` (GET 조회 / POST 누적 merge). 배열=합집합, 객체=재귀병합, free_facts 합집합. 별도 호출 없이 chat 응답의 `persona_update`로 자동 누적
+  - **시나리오 API** `/api/lesson-scenario` (POST generate / GET 조회 / POST `?action=update_progress`). 로그인 직후 백그라운드로 GPT가 오늘 Unit + 페르소나 기반 수업 시나리오 생성 → `lesson_scenarios`에 저장. 같은 book/unit ready 시나리오는 중복 생성 방지(재사용), 새로 생성 시 이전 ready는 expired 처리, 24시간 만료
+  - **chat/route.ts 전면 개편**: 대화 GPT 호출이 `response_format: json_object`로 `{ text, stage_progress, persona_update }` 반환. 시스템 프롬프트에 학생 주도 유도 규칙(5 techniques) + 페르소나 + 시나리오 + 미완료 target(pendingTargets) 주입. 기존 별도 진도율 GPT 호출 제거 → 진도는 stage_progress 기반으로 클라이언트가 계산
+  - **진도율 = 자연스럽게 3회 사용 시 완료**: `useConversation`이 `progress_state`(stage별 current_count/completed/usage_log) 관리. 힌트 보고 말한 것(`meta.hintUsed` 또는 `hint_used`)은 카운트 제외. 단어/패턴 변형 인정(matchStage). 완료 가중치 합으로 0~100 정규화, `/api/lesson-scenario` update_progress로 실시간 저장
+  - **학생 화면 📊 진행 상황 모달**: 단어/패턴별 달성 현황(✅3회/🔄n회/⬜)과 usage_log 표시. 진행률 바 옆 📊 버튼으로 진입
+  - **교사 대시보드**: 본인 반 학생만 조회(teacher_id→classes→profiles), 🔴실시간 탭에 학생별 수업 진행률 바 + stage 현황 추가(lesson_scenarios realtime 구독), 👤페르소나 탭 신규(관심사/가족/취약점/꿈/알려진 사실 카드)
 - **피드백(점수/교정/팁) 미표시 버그 수정**: 피드백 route가 `JSON.parse`를 마크다운 제거 없이 해서, gpt-4o-mini가 ```json 으로 감싸면 파싱 실패 → 500 → 피드백 미부착. 백틱 펜스 제거 후 파싱하도록 수정. 실패 시 클라이언트 콘솔에 진단 로그 추가
 - **마이크 스트림 예열(warm) — 발화 앞부분 잘림 해결**: 기존엔 누를 때마다 getUserMedia를 새로 호출해 ~0.5~1초 동안 녹음이 안 돼 앞부분이 잘림. 이제 마운트 시 스트림+AudioContext를 한 번 예열(`prepare`)하고 세션 내내 유지(warm) → 마이크 누르면 녹음기만 즉시 시작. 설정 변경/트랙 종료 시에만 재예열. 단일 컨텍스트 유지로 AudioContext 누수도 원천 해소. `isReady` 노출. (단점: 수업 중 마이크 표시등 상시 켜짐)
 - **"녹음 데이터 없음" 반복 버그 수정 (AudioContext 누수)**: `useWebSpeech`가 매 녹음마다 `new AudioContext()`를 만들고 close/resume하지 않아, 컨텍스트가 누적되거나 suspended되면 가공 스트림이 무음 → 청크 0개가 되던 문제. 마이크 누를 때 이전 오디오 자원을 정리(`teardownAudio`)하고 컨텍스트를 `resume()`, stopListening에서 `close()` 추가

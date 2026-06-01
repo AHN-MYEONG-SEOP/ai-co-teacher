@@ -18,6 +18,38 @@ interface ConversationMeta {
   hintUsed?: boolean
 }
 
+// 진도 추적 — lesson_scenarios.progress_state 와 동일 구조
+export interface ProgressStage {
+  type: string
+  target: string
+  pattern_core?: string
+  valid_variations?: string[]
+  weight: number
+  min_uses: number
+  current_count: number
+  completed: boolean
+  usage_log: string[]
+}
+export interface ProgressState {
+  progress: number
+  stages: ProgressStage[]
+}
+export interface LessonScenario {
+  id: string
+  book: string
+  unit: number
+  unit_title?: string | null
+  scenario: Record<string, unknown>
+  progress_state: ProgressState
+  status: string
+}
+interface StageProgressItem {
+  target?: string
+  used_form?: string
+  natural_use?: boolean
+  hint_used?: boolean
+}
+
 interface UseConversationProps {
   sessionId?: string | null
   studentId?: string
@@ -25,7 +57,39 @@ interface UseConversationProps {
   ttsSpeed?: 'slow' | 'normal' | 'fast'
   currentBook?: string
   currentUnit?: number
+  persona?: Record<string, unknown> | null
+  scenario?: LessonScenario | null
   onBookUnitChange?: (book: string, unit: number) => void
+}
+
+// stage_progress 항목을 progress_state의 stage에 매칭
+function matchStage(stages: ProgressStage[], item: StageProgressItem): ProgressStage | undefined {
+  const t = (item.target || '').toLowerCase().trim()
+  const used = (item.used_form || '').toLowerCase().trim()
+  if (!t && !used) return undefined
+  return stages.find((s) => {
+    const st = (s.target || '').toLowerCase().trim()
+    if (!st) return false
+    if (st === t || (t && (st.includes(t) || t.includes(st)))) return true
+    if (s.pattern_core && t.includes(s.pattern_core.toLowerCase())) return true
+    if (s.valid_variations?.some((v) => {
+      const vv = v.toLowerCase()
+      return (used && (used.includes(vv) || vv.includes(used))) || (t && (t.includes(vv) || vv.includes(t)))
+    })) return true
+    return false
+  })
+}
+
+// 완료된 stage 가중치 합 → 0~100 진도율 (가중치 합이 100이 아니어도 정규화)
+function computeProgress(stages: ProgressStage[]): number {
+  const total = stages.reduce((a, s) => a + (s.weight || 0), 0)
+  const done = stages.filter((s) => s.completed).reduce((a, s) => a + (s.weight || 0), 0)
+  if (total <= 0) {
+    if (stages.length === 0) return 0
+    const completed = stages.filter((s) => s.completed).length
+    return Math.round((completed / stages.length) * 100)
+  }
+  return Math.min(100, Math.round((done / total) * 100))
 }
 
 // 대화 단계
@@ -37,6 +101,7 @@ export function useConversation({
   sessionId, studentId, studentNickname,
   ttsSpeed = 'normal',
   currentBook, currentUnit,
+  persona, scenario,
   onBookUnitChange,
 }: UseConversationProps = {}) {
   const { addMessage, setAIResponding, updateMessageFeedback } = useUIStore()
@@ -47,6 +112,12 @@ export function useConversation({
   const [feedback, setFeedback] = useState<FeedbackData | null>(null)
   const [lessonPhase, setLessonPhase] = useState<LessonPhase>('greeting')
   const [progress, setProgress] = useState(0)
+
+  // 페르소나 + 시나리오/진도 상태
+  const personaRef = useRef<Record<string, unknown> | null>(persona ?? null)
+  const scenarioRef = useRef<LessonScenario | null>(scenario ?? null)
+  const progressStateRef = useRef<ProgressState | null>(scenario?.progress_state ?? null)
+  const [progressState, setProgressState] = useState<ProgressState | null>(scenario?.progress_state ?? null)
 
   // 리포트 추적
   const reportIdRef = useRef<string | null>(null)
@@ -70,6 +141,17 @@ export function useConversation({
   useEffect(() => { currentBookRef.current = currentBook }, [currentBook])
   useEffect(() => { currentUnitRef.current = currentUnit }, [currentUnit])
   useEffect(() => { onBookUnitChangeRef.current = onBookUnitChange }, [onBookUnitChange])
+  useEffect(() => { personaRef.current = persona ?? null }, [persona])
+  // 시나리오 도착 시 진도 상태 초기화 (수업 시작 전 백그라운드 생성)
+  useEffect(() => {
+    if (!scenario) return
+    scenarioRef.current = scenario
+    if (scenario.progress_state && !progressStateRef.current) {
+      progressStateRef.current = scenario.progress_state
+      setProgressState(scenario.progress_state)
+      setProgress(scenario.progress_state.progress || 0)
+    }
+  }, [scenario])
 
   const addMessageRef = useRef(addMessage)
   const speakRef = useRef<(text: string) => Promise<void>>(async () => {})
@@ -316,6 +398,11 @@ export function useConversation({
     setAvatarStatus('processing')
 
     try {
+      // 아직 완료되지 않은 target 목록 — GPT가 학생을 유도하도록 힌트
+      const pendingTargets = (progressStateRef.current?.stages || [])
+        .filter(s => !s.completed)
+        .map(s => s.target)
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -326,6 +413,9 @@ export function useConversation({
           currentBook: currentBookRef.current,
           currentUnit: currentUnitRef.current,
           phase: lessonPhaseRef.current,
+          persona: personaRef.current,
+          scenario: scenarioRef.current,
+          pendingTargets,
         }),
       })
       if (!res.ok) throw new Error('GPT 응답 실패')
@@ -339,42 +429,80 @@ export function useConversation({
         setLessonPhase(data.nextPhase)
       }
 
-      // 진행률 업데이트 (절대 낮아지지 않음)
-      if (data.progress !== null && data.progress !== undefined) {
-        setProgress(prev => {
-          const newProgress = Math.max(prev, data.progress)
-          // report에 progress 저장
-          if (reportIdRef.current && newProgress > prev) {
-            fetch('/api/lesson-report', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'update',
-                report_id: reportIdRef.current,
-                progress: newProgress,
-              }),
-            })
-          }
-          // 100% 달성 시 최종 요약 생성
-          if (newProgress >= 100 && prev < 100 && reportIdRef.current) {
-            fetch('/api/lesson-report', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'finish',
-                report_id: reportIdRef.current,
-                conversation_history: historyRef.current
-                  .map(m => `${m.role}: ${m.content}`).join('\n'),
-                book: currentBookRef.current,
-                unit: currentUnitRef.current,
-                unit_title: '',
-                progress: newProgress,
-                corrections: correctionsRef.current.join(', '),
-              }),
-            })
-          }
-          return newProgress
-        })
+      // ── 페르소나 업데이트 (학생 발화에서 새 정보 감지 시) ──
+      if (data.persona_update && studentId) {
+        fetch('/api/persona', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_id: studentId, persona_update: data.persona_update }),
+        }).then(r => r.ok ? r.json() : null).then(d => {
+          if (d?.persona) personaRef.current = d.persona
+        }).catch(() => {})
+      }
+
+      // ── 진도율 업데이트 (자연스럽게 3회 사용 = 완료) ──
+      if (Array.isArray(data.stage_progress) && data.stage_progress.length > 0 && progressStateRef.current) {
+        const ps = progressStateRef.current
+        let changed = false
+        for (const item of data.stage_progress as StageProgressItem[]) {
+          if (!item.natural_use) continue
+          if (item.hint_used || meta?.hintUsed) continue  // 힌트 보고 말한 건 카운트 안 함
+          const stage = matchStage(ps.stages, item)
+          if (!stage || stage.completed) continue
+          stage.current_count++
+          if (item.used_form) stage.usage_log.push(item.used_form)
+          if (stage.current_count >= stage.min_uses) stage.completed = true
+          changed = true
+        }
+        if (changed) {
+          const newProgress = computeProgress(ps.stages)
+          ps.progress = newProgress
+          const nextState: ProgressState = { progress: newProgress, stages: ps.stages.map(s => ({ ...s })) }
+          progressStateRef.current = nextState
+          setProgressState(nextState)
+
+          setProgress(prev => {
+            const merged = Math.max(prev, newProgress)
+            // 시나리오 진도 저장
+            if (scenarioRef.current?.id) {
+              fetch('/api/lesson-scenario?action=update_progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  scenario_id: scenarioRef.current.id,
+                  progress_state: nextState,
+                  status: merged >= 100 ? 'used' : undefined,
+                }),
+              }).catch(() => {})
+            }
+            // report에 progress 저장
+            if (reportIdRef.current && merged > prev) {
+              fetch('/api/lesson-report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', report_id: reportIdRef.current, progress: merged }),
+              })
+            }
+            // 100% 달성 시 최종 요약 생성
+            if (merged >= 100 && prev < 100 && reportIdRef.current) {
+              fetch('/api/lesson-report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'finish',
+                  report_id: reportIdRef.current,
+                  conversation_history: historyRef.current.map(m => `${m.role}: ${m.content}`).join('\n'),
+                  book: currentBookRef.current,
+                  unit: currentUnitRef.current,
+                  unit_title: scenarioRef.current?.unit_title || '',
+                  progress: merged,
+                  corrections: correctionsRef.current.join(', '),
+                }),
+              })
+            }
+            return merged
+          })
+        }
       }
 
       // unit 변경 처리
@@ -433,5 +561,6 @@ export function useConversation({
     sendToGPT, isSpeaking, stopSpeaking, feedback,
     clearFeedback: () => setFeedback(null),
     lessonPhase, progress,
+    progressState,
   }
 }

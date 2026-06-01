@@ -94,10 +94,75 @@ Rules:
   }
 }
 
+// 페르소나를 GPT 시스템 프롬프트용 텍스트로 변환
+function formatPersona(persona: Record<string, unknown> | null | undefined, nickname?: string): string {
+  if (!persona || typeof persona !== 'object') return ''
+  const lines: string[] = []
+  if (nickname) lines.push(`- Name: ${nickname}`)
+  const pick = (key: string, label: string) => {
+    const v = persona[key]
+    if (v && typeof v === 'object' && Object.keys(v).length > 0) {
+      lines.push(`- ${label}: ${JSON.stringify(v)}`)
+    }
+  }
+  pick('hobbies', 'Interests')
+  pick('family_members', 'Family')
+  pick('food_preferences', 'Food')
+  pick('school_life', 'School')
+  pick('nature', 'Pets/Nature')
+  pick('future', 'Dream')
+  pick('personality', 'Personality')
+  const lp = persona.learning_patterns as Record<string, unknown> | undefined
+  if (lp?.weak_points) lines.push(`- Weak points (focus extra): ${JSON.stringify(lp.weak_points)}`)
+  const facts = persona.free_facts
+  if (Array.isArray(facts) && facts.length > 0) lines.push(`- Known facts: ${facts.join('; ')}`)
+  if (lines.length === 0) return ''
+  return `\nSTUDENT PROFILE (use naturally to create situations — NEVER read it out loud):\n${lines.join('\n')}\n`
+}
+
+// 시나리오(jsonb)를 GPT 지침 텍스트로 변환
+function formatScenario(scenario: Record<string, unknown> | null | undefined, pendingTargets?: string[]): string {
+  if (!scenario || typeof scenario !== 'object') return ''
+  const parts: string[] = ['\nTODAY\'S LESSON SCENARIO (follow loosely, stay natural — do NOT recite it):']
+  if (scenario.opening) parts.push(`Opening idea: ${scenario.opening}`)
+  if (scenario.bridge) parts.push(`Bridge to today's unit: ${scenario.bridge}`)
+  const stages = scenario.stages
+  if (Array.isArray(stages) && stages.length > 0) {
+    parts.push('Techniques to make the STUDENT produce each target:')
+    for (const s of stages.slice(0, 12) as Record<string, unknown>[]) {
+      parts.push(`  • [${s.type}] "${s.target}" via ${s.technique || 'conversation'} — ${s.setup || ''}`)
+    }
+  }
+  if (Array.isArray(pendingTargets) && pendingTargets.length > 0) {
+    parts.push(`STILL NEEDED (drive the student to SAY these themselves): ${pendingTargets.join(', ')}`)
+  }
+  if (scenario.closing) parts.push(`Closing idea: ${scenario.closing}`)
+  return parts.join('\n') + '\n'
+}
+
+// 학생 주도 유도 규칙 + JSON 출력 형식
+const INITIATIVE_RULES = `
+STUDENT-INITIATIVE RULES (critical):
+- Never ask more than 2 questions in a row. After that, flip roles: "Now YOU ask ME!"
+- Pretend you don't know the student's favorite topics so the student explains.
+- Sometimes make a deliberate, obvious mistake so the student corrects you.
+- The target words/patterns must come FROM THE STUDENT — do not say them first.
+`
+
+const JSON_OUTPUT_RULE = `
+RESPOND WITH A JSON OBJECT ONLY (no markdown, no backticks):
+{
+  "text": "<your spoken reply — obey ALL rules above (max 2 sentences, one question at the end)>",
+  "stage_progress": [ { "target": "<target word or pattern>", "used_form": "<exact words the student said>", "natural_use": true, "hint_used": false } ],
+  "persona_update": { }
+}
+stage_progress: list ONLY target words/patterns that the STUDENT produced THEMSELVES in their latest message. Accept variations (tall/taller, who is he/who is she). Empty array [] if none. NEVER count words the AI said.
+persona_update: only BRAND-NEW info learned about the student in their latest message, matching keys like hobbies/family_members/food_preferences/nature/school_life/future/personality/free_facts. Use {} if nothing new.`
+
 export async function POST(req: NextRequest) {
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const { messages, studentText, withTranslation, currentBook, currentUnit, phase } = await req.json()
+    const { messages, studentText, withTranslation, currentBook, currentUnit, phase, persona, scenario, pendingTargets } = await req.json()
 
     if (!studentText) {
       return NextResponse.json({ error: 'studentText required' }, { status: 400 })
@@ -261,6 +326,14 @@ Teaching rules:
 - ${levelGuide}` : ''
     }
 
+    // ── 페르소나 + 시나리오 + 학생 주도 규칙 주입 ──────────
+    systemContent += INITIATIVE_RULES
+    systemContent += formatPersona(persona)
+    if (phase === 'study') {
+      systemContent += formatScenario(scenario?.scenario || scenario, pendingTargets)
+    }
+    systemContent += JSON_OUTPUT_RULE
+
     // 호출자(useConversation)가 이미 현재 학생 발화를 messages 끝에 push해서 보내므로
     // 여기서 또 붙이면 동일 발화가 중복 전달된다 → 마지막 메시지가 현재 발화면 재추가하지 않음
     const history = messages || []
@@ -275,51 +348,34 @@ Teaching rules:
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: conversationMessages,
-      max_tokens: 100,
+      max_tokens: 300,
       temperature: 0.7,
+      response_format: { type: 'json_object' },
     })
 
-    const aiText = response.choices[0]?.message?.content || ''
+    const rawContent = response.choices[0]?.message?.content || ''
+
+    // JSON 응답 파싱 — { text, stage_progress, persona_update }
+    // gpt-4o-mini가 백틱 펜스로 감싸는 경우 대비해 제거 후 파싱
+    let aiText = ''
+    let stageProgress: unknown[] = []
+    let personaUpdate: Record<string, unknown> = {}
+    try {
+      const parsed = JSON.parse(rawContent.replace(/```json|```/g, '').trim())
+      aiText = typeof parsed.text === 'string' ? parsed.text : ''
+      if (Array.isArray(parsed.stage_progress)) stageProgress = parsed.stage_progress
+      if (parsed.persona_update && typeof parsed.persona_update === 'object') {
+        personaUpdate = parsed.persona_update
+      }
+    } catch {
+      // 파싱 실패 시 원문을 그대로 답변으로 사용 (대화 끊김 방지)
+      console.error('chat JSON 파싱 실패. raw:', rawContent)
+      aiText = rawContent
+    }
 
     // 선택지 생성 — 모든 phase에서 항상 힌트 제공
     const choices = await generateChoices(openai, aiText, levelGuide)
 
-    // 진행률 계산 (study phase에서만)
-    let progress: number | null = null
-    if (phase === 'study' && aiText && unitData) {
-      const progressRes = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are evaluating a student's lesson progress.
-Today's lesson: ${currentBook}, Unit ${currentUnit} - "${unitData.title || ''}"
-Target words: ${unitData.words}
-Objectives: ${unitData.objectives}
-Key patterns: ${unitData.sentence_patterns || ''}
-
-Based on the conversation history, evaluate how much of today's lesson the student has completed.
-Rules:
-- Only increase progress when student gives COMPLETE, CORRECT sentences
-- Incomplete answers (single words, fragments) = no increase
-- Correct full sentences using target vocabulary = increase
-- Return ONLY a single integer 0-100 representing cumulative progress
-- Never decrease the progress
-- Start from 0, reach 100 only when all target words and patterns have been practiced correctly`,
-          },
-          {
-            role: 'user',
-            content: `Conversation so far:\n${[...conversationMessages.slice(1), { role: 'assistant', content: aiText }]
-              .map((m: {role: string, content: string}) => `${m.role}: ${m.content}`)
-              .join('\n')}\n\nCurrent progress (0-100)?`,
-          },
-        ],
-        max_tokens: 5,
-        temperature: 0,
-      })
-      const raw = progressRes.choices[0]?.message?.content?.trim() || '0'
-      progress = Math.min(100, Math.max(0, parseInt(raw) || 0))
-    }
     // 번역 — 항상 생성
     let translation = ''
     if (aiText) {
@@ -335,7 +391,19 @@ Rules:
       translation = translRes.choices[0]?.message?.content || ''
     }
 
-    return NextResponse.json({ text: aiText, translation, choices, progress, nextPhase, ...responseExtra, role: 'assistant' })
+    // persona_update가 비어있지 않을 때만 내려보냄
+    const hasPersonaUpdate = personaUpdate && Object.keys(personaUpdate).length > 0
+
+    return NextResponse.json({
+      text: aiText,
+      translation,
+      choices,
+      stage_progress: stageProgress,
+      ...(hasPersonaUpdate ? { persona_update: personaUpdate } : {}),
+      nextPhase,
+      ...responseExtra,
+      role: 'assistant',
+    })
 
   } catch (error) {
     console.error('GPT 오류:', error)

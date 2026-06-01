@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import type { LessonScenario } from './useConversation'
 
 export interface StudentSettings {
   tts_speed: 'slow' | 'normal' | 'fast'
@@ -24,6 +25,8 @@ interface StudentSession {
   studentNickname: string | null
   isLoggedIn: boolean
   settings: StudentSettings
+  persona: Record<string, unknown> | null
+  scenario: LessonScenario | null
   updateSettings: (settings: Partial<StudentSettings>) => Promise<void>
 }
 
@@ -36,6 +39,8 @@ export function useStudentSession(): StudentSession {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [settings, setSettings] = useState<StudentSettings>(DEFAULT_SETTINGS)
+  const [persona, setPersona] = useState<Record<string, unknown> | null>(null)
+  const [scenario, setScenario] = useState<LessonScenario | null>(null)
 
   useEffect(() => {
     const init = async () => {
@@ -53,16 +58,35 @@ export function useStudentSession(): StudentSession {
         .eq('id', user.id)
         .single()
 
+      const book = profile?.current_book || DEFAULT_SETTINGS.current_book
+      const unit = profile?.current_unit || DEFAULT_SETTINGS.current_unit
+
       if (profile) {
         setStudentName(profile.name)
         setStudentNickname(profile.nickname || profile.name)
         setSettings({
           tts_speed: profile.tts_speed || 'normal',
           show_feedback: profile.show_feedback ?? true,
-          current_book: profile.current_book || 'STARLAND Phonics 1 Single Letters',
-          current_unit: profile.current_unit || 1,
+          current_book: book,
+          current_unit: unit,
         })
       }
+
+      // ① 페르소나 로드
+      fetch(`/api/persona?student_id=${user.id}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.persona) setPersona(d.persona) })
+        .catch(() => {})
+
+      // ② 오늘 수업 시나리오 생성 (백그라운드 — 수업 시작 전 준비)
+      fetch('/api/lesson-scenario?action=generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: user.id, book, unit }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.scenario) setScenario(d.scenario) })
+        .catch(() => {})
 
       try {
         const { data, error } = await supabase
@@ -104,5 +128,5 @@ export function useStudentSession(): StudentSession {
       .eq('id', studentId)
   }
 
-  return { studentId: studentId ?? undefined, sessionId, studentName, studentNickname, isLoggedIn, settings, updateSettings }
+  return { studentId: studentId ?? undefined, sessionId, studentName, studentNickname, isLoggedIn, settings, persona, scenario, updateSettings }
 }

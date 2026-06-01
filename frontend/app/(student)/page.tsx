@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
-import { useConversation } from '@/hooks/useConversation'
+import { useConversation, type ProgressState } from '@/hooks/useConversation'
 import { useStudentSession, type StudentSettings } from '@/hooks/useStudentSession'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { NavBar } from '@/components/common/NavBar'
@@ -365,6 +365,99 @@ function AudioProcessingModal({
   )
 }
 
+// ── 📊 학습 진행 상황 모달 ────────────────────────────
+function ProgressModal({
+  progressState,
+  book,
+  unit,
+  unitTitle,
+  onClose,
+}: {
+  progressState: ProgressState | null
+  book: string
+  unit: number
+  unitTitle?: string | null
+  onClose: () => void
+}) {
+  const stages = progressState?.stages || []
+  const words = stages.filter(s => s.type === 'word')
+  const patterns = stages.filter(s => s.type === 'pattern')
+  const progress = progressState?.progress || 0
+  const wordsDone = words.filter(s => s.completed).length
+  const patternsDone = patterns.filter(s => s.completed).length
+
+  const StageRow = ({ s }: { s: ProgressState['stages'][number] }) => (
+    <div className="space-y-0.5">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-slate-200">{s.target}</span>
+        <span className="text-xs">
+          {s.completed
+            ? <span className="text-emerald-400">✅ {s.current_count}회</span>
+            : s.current_count > 0
+              ? <span className="text-amber-400">🔄 {s.current_count}/{s.min_uses}회</span>
+              : <span className="text-slate-600">⬜</span>}
+        </span>
+      </div>
+      {s.usage_log.length > 0 && (
+        <p className="text-[11px] text-slate-500 pl-2 truncate">└ {s.usage_log.slice(-4).join(' / ')}</p>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-lg bg-slate-900 border border-slate-700/50 rounded-t-3xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-300 max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-white font-semibold text-base">📊 오늘의 학습 진행</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-sm">✕</button>
+        </div>
+
+        <div>
+          <p className="text-sm text-white font-medium">{book}</p>
+          <p className="text-xs text-slate-400">Unit {unit}{unitTitle ? ` — ${unitTitle}` : ''}</p>
+        </div>
+
+        {/* 진행률 바 */}
+        <div className="space-y-1">
+          <div className="flex justify-end">
+            <span className={cn('text-xs font-bold tabular-nums',
+              progress >= 80 ? 'text-emerald-400' : progress >= 50 ? 'text-amber-400' : 'text-slate-400'
+            )}>{progress}%</span>
+          </div>
+          <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div className={cn('h-full rounded-full transition-all duration-700',
+              progress >= 80 ? 'bg-emerald-500' : progress >= 50 ? 'bg-amber-500' : 'bg-violet-500'
+            )} style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+
+        {stages.length === 0 ? (
+          <p className="text-sm text-slate-500 text-center py-4">수업 시나리오를 준비하고 있어요...</p>
+        ) : (
+          <>
+            {words.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-slate-400">단어 ({wordsDone}/{words.length})</p>
+                <div className="space-y-1.5">{words.map((s, i) => <StageRow key={`w${i}`} s={s} />)}</div>
+              </div>
+            )}
+            {patterns.length > 0 && (
+              <div className="space-y-2 border-t border-slate-800 pt-3">
+                <p className="text-xs font-medium text-slate-400">패턴 ({patternsDone}/{patterns.length})</p>
+                <div className="space-y-1.5">{patterns.map((s, i) => <StageRow key={`p${i}`} s={s} />)}</div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── 상단 상태 인디케이터 (아바타 대체 — 공간 최소화) ──
 function StatusBar({ status }: { status: string }) {
   const STATUS_LABEL: Record<string, string> = {
@@ -496,18 +589,21 @@ export default function StudentPage() {
     setInterimWords, setFinalWords,
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage } = useUIStore()
-  const { studentId, sessionId, studentNickname, settings, updateSettings } = useStudentSession()
-  const { sendToGPT, isSpeaking, stopSpeaking, progress } = useConversation({
+  const { studentId, sessionId, studentNickname, settings, persona, scenario: loadedScenario, updateSettings } = useStudentSession()
+  const { sendToGPT, isSpeaking, stopSpeaking, progress, progressState } = useConversation({
     sessionId, studentId, studentNickname,
     ttsSpeed: settings.tts_speed,
     currentBook: settings.current_book,
     currentUnit: settings.current_unit,
+    persona,
+    scenario: loadedScenario,
     onBookUnitChange: (book, unit) => {
       updateSettings({ current_book: book, current_unit: unit })
     },
   })
   const [showSettings, setShowSettings] = useState(false)
   const [showAudioSettings, setShowAudioSettings] = useState(false)
+  const [showProgress, setShowProgress] = useState(false)
 
   // 오디오 가공 설정 (localStorage 유지) — useWebSpeech 파이프라인에 전달
   const { config: audioConfig, setConfig: setAudioConfig, resetConfig: resetAudioConfig, hydrate: hydrateAudioConfig } = useAudioConfigStore()
@@ -926,20 +1022,29 @@ export default function StudentPage() {
         {/* ③ 하단 컨트롤 영역 (고정) */}
         <div className="shrink-0 px-4 pb-4 pt-2 space-y-3">
 
-          {/* 진행률 바 — study phase에서만 표시 */}
-          {progress > 0 && (
+          {/* 진행률 바 — 시나리오/진도가 있으면 표시 */}
+          {((progressState && progressState.stages.length > 0) || progress > 0) && (
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-400 truncate mr-2">
                   📚 {settings.current_book} · Unit {settings.current_unit}
                 </span>
-                <span className={cn(
-                  'text-xs font-bold tabular-nums transition-colors',
-                  progress >= 80 ? 'text-emerald-400' :
-                  progress >= 50 ? 'text-amber-400' : 'text-slate-400'
-                )}>
-                  {progress}%
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={cn(
+                    'text-xs font-bold tabular-nums transition-colors',
+                    progress >= 80 ? 'text-emerald-400' :
+                    progress >= 50 ? 'text-amber-400' : 'text-slate-400'
+                  )}>
+                    {progress}%
+                  </span>
+                  <button
+                    onClick={() => setShowProgress(true)}
+                    className="text-sm text-slate-400 hover:text-white transition-colors"
+                    title="학습 진행 상황"
+                  >
+                    📊
+                  </button>
+                </div>
               </div>
               <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                 <div
@@ -1051,6 +1156,17 @@ export default function StudentPage() {
           onApply={setAudioConfig}
           onReset={resetAudioConfig}
           onClose={() => setShowAudioSettings(false)}
+        />
+      )}
+
+      {/* 학습 진행 상황 모달 */}
+      {showProgress && (
+        <ProgressModal
+          progressState={progressState}
+          book={settings.current_book}
+          unit={settings.current_unit}
+          unitTitle={loadedScenario?.unit_title}
+          onClose={() => setShowProgress(false)}
         />
       )}
 

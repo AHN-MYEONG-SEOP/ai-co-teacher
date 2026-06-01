@@ -84,6 +84,8 @@ ai-co-teacher/
 │   │       ├── log/route.ts
 │   │       ├── study-log/route.ts
 │   │       ├── lesson-report/route.ts
+│   │       ├── persona/route.ts          # 페르소나 조회/누적merge
+│   │       ├── lesson-scenario/route.ts  # 시나리오 생성/조회/진도update
 │   │       ├── curriculum/route.ts
 │   │       └── deepgram-token/route.ts
 │   ├── components/
@@ -211,7 +213,32 @@ lesson_reports (
 
 sessions (id, class_id, started_at, ended_at)
 classes (id, teacher_id, name)
+
+-- 학생 페르소나 (자동 누적, student_id UNIQUE)
+student_personas (
+  id uuid PK, student_id uuid UNIQUE,
+  family_members jsonb, school_life jsonb, food_preferences jsonb,
+  hobbies jsonb, nature jsonb, appearance jsonb, personality jsonb,
+  daily_life jsonb, future jsonb, environment jsonb, learning_patterns jsonb,
+  free_facts text[],
+  created_at timestamptz, updated_at timestamptz
+)
+
+-- 수업 시나리오 (로그인 시 GPT 생성, 24h 만료)
+lesson_scenarios (
+  id uuid PK, student_id uuid,
+  book text, unit integer, unit_title text,
+  scenario jsonb,          -- GPT 생성 시나리오 (opening/bridge/stages/...)
+  persona_snapshot jsonb,  -- 생성 시 페르소나 스냅샷
+  progress_state jsonb,    -- { progress, stages[{target,weight,current_count,completed,usage_log}] }
+  status text,             -- 'ready' | 'used' | 'expired'
+  created_at timestamptz, updated_at timestamptz, expires_at timestamptz
+)
 ```
+
+> 페르소나/진도는 chat 응답의 `persona_update`/`stage_progress`로 갱신 (별도 LLM 호출 없음).
+> study phase의 chat 호출은 `response_format: json_object`로 `{ text, stage_progress, persona_update }` 반환.
+> 진도율 = target 단어/패턴을 **힌트 없이 자연스럽게 3회** 사용 시 완료 (변형 인정).
 
 ---
 
