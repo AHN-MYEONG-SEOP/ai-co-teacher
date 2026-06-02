@@ -3,7 +3,7 @@ import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import curriculumData from '@/data/curriculum.json'
 import { buildSystemPrompt, type LessonScenarioRow, type PersonaRow } from '@/prompts/system-prompt'
-import { kstToday, progressRate, pushUnique } from '@/lib/lesson'
+import { progressRate, pushUnique } from '@/lib/lesson'
 
 export const dynamic = 'force-dynamic'
 
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const body = await req.json()
     const {
-      messages, studentText, studentId, scenarioId, nickname,
+      messages, studentText, studentId, scenarioId, progressId, nickname,
       hintUsed: clientHintUsed,
       progressData, currentBook, currentUnit,
     }: {
@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
       studentText?: string
       studentId?: string
       scenarioId?: string | null
+      progressId?: string | null
       nickname?: string
       hintUsed?: boolean
       progressData?: ProgressData
@@ -292,8 +293,8 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
       currentStep = stepCompleted + 1
       completed = completedSteps.length >= scenario.total_steps
 
-      if (studentId) {
-        const today = kstToday()
+      // 회차(attempt) 행을 id 기준으로 갱신 — 같은 날 여러 회차가 공존해도 정확히 그 회차만 업데이트
+      if (progressId) {
         await supabase
           .from('lesson_progress')
           .update({
@@ -305,9 +306,7 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
             ...(completed ? { completed_at: new Date().toISOString() } : {}),
             updated_at: new Date().toISOString(),
           })
-          .eq('student_id', studentId)
-          .eq('scenario_id', scenario.id)
-          .eq('session_date', today)
+          .eq('id', progressId)
       }
     }
 

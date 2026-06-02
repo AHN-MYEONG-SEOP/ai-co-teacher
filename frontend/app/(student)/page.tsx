@@ -703,6 +703,193 @@ interface LogEntry {
   type: 'info' | 'success' | 'warning' | 'error'
 }
 
+// ── 수업 시작 확인 카드 (로그인 직후) ──────────────────
+function ConfirmStartCard({
+  book, unit, scenario, attemptCount, completedCount, onStart, onPick,
+}: {
+  book: string
+  unit: number
+  scenario: LessonScenario | null
+  attemptCount: number
+  completedCount: number
+  onStart: () => void
+  onPick: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700/50 rounded-3xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-300">
+        <div className="text-center space-y-1">
+          <p className="text-3xl">📚</p>
+          <h2 className="text-white font-bold text-lg">오늘 배울 내용이에요</h2>
+        </div>
+
+        <div className="bg-slate-800/60 rounded-2xl p-4 space-y-1 text-center">
+          <p className="text-sm text-emerald-300 font-medium">{book}</p>
+          <p className="text-base text-white font-bold">Unit {unit}</p>
+          {scenario?.title && <p className="text-xs text-slate-400">{scenario.title}</p>}
+          {!scenario && <p className="text-[11px] text-slate-500 mt-1">이 Unit은 자유 대화로 진행해요</p>}
+        </div>
+
+        {(attemptCount > 0 || completedCount > 0) && (
+          <p className="text-center text-xs text-slate-400">
+            지금까지 <span className="text-violet-300 font-semibold">{attemptCount}번</span> 했어요
+            {completedCount > 0 && <> · <span className="text-emerald-400 font-semibold">{completedCount}회 완료</span></>}
+          </p>
+        )}
+
+        <div className="space-y-2">
+          <button
+            onClick={onStart}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3.5 text-sm font-bold transition-colors"
+          >
+            🚀 시작하기
+          </button>
+          <button
+            onClick={onPick}
+            className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-2xl py-3 text-sm font-medium transition-colors"
+          >
+            📖 다른 Unit 고르기
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Book·Unit 선택 카드 ────────────────────────────────
+function BookUnitPickerCard({
+  initialBook, initialUnit, onSelect, onCancel,
+}: {
+  initialBook: string
+  initialUnit: number
+  onSelect: (book: string, unit: number) => void
+  onCancel: () => void
+}) {
+  const { booksByLevel, level_order, getUnits } = useCurriculum()
+  const [book, setBook] = useState(initialBook)
+  const [unit, setUnit] = useState(initialUnit)
+  const units = getUnits(book)
+  const selectedUnit = units.find(u => u.unit === unit)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onCancel}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-lg bg-slate-900 border border-slate-700/50 rounded-t-3xl p-6 space-y-5 animate-in slide-in-from-bottom-4 duration-300 max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-white font-semibold text-base">📖 학습할 Book · Unit 선택</h2>
+          <button onClick={onCancel} className="text-slate-500 hover:text-white text-sm">✕</button>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs text-slate-500">Book</p>
+          <select
+            value={book}
+            onChange={(e) => { setBook(e.target.value); setUnit(1) }}
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+          >
+            {level_order.map(level => (
+              booksByLevel[level] && (
+                <optgroup key={level} label={`── ${level} ──`}>
+                  {booksByLevel[level].map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </optgroup>
+              )
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-xs text-slate-500">Unit</p>
+          <select
+            value={unit}
+            onChange={(e) => setUnit(Number(e.target.value))}
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+          >
+            {units.map(u => (
+              <option key={u.unit} value={u.unit}>
+                Unit {u.unit}{u.title ? ` — ${u.title}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedUnit && (
+          <div className="bg-slate-800/60 rounded-xl px-3 py-2 space-y-1">
+            <p className="text-xs text-emerald-400">학습 단어</p>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {selectedUnit.words.split(',').slice(0, 8).join(', ')}...
+            </p>
+          </div>
+        )}
+
+        <button
+          onClick={() => onSelect(book, unit)}
+          className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3.5 text-sm font-bold transition-colors"
+        >
+          🚀 이 Unit으로 시작하기
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── 회차 완료 선택 카드 (Unit 끝나면) ──────────────────
+function UnitCompleteCard({
+  book, unit, progress, completedCount, onRepeat, onNext, onFinish,
+}: {
+  book: string
+  unit: number
+  progress: number
+  completedCount: number
+  onRepeat: () => void
+  onNext: () => void
+  onFinish: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700/50 rounded-3xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-300">
+        <div className="text-center space-y-1">
+          <p className="text-4xl">🎉</p>
+          <h2 className="text-white font-bold text-lg">Unit {unit} 완료!</h2>
+          <p className="text-xs text-slate-400">{book}</p>
+          <p className="text-xs text-emerald-400 font-semibold">
+            진도율 {progress}% · 누적 완료 {completedCount}회
+          </p>
+        </div>
+
+        <p className="text-center text-sm text-slate-300">이제 어떻게 할까요?</p>
+
+        <div className="space-y-2">
+          <button
+            onClick={onRepeat}
+            className="w-full bg-violet-600 hover:bg-violet-500 text-white rounded-2xl py-3.5 text-sm font-bold transition-colors"
+          >
+            🔁 한 번 더
+          </button>
+          <button
+            onClick={onNext}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3.5 text-sm font-bold transition-colors"
+          >
+            ➡️ 다음 Unit (직접 고르기)
+          </button>
+          <button
+            onClick={onFinish}
+            className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-2xl py-3 text-sm font-medium transition-colors"
+          >
+            👋 오늘은 끝내기
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── 메인 페이지 ───────────────────────────────────────
 export default function StudentPage() {
   const {
@@ -710,17 +897,146 @@ export default function StudentPage() {
     setAvatarStatus, setInterimText, setSpeechResult, setLatency,
     setInterimWords, setFinalWords,
   } = useAudioStore()
-  const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage } = useUIStore()
-  const { studentId, sessionId, studentNickname, settings, persona, scenario: loadedScenario, lessonProgress, updateSettings } = useStudentSession()
-  const { sendToGPT, isSpeaking, stopSpeaking, progress, stepProgress, sessionEnded } = useConversation({
+  const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage, clearMessages } = useUIStore()
+  const { studentId, sessionId, studentNickname, ready, settings, persona, updateSettings } = useStudentSession()
+
+  // ── 회차(attempt) 기반 수업 오케스트레이션 ──────────────
+  // lessonState: loading→confirm(시작 확인)→active(수업중)→choosing(완료 선택) / picking(Book·Unit 선택)
+  type LessonState = 'loading' | 'confirm' | 'picking' | 'active' | 'choosing'
+  const [lessonState, setLessonState] = useState<LessonState>('loading')
+  const [activeBook, setActiveBook] = useState<string>(settings.current_book)
+  const [activeUnit, setActiveUnit] = useState<number>(settings.current_unit)
+  const [activeScenario, setActiveScenario] = useState<LessonScenario | null>(null)
+  const [progressId, setProgressId] = useState<string | null>(null)
+  const [resumeProgress, setResumeProgress] = useState<StepProgress | null>(null)
+  const [attemptNumber, setAttemptNumber] = useState(0)   // 현재 회차 번호 (몇 번째 진행)
+  const [attemptCount, setAttemptCount] = useState(0)     // 지금까지 누적 시도 횟수
+  const [completedCount, setCompletedCount] = useState(0) // 누적 완료 횟수
+  const initedRef = useRef(false)
+
+  const { sendToGPT, isSpeaking, stopSpeaking, progress, stepProgress, sessionEnded, start, reset, endSession } = useConversation({
     sessionId, studentId, studentNickname,
     ttsSpeed: settings.tts_speed,
-    currentBook: settings.current_book,
-    currentUnit: settings.current_unit,
+    currentBook: activeBook,
+    currentUnit: activeUnit,
     persona,
-    scenario: loadedScenario,
-    initialProgress: lessonProgress,
+    scenario: activeScenario,
+    initialProgress: resumeProgress,
+    progressId,
+    onUnitComplete: () => { setCompletedCount(c => c + 1); setLessonState('choosing') },
   })
+
+  // 시나리오 + 회차 통계 로드 (행 생성 없음)
+  const loadUnit = useCallback(async (book: string, unit: number) => {
+    if (!studentId) return
+    try {
+      const res = await fetch(`/api/lesson-scenario?student_id=${studentId}&book=${encodeURIComponent(book)}&unit=${unit}`)
+      const data = res.ok ? await res.json() : null
+      setActiveBook(book)
+      setActiveUnit(unit)
+      setActiveScenario(data?.scenario ?? null)
+      setAttemptCount(data?.attempt_count ?? 0)
+      setCompletedCount(data?.completed_count ?? 0)
+    } catch {
+      setActiveBook(book)
+      setActiveUnit(unit)
+      setActiveScenario(null)
+    }
+  }, [studentId])
+
+  // 진행 중 회차 이어하기 (새로고침) — 인사/회차 생성 없음
+  const resumeAttempt = useCallback(async (book: string, unit: number, pid: string) => {
+    if (!studentId) return
+    try {
+      const res = await fetch(`/api/lesson-scenario?student_id=${studentId}&book=${encodeURIComponent(book)}&unit=${unit}&progress_id=${pid}`)
+      const data = res.ok ? await res.json() : null
+      setActiveBook(book)
+      setActiveUnit(unit)
+      setActiveScenario(data?.scenario ?? null)
+      setAttemptCount(data?.attempt_count ?? 0)
+      setCompletedCount(data?.completed_count ?? 0)
+      if (data?.resume) {
+        setResumeProgress(data.resume)
+        setAttemptNumber(data.resume.attempt ?? 0)
+        setProgressId(pid)
+      }
+    } catch {
+      setActiveBook(book)
+      setActiveUnit(unit)
+    }
+  }, [studentId])
+
+  // 새 회차 시작 — 진도율 0부터, 기존 회차는 누적 보존 (시작하기/한 번 더/Unit 선택)
+  const startAttempt = useCallback(async (book: string, unit: number) => {
+    if (!studentId) return
+    reset()
+    clearMessages()
+    setResumeProgress(null)
+    setActiveBook(book)
+    setActiveUnit(unit)
+    setLessonState('active')
+    try {
+      const res = await fetch('/api/lesson-scenario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start', student_id: studentId, book, unit }),
+      })
+      const data = res.ok ? await res.json() : null
+      const scen: LessonScenario | null = data?.scenario ?? null
+      const pid: string | null = data?.progress?.id ?? null
+      setActiveScenario(scen)
+      setProgressId(pid)
+      setAttemptNumber(data?.attempt_number ?? 1)
+      setAttemptCount(data?.attempt_number ?? 1)
+      setCompletedCount(data?.completed_count ?? 0)
+      if (pid) {
+        sessionStorage.setItem('activeProgressId', pid)
+        sessionStorage.setItem('activeBook', book)
+        sessionStorage.setItem('activeUnit', String(unit))
+      } else {
+        sessionStorage.removeItem('activeProgressId')
+      }
+      start({ scenario: scen, progressId: pid, book, unit })
+    } catch {
+      setActiveScenario(null)
+      setProgressId(null)
+      start({ scenario: null, progressId: null, book, unit })
+    }
+  }, [studentId, reset, clearMessages, start])
+
+  // 오늘은 끝내기 — 마이크 비활성화 + 이어하기 정보 제거
+  const finishToday = useCallback(() => {
+    endSession()
+    sessionStorage.removeItem('activeProgressId')
+    sessionStorage.removeItem('activeBook')
+    sessionStorage.removeItem('activeUnit')
+    setLessonState('active')
+  }, [endSession])
+
+  // Book·Unit 선택 완료 → 프로필에 저장하고 새 회차 시작
+  const handlePickUnit = useCallback((book: string, unit: number) => {
+    updateSettings({ current_book: book, current_unit: unit })
+    startAttempt(book, unit)
+  }, [updateSettings, startAttempt])
+
+  // 최초 진입 — 프로필 로드 후: 새로고침이면 이어하기, 신규 로그인이면 확인 카드
+  useEffect(() => {
+    if (!ready || !studentId || initedRef.current) return
+    initedRef.current = true
+
+    const savedPid = sessionStorage.getItem('activeProgressId')
+    const savedBook = sessionStorage.getItem('activeBook')
+    const savedUnit = sessionStorage.getItem('activeUnit')
+    if (savedPid && savedBook && savedUnit) {
+      // mount 시 1회 비동기 이어하기 (setState는 await 이후 콜백에서만 발생)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      resumeAttempt(savedBook, Number(savedUnit), savedPid).then(() => setLessonState('active'))
+    } else {
+      loadUnit(settings.current_book, settings.current_unit).then(() => setLessonState('confirm'))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, studentId])
+
   const [showSettings, setShowSettings] = useState(false)
   const [showAudioSettings, setShowAudioSettings] = useState(false)
   const [showProgress, setShowProgress] = useState(false)
@@ -734,7 +1050,7 @@ export default function StudentPage() {
   //   ① 오늘 Unit의 target 단어  ② 시나리오 stage 타깃  ③ AI가 방금 던진 질문 속 핵심어
   // 학생이 다음에 말할 가능성이 높은 단어를 미리 알려줘 연음/뭉갠 발음 인식을 보완한다.
   const { getUnitData } = useCurriculum()
-  const unitForKeywords = getUnitData(settings.current_book, settings.current_unit)
+  const unitForKeywords = getUnitData(activeBook, activeUnit)
   // 흔한 기능어는 부스트해도 도움이 안 되고 오인식만 늘리므로 제외
   const STT_STOPWORDS = new Set([
     'the','and','for','you','your','are','was','were','this','that','with','what','how','who',
@@ -748,8 +1064,8 @@ export default function StudentPage() {
     : []
   // 시나리오 target 단어/패턴 핵심어 → STT keyword boosting
   const scenarioWords = [
-    ...(loadedScenario?.target_words || []),
-    ...(loadedScenario?.target_patterns || []).flatMap(p => tokenize(p)),
+    ...(activeScenario?.target_words || []),
+    ...(activeScenario?.target_patterns || []).flatMap(p => tokenize(p)),
   ]
   const lastAiText = [...messages].reverse().find(m => m.role === 'ai')?.content || ''
   const aiWords = tokenize(lastAiText)
@@ -963,6 +1279,7 @@ export default function StudentPage() {
   const handleMicStart = useCallback(async () => {
     if (!isSupported) { addLog('Web Speech API 미지원 브라우저', 'error'); return }
     if (sessionEnded) { addLog('오늘 대화가 종료되어 마이크가 비활성화되었습니다', 'info'); return }
+    if (lessonState !== 'active') return  // 시작 확인/선택 카드 표시 중에는 마이크 비활성화
     if (isHolding) return
     console.group('🎤 [PAGE] handleMicStart')
     console.log('① isHolding = true')
@@ -980,7 +1297,7 @@ export default function StudentPage() {
     console.groupEnd()
     addLog('마이크 시작', 'info')
     startListening()
-  }, [isSupported, sessionEnded, isHolding, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog, seenHints])
+  }, [isSupported, sessionEnded, lessonState, isHolding, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog, seenHints])
 
   const handleMicStop = useCallback(async () => {
     if (!isHolding) return  // 이미 중지된 경우 무시
@@ -1171,11 +1488,22 @@ export default function StudentPage() {
         <div className="shrink-0 px-4 pb-4 pt-2 space-y-3">
 
           {/* 진행률 바 — 시나리오가 있으면 표시 */}
-          {(loadedScenario || progress > 0) && (
+          {(activeScenario || progress > 0) && (
             <div className="space-y-1">
+              {/* 회차·완료 횟수 (진도율 위) */}
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-400 truncate mr-2">
+                  {attemptNumber > 0 && (
+                    <span className="text-violet-300 font-semibold">{attemptNumber}번째 진행</span>
+                  )}
+                </span>
+                {completedCount > 0 && (
+                  <span className="text-emerald-400 font-semibold shrink-0">✅ 완료 {completedCount}회</span>
+                )}
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-400 truncate mr-2">
-                  📚 {settings.current_book} · Unit {settings.current_unit}
+                  📚 {activeBook} · Unit {activeUnit}
                 </span>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className={cn(
@@ -1245,7 +1573,7 @@ export default function StudentPage() {
                 setTimeout(() => { isTouchRef.current = false }, 300)
               }}
               onContextMenu={(e) => e.preventDefault()}
-              disabled={!isSupported || sessionEnded}
+              disabled={!isSupported || sessionEnded || lessonState !== 'active'}
               className={cn(
                 'w-24 h-24 rounded-full flex items-center justify-center text-4xl',
                 'transition-all duration-150 shadow-2xl select-none',
@@ -1319,11 +1647,11 @@ export default function StudentPage() {
       {/* 학습 진행 상황 모달 */}
       {showProgress && (
         <ProgressModal
-          scenario={loadedScenario}
+          scenario={activeScenario}
           stepProgress={stepProgress}
-          book={settings.current_book}
-          unit={settings.current_unit}
-          unitTitle={loadedScenario?.title}
+          book={activeBook}
+          unit={activeUnit}
+          unitTitle={activeScenario?.title}
           onClose={() => setShowProgress(false)}
         />
       )}
@@ -1331,9 +1659,45 @@ export default function StudentPage() {
       {/* 시나리오·지침 인스펙터 모달 (교사/운영자용) */}
       {showScenario && (
         <ScenarioInspectorModal
-          scenario={loadedScenario}
+          scenario={activeScenario}
           nickname={studentNickname}
           onClose={() => setShowScenario(false)}
+        />
+      )}
+
+      {/* 수업 시작 확인 카드 (로그인 직후) */}
+      {lessonState === 'confirm' && (
+        <ConfirmStartCard
+          book={activeBook}
+          unit={activeUnit}
+          scenario={activeScenario}
+          attemptCount={attemptCount}
+          completedCount={completedCount}
+          onStart={() => startAttempt(activeBook, activeUnit)}
+          onPick={() => setLessonState('picking')}
+        />
+      )}
+
+      {/* Book·Unit 선택 카드 */}
+      {lessonState === 'picking' && (
+        <BookUnitPickerCard
+          initialBook={activeBook}
+          initialUnit={activeUnit}
+          onSelect={handlePickUnit}
+          onCancel={() => setLessonState('confirm')}
+        />
+      )}
+
+      {/* 회차 완료 선택 카드 */}
+      {lessonState === 'choosing' && (
+        <UnitCompleteCard
+          book={activeBook}
+          unit={activeUnit}
+          progress={progress}
+          completedCount={completedCount}
+          onRepeat={() => startAttempt(activeBook, activeUnit)}
+          onNext={() => setLessonState('picking')}
+          onFinish={finishToday}
         />
       )}
 

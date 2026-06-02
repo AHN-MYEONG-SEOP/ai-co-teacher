@@ -2,8 +2,6 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { toBookSlug } from '@/lib/lesson'
-import type { LessonScenario, StepProgress } from './useConversation'
 
 export interface StudentSettings {
   tts_speed: 'slow' | 'normal' | 'fast'
@@ -25,10 +23,9 @@ interface StudentSession {
   studentName: string | null
   studentNickname: string | null
   isLoggedIn: boolean
+  ready: boolean              // 프로필 로드 완료 (settings 확정) 여부
   settings: StudentSettings
   persona: Record<string, unknown> | null
-  scenario: LessonScenario | null
-  lessonProgress: StepProgress | null
   updateSettings: (settings: Partial<StudentSettings>) => Promise<void>
 }
 
@@ -40,10 +37,9 @@ export function useStudentSession(): StudentSession {
   const [studentNickname, setStudentNickname] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [ready, setReady] = useState(false)
   const [settings, setSettings] = useState<StudentSettings>(DEFAULT_SETTINGS)
   const [persona, setPersona] = useState<Record<string, unknown> | null>(null)
-  const [scenario, setScenario] = useState<LessonScenario | null>(null)
-  const [lessonProgress, setLessonProgress] = useState<StepProgress | null>(null)
 
   useEffect(() => {
     const init = async () => {
@@ -61,34 +57,23 @@ export function useStudentSession(): StudentSession {
         .eq('id', user.id)
         .single()
 
-      const book = profile?.current_book || DEFAULT_SETTINGS.current_book
-      const unit = profile?.current_unit || DEFAULT_SETTINGS.current_unit
-
       if (profile) {
         setStudentName(profile.name)
         setStudentNickname(profile.nickname || profile.name)
         setSettings({
           tts_speed: profile.tts_speed || 'normal',
           show_feedback: profile.show_feedback ?? true,
-          current_book: book,
-          current_unit: unit,
+          current_book: profile.current_book || DEFAULT_SETTINGS.current_book,
+          current_unit: profile.current_unit || DEFAULT_SETTINGS.current_unit,
         })
       }
+      // 프로필 로드 완료 → page에서 시나리오/회차 로드를 시작할 수 있음
+      setReady(true)
 
-      // ① 페르소나 로드
+      // 페르소나 로드 (시나리오/진도는 page.tsx 가 회차 모델로 직접 관리)
       fetch(`/api/persona?student_id=${user.id}`)
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d?.persona) setPersona(d.persona) })
-        .catch(() => {})
-
-      // ② 오늘 수업 시나리오(공용 템플릿) + 진도 로드 (수업 시작 전 준비)
-      //    book_slug + unit 으로 lesson_scenarios 조회, lesson_progress 생성/로드
-      fetch(`/api/lesson-scenario?student_id=${user.id}&book_slug=${toBookSlug(book)}&unit=${unit}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(d => {
-          if (d?.scenario) setScenario(d.scenario)
-          if (d?.progress) setLessonProgress(d.progress)
-        })
         .catch(() => {})
 
       try {
@@ -131,5 +116,5 @@ export function useStudentSession(): StudentSession {
       .eq('id', studentId)
   }
 
-  return { studentId: studentId ?? undefined, sessionId, studentName, studentNickname, isLoggedIn, settings, persona, scenario, lessonProgress, updateSettings }
+  return { studentId: studentId ?? undefined, sessionId, studentName, studentNickname, isLoggedIn, ready, settings, persona, updateSettings }
 }

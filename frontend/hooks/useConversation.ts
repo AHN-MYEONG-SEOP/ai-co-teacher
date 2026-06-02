@@ -79,6 +79,16 @@ interface UseConversationProps {
   persona?: Record<string, unknown> | null
   scenario?: LessonScenario | null
   initialProgress?: StepProgress | null
+  progressId?: string | null
+  onUnitComplete?: () => void   // 한 회차의 모든 step 완료 시 (완료 선택 카드 트리거)
+}
+
+// start() 호출 시 넘기는 현재 회차 정보 (refs 갱신 지연 회피용 명시 인자)
+export interface StartLessonArgs {
+  scenario: LessonScenario | null
+  progressId: string | null
+  book: string
+  unit: number
 }
 
 const TTS_SPEED_MAP = { slow: 0.75, normal: 1.0, fast: 1.25 }
@@ -88,6 +98,7 @@ export function useConversation({
   ttsSpeed = 'normal',
   currentBook, currentUnit,
   persona, scenario, initialProgress,
+  progressId, onUnitComplete,
 }: UseConversationProps = {}) {
   const { addMessage, setAIResponding, updateMessageFeedback } = useUIStore()
   const { setAvatarStatus } = useAudioStore()
@@ -119,11 +130,16 @@ export function useConversation({
   const ttsSpeedRef = useRef(ttsSpeed)
   const currentBookRef = useRef(currentBook)
   const currentUnitRef = useRef(currentUnit)
+  const progressIdRef = useRef<string | null>(progressId ?? null)
+  const onUnitCompleteRef = useRef(onUnitComplete)
+  const unitCompleteFiredRef = useRef(false)   // 현재 회차에서 완료 콜백 1회만 발화
   const greetedRef = useRef(false)
 
   useEffect(() => { ttsSpeedRef.current = ttsSpeed }, [ttsSpeed])
   useEffect(() => { currentBookRef.current = currentBook }, [currentBook])
   useEffect(() => { currentUnitRef.current = currentUnit }, [currentUnit])
+  useEffect(() => { progressIdRef.current = progressId ?? null }, [progressId])
+  useEffect(() => { onUnitCompleteRef.current = onUnitComplete }, [onUnitComplete])
   useEffect(() => { personaRef.current = persona ?? null }, [persona])
   useEffect(() => { scenarioRef.current = scenario ?? null }, [scenario])
   // 시나리오 도착 시 초기 진도 반영 (수업 시작 전 백그라운드 로드)
@@ -179,80 +195,105 @@ export function useConversation({
 
   useEffect(() => { speakRef.current = speak }, [speak])
 
-  // 수업 시작 인사 (시나리오 첫 step의 ai_line, 없으면 일반 인사)
-  useEffect(() => {
-    if (!studentNickname) return
-    const greetedKey = `greeted_${studentNickname}`
-    if (sessionStorage.getItem(greetedKey)) return
-    sessionStorage.setItem(greetedKey, '1')
+  // 한 회차의 누적 상태(대화 이력·점수·리포트)를 초기화 — "한 번 더"/"다음 Unit" 시작 전 호출
+  const reset = useCallback(() => {
+    historyRef.current = []
+    greetedRef.current = false
+    unitCompleteFiredRef.current = false
+    reportIdRef.current = null
+    totalTurnsRef.current = 0
+    correctTurnsRef.current = 0
+    hintUsedCountRef.current = 0
+    grammarScoresRef.current = []
+    fluencyScoresRef.current = []
+    vocabScoresRef.current = []
+    overallScoresRef.current = []
+    correctionsRef.current = []
+    setFeedback(null)
+    setSessionEnded(false)
+    setProgress(0)
+    setStepProgress(EMPTY_PROGRESS)
+    stepProgressRef.current = EMPTY_PROGRESS
+  }, [])
 
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/chat', {
+  // 오늘 수업 종료 (마이크 비활성화)
+  const endSession = useCallback(() => {
+    setSessionEnded(true)
+  }, [])
+
+  // 수업 시작 — 학생이 "시작하기"/"한 번 더"/Unit 선택 후 호출
+  // 시나리오 첫 step의 ai_line 으로 오프닝(없으면 일반 인사). 회차 정보는 명시 인자로 받아 ref 갱신.
+  const start = useCallback(async (a: StartLessonArgs) => {
+    if (!studentNickname || greetedRef.current) return
+    greetedRef.current = true
+
+    // 현재 회차 정보를 refs에 즉시 반영 (이후 sendToGPT가 정확한 scenario/progressId 사용)
+    scenarioRef.current = a.scenario
+    progressIdRef.current = a.progressId
+    currentBookRef.current = a.book
+    currentUnitRef.current = a.unit
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [],
+          studentText: `__GREETING__:${studentNickname}`,
+          scenarioId: a.scenario?.id ?? null,
+          nickname: studentNickname,
+          currentBook: a.book,
+          currentUnit: a.unit,
+        }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      const greetingText = data.message || data.text
+
+      historyRef.current.push({ role: 'assistant', content: greetingText })
+
+      // 학습 로그 + 리포트 생성 (회차마다 새 리포트)
+      if (a.book && a.unit) {
+        fetch('/api/study-log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: [],
-            studentText: `__GREETING__:${studentNickname}`,
-            scenarioId: scenarioRef.current?.id ?? null,
-            nickname: studentNickname,
-            currentBook: currentBookRef.current,
-            currentUnit: currentUnitRef.current,
+            student_id: studentId,
+            session_id: sessionId,
+            book: a.book,
+            unit: a.unit,
+            unit_title: data.unitTitle || a.scenario?.title || '',
           }),
         })
-        if (!res.ok) throw new Error()
-        const data = await res.json()
-        const greetingText = data.message || data.text
-
-        historyRef.current.push({ role: 'assistant', content: greetingText })
-        greetedRef.current = true
-
-        // 학습 로그 + 리포트 생성
-        if (currentBookRef.current && currentUnitRef.current) {
-          fetch('/api/study-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              student_id: studentId,
-              session_id: sessionId,
-              book: currentBookRef.current,
-              unit: currentUnitRef.current,
-              unit_title: data.unitTitle || scenarioRef.current?.title || '',
-            }),
-          })
-          fetch('/api/lesson-report', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'start',
-              student_id: studentId,
-              session_id: sessionId,
-              book: currentBookRef.current,
-              unit: currentUnitRef.current,
-              unit_title: data.unitTitle || scenarioRef.current?.title || '',
-            }),
-          }).then(r => r.json()).then(d => {
-            if (d.report_id) reportIdRef.current = d.report_id
-          })
-        }
-
-        await speakRef.current(greetingText)
-        addMessageRef.current({
-          id: 'greeting', role: 'ai', content: greetingText,
-          choices: data.choices?.length ? data.choices : undefined,
-          createdAt: new Date().toISOString(),
+        fetch('/api/lesson-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'start',
+            student_id: studentId,
+            session_id: sessionId,
+            book: a.book,
+            unit: a.unit,
+            unit_title: data.unitTitle || a.scenario?.title || '',
+          }),
+        }).then(r => r.json()).then(d => {
+          if (d.report_id) reportIdRef.current = d.report_id
         })
-      } catch {
-        const fallback = `Hi ${studentNickname}! Are you ready to start?`
-        historyRef.current.push({ role: 'assistant', content: fallback })
-        greetedRef.current = true
-        await speakRef.current(fallback)
-        addMessageRef.current({ id: 'greeting', role: 'ai', content: fallback, createdAt: new Date().toISOString() })
       }
-    }, 300)
-    return () => clearTimeout(timer)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studentNickname])
+
+      await speakRef.current(greetingText)
+      addMessageRef.current({
+        id: `greeting_${Date.now()}`, role: 'ai', content: greetingText,
+        choices: data.choices?.length ? data.choices : undefined,
+        createdAt: new Date().toISOString(),
+      })
+    } catch {
+      const fallback = `Hi ${studentNickname}! Are you ready to start?`
+      historyRef.current.push({ role: 'assistant', content: fallback })
+      await speakRef.current(fallback)
+      addMessageRef.current({ id: `greeting_${Date.now()}`, role: 'ai', content: fallback, createdAt: new Date().toISOString() })
+    }
+  }, [studentNickname, studentId, sessionId])
 
   // 페이지 종료 시 리포트 마무리
   useEffect(() => {
@@ -370,6 +411,7 @@ export function useConversation({
           studentText,
           studentId,
           scenarioId: scenarioRef.current?.id ?? null,
+          progressId: progressIdRef.current,
           nickname: studentNickname,
           hintUsed: meta?.hintUsed ?? false,
           progressData: stepProgressRef.current,
@@ -408,8 +450,13 @@ export function useConversation({
               body: JSON.stringify({ action: 'update', report_id: reportIdRef.current, progress: merged }),
             })
           }
-          // 100% 달성 시 최종 요약 생성
-          if ((merged >= 100 || p.completed) && prev < 100 && reportIdRef.current) {
+          return merged
+        })
+
+        // 회차의 모든 step 완료 → 리포트 마무리 + 완료 선택 카드 트리거 (회차당 1회)
+        if (p.completed && !unitCompleteFiredRef.current) {
+          unitCompleteFiredRef.current = true
+          if (reportIdRef.current) {
             fetch('/api/lesson-report', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -420,13 +467,13 @@ export function useConversation({
                 book: currentBookRef.current,
                 unit: currentUnitRef.current,
                 unit_title: scenarioRef.current?.title || '',
-                progress: merged,
+                progress: p.progress_rate,
                 corrections: correctionsRef.current.join(', '),
               }),
             })
           }
-          return merged
-        })
+          onUnitCompleteRef.current?.()
+        }
       }
 
       // 세션 종료 신호 (클로징 마지막 턴) → 마이크 비활성화 트리거
@@ -466,5 +513,6 @@ export function useConversation({
     sendToGPT, isSpeaking, stopSpeaking, feedback,
     clearFeedback: () => setFeedback(null),
     progress, stepProgress, sessionEnded,
+    start, reset, endSession,
   }
 }

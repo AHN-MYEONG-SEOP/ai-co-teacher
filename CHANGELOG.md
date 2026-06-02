@@ -46,6 +46,14 @@
 
 ### 최근 추가된 기능
 
+- [x] **회차(attempt) 모델 + 수업 시작/완료 선택 흐름 (2026-06-02, v2026-06-02.6)** — 로그인/로그아웃마다 진도율을 새 회차로 시작하되 기존 자료는 모두 누적 보존. 진도율 바 위에 `N번째 진행 · ✅ 완료 X회` 표시.
+  - **DB**: `lesson_progress.attempt integer` 컬럼 추가 → 날짜당 1행 → **회차당 1행**. (`db/2026-06-02_lesson_progress_attempt.sql` 실행 필요. (학생·시나리오·날짜) 유니크 제약 제거 후 (…·attempt) 재설정)
+  - **흐름**: ① 로그인 직후 `ConfirmStartCard` — 오늘 Book/Unit 안내 + `🚀 시작하기` / `📖 다른 Unit 고르기`(`BookUnitPickerCard`). ② Unit 모든 step 완료 시 `UnitCompleteCard` — `🔁 한 번 더` / `➡️ 다음 Unit(직접 고르기)` / `👋 오늘은 끝내기`.
+  - `lesson-scenario/route.ts` — GET은 **행 생성 없이** 시나리오 + 회차 통계(`attempt_count`/`completed_count`) + (progress_id 주면) 이어할 회차 반환. `POST {action:'start'}`가 새 회차 행 생성(`attempt = max+1`).
+  - `chat/route.ts` — 진도 갱신을 (날짜) 대신 **회차 행 `progressId`** 기준 UPDATE. 같은 날 여러 회차 공존해도 정확한 행만 갱신.
+  - `useConversation.ts` — 자동 인사 제거, 수동 `start()`/`reset()`/`endSession()` + `onUnitComplete` 콜백 + `progressId` 전달. 회차마다 새 리포트.
+  - `useStudentSession.ts` — 시나리오/진도 자동 로드·생성 제거(page가 회차 모델로 직접 관리), `ready` 플래그 추가. 시나리오 오케스트레이션은 `page.tsx`로 이관.
+  - **이어하기**: 새로고침 시 `sessionStorage(activeProgressId/activeBook/activeUnit)`로 진행 중 회차 복구(인사·회차 생성 없음). 로그아웃(`NavBar`의 `sessionStorage.clear()`)·탭 종료 시 다음 로그인은 새 회차.
 - [x] **진도·로그·리포트 누적 보존 정책 확정 (2026-06-02)** — 로그아웃해도 DB의 `lesson_progress`/`conversation_logs`/`lesson_reports`는 삭제하지 않고 그대로 누적. (한때 추가했던 `reset-progress` 엔드포인트와 로그아웃 삭제 로직은 제거) `NavBar.handleLogout`은 화면용 대화창·sessionStorage만 초기화.
   - 같은 날 같은 Unit 재학습 → `lesson_progress` 같은 행에 `natural_steps` 누적
   - 같은 날 다른 Unit / 재로그인 → `lesson_reports` 새 `seq` 행으로 각각 보존

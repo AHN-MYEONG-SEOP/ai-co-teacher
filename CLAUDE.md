@@ -85,7 +85,7 @@ ai-co-teacher/
 │   │       ├── study-log/route.ts
 │   │       ├── lesson-report/route.ts
 │   │       ├── persona/route.ts          # 페르소나 조회/누적merge
-│   │       ├── lesson-scenario/route.ts  # 시나리오 템플릿 + 오늘 진도 로드(GET)
+│   │       ├── lesson-scenario/route.ts  # GET 시나리오+회차통계 / POST start 새 회차 생성
 │   │       ├── curriculum/route.ts
 │   │       └── deepgram-token/route.ts
 │   ├── components/
@@ -152,10 +152,19 @@ transcript + confidence + words 반환
 
 ## 5. Conversation Flow
 
-### 시나리오 step 워크스루 (v4.0)
+### 시나리오 step 워크스루 (v4.1 — 회차/시작·완료 선택)
 ```
-인사(시나리오 첫 step ai_line) → step 1 → step 2 → ... → step N → closing
+로그인 → [시작 확인 카드: Book/Unit 안내 · 시작하기 / 다른 Unit 고르기]
+       → 새 회차(attempt) 생성 → 인사(시나리오 첫 step ai_line)
+       → step 1 → ... → step N
+       → [완료 선택 카드: 한 번 더 / 다음 Unit(Book·Unit 직접 선택) / 오늘은 끝내기]
 ```
+
+- **회차(attempt) 모델**: 로그인/시작마다 `lesson_progress`에 새 회차 행을 만들어 진도율을 0%부터 시작. 기존 회차는 **삭제하지 않고 누적**. 진도율 바 위에 `N번째 진행 · ✅ 완료 X회`(해당 Unit 전체 기간 누적) 표시.
+- **시작 확인**: 로그인 직후 `ConfirmStartCard`로 오늘 Book/Unit 안내·확인. "다른 Unit 고르기" → `BookUnitPickerCard`.
+- **완료 선택**: 한 회차의 모든 step 완료 시 `UnitCompleteCard`. "한 번 더"=같은 Unit 새 회차, "다음 Unit"=Book·Unit 카드 선택 후 새 회차, "끝내기"=마이크 비활성화.
+- **이어하기**: 새로고침은 `sessionStorage(activeProgressId/activeBook/activeUnit)`로 진행 중 회차 복구(인사·회차 생성 없음). 로그아웃·탭 종료 후 다음 로그인은 새 회차.
+- 오케스트레이션은 `page.tsx`가 담당(`useStudentSession`은 프로필/세션만 + `ready` 플래그 노출).
 
 - 오늘 Unit의 `lesson_scenarios` 템플릿을 로드해 `phases[].steps[]`를 **순서대로** 진행.
 - 매 학생 발화마다 `chat/route.ts`가 시나리오 전체를 system prompt로 GPT에 주고, GPT가 현재 step을 판단·진행.
@@ -235,9 +244,10 @@ lesson_scenarios (
   created_at timestamptz, updated_at timestamptz
 )
 
--- 수업 진도 (학생·시나리오·일자별 1행, step 워크스루 추적)
+-- 수업 진도 (학생·시나리오·일자·회차별 1행, step 워크스루 추적)
 lesson_progress (
   id uuid PK, student_id uuid, scenario_id uuid, session_date date,
+  attempt integer,             -- 회차 번호 (1부터, 시작할 때마다 +1) ← 같은 날 같은 Unit 누적
   current_step integer,
   completed_steps integer[],   -- 완료된 step
   natural_steps integer[],     -- 힌트 없이 스스로 말한 step (← 진도율 산정 기준)
@@ -245,12 +255,14 @@ lesson_progress (
   completed boolean, completed_at timestamptz,
   created_at timestamptz, updated_at timestamptz
 )
+-- UNIQUE (student_id, scenario_id, session_date, attempt)  ← db/2026-06-02_lesson_progress_attempt.sql
 ```
 
-> 시나리오는 로그인 시 `GET /api/lesson-scenario?student_id&book_slug&unit` 로 로드(없으면 일반 Coty 대화 폴백). 같은 호출이 오늘자 `lesson_progress` 행을 생성/반환.
-> chat 호출은 `response_format: json_object`로 `{ message, step_completed, hint_used, word_spoken_naturally, persona_update }` 반환. step 완료 시 chat route가 `lesson_progress` 영속화.
+> 로그인 시 `GET /api/lesson-scenario?student_id&book_slug&unit[&progress_id]` 로 시나리오 + 회차 통계(`attempt_count`/`completed_count`)를 로드(**행 생성 안 함**, progress_id 주면 이어할 회차 반환). 시나리오 없으면 일반 Coty 대화 폴백.
+> 새 회차 시작은 `POST /api/lesson-scenario { action:'start', student_id, book_slug, unit }` → `attempt = max+1` 행 생성 후 반환.
+> chat 호출은 `response_format: json_object`로 `{ message, step_completed, hint_used, word_spoken_naturally, persona_update }` 반환. step 완료 시 chat route가 요청의 `progressId`(회차 행 id) 기준으로 `lesson_progress`를 UPDATE.
 > 페르소나는 chat 응답의 `persona_update`를 `/api/persona`로 누적 merge.
-> **진도율 = natural_steps.length / total_steps × 100** (힌트/선택지 버튼 사용 step은 제외).
+> **진도율 = natural_steps.length / total_steps × 100** (힌트/선택지 버튼 사용 step은 제외, **회차마다 0%부터**).
 
 ---
 
