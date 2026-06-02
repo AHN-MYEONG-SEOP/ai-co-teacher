@@ -7,6 +7,9 @@ import { kstToday, progressRate, pushUnique } from '@/lib/lesson'
 
 export const dynamic = 'force-dynamic'
 
+// 클로징 종료 신호 — system-prompt.ts의 마지막 종료 문장과 동일해야 함
+const SESSION_END_MARK = '오늘 대화는 여기까지입니다'
+
 const curriculum = curriculumData as {
   level_order: string[]
   curriculum: Record<string, Record<string, Record<string, {
@@ -310,9 +313,13 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
 
     const rate = progressRate(naturalSteps, scenario.total_steps)
 
+    // ── 세션 종료 신호 감지 (클로징 마지막 턴) ───────────
+    const sessionEnded = aiText.includes(SESSION_END_MARK)
+
     // ── 힌트 선택지 + 번역 ───────────────────────────────
+    // 세션 종료 턴에는 답할 차례가 없으므로 힌트 선택지 생략
     const [choices, translation] = await Promise.all([
-      generateChoices(openai, aiText, levelGuide),
+      sessionEnded ? Promise.resolve([] as string[]) : generateChoices(openai, aiText, levelGuide),
       translate(openai, aiText),
     ])
 
@@ -322,6 +329,7 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
       step_completed: stepCompleted,
       hint_used: hintUsed,
       word_spoken_naturally: wordSpokenNaturally,
+      session_ended: sessionEnded,
       progress: {
         current_step: currentStep,
         completed_steps: completedSteps,

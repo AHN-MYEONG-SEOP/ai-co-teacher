@@ -46,6 +46,11 @@
 
 ### 최근 추가된 기능
 
+- [x] **클로징 2턴 매끄럽게 처리 + 세션 종료 UI (2026-06-02)**
+  - `system-prompt.ts` closing 지침을 2턴 흐름으로 명확화. ① 모든 step 완료 후 첫 마무리 턴에서 칭찬 + "See you tomorrow!" 작별 인사 (종료 안 함, 학생 인사 대기) → ② 학생이 인사로 답하면 짧은 칭찬과 함께 message 끝에 한국어 `오늘 대화는 여기까지입니다.`를 덧붙여 종료 (영어 전용 규칙의 유일한 예외)
+  - `chat/route.ts` — AI 응답에 종료 문장 포함 시 `session_ended: true` 반환 (`SESSION_END_MARK` 상수), 종료 턴에는 힌트 선택지 생략
+  - `useConversation.ts` — `sessionEnded` 상태 노출, chat 응답의 `session_ended` 감지
+  - `page.tsx` — 종료 시 마이크 버튼 비활성화(👋) + handleMicStart 가드 + 하단 안내문구 "오늘 수업이 끝났어요. 내일 또 만나요!" 전환
 - [x] **📋 시나리오·지침 인스펙터 모달 (2026-06-02, 교사/운영자용)** — 학생 페이지 하단 `📋 시나리오 · 지침` 버튼 → 오늘 Unit의 전체 시나리오 대본(phase/step별 scene_kr·ai_line·expected_pattern·accept_variants·hint_line·reaction)과 AI 진행 지침(`gpt_rules.flow`/`counting_rules`)·마무리(closing)를 펼쳐 확인. 이미 로드된 `loadedScenario` 재사용(추가 fetch 없음), `{{nickname}}` 치환 미리보기. 시나리오 없는 교재는 폴백 안내.
 - [x] **수업 시나리오 step 워크스루 v4.0 (2026-06-02)** — `lesson_scenarios`(공용 템플릿: `book_slug`/`phases`/`closing`/`gpt_rules`/`target_words`/`total_steps`) + `lesson_progress`(학생·시나리오·일자별 진도) 기반 선형 step 1..N 진행
   - `frontend/prompts/system-prompt.ts` 신규 — 시나리오/페르소나/닉네임 → Coty system prompt 빌더

@@ -95,6 +95,7 @@ export function useConversation({
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackData | null>(null)
+  const [sessionEnded, setSessionEnded] = useState(false)
   const [progress, setProgress] = useState(initialProgress?.progress_rate ?? 0)
   const [stepProgress, setStepProgress] = useState<StepProgress>(initialProgress ?? EMPTY_PROGRESS)
 
@@ -428,6 +429,9 @@ export function useConversation({
         })
       }
 
+      // 세션 종료 신호 (클로징 마지막 턴) → 마이크 비활성화 트리거
+      if (data.session_ended === true) setSessionEnded(true)
+
       historyRef.current.push({ role: 'assistant', content: aiText })
       setAIResponding(false)
       await speak(aiText)
@@ -461,6 +465,6 @@ export function useConversation({
   return {
     sendToGPT, isSpeaking, stopSpeaking, feedback,
     clearFeedback: () => setFeedback(null),
-    progress, stepProgress,
+    progress, stepProgress, sessionEnded,
   }
 }

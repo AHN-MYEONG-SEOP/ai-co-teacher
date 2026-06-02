@@ -712,7 +712,7 @@ export default function StudentPage() {
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage } = useUIStore()
   const { studentId, sessionId, studentNickname, settings, persona, scenario: loadedScenario, lessonProgress, updateSettings } = useStudentSession()
-  const { sendToGPT, isSpeaking, stopSpeaking, progress, stepProgress } = useConversation({
+  const { sendToGPT, isSpeaking, stopSpeaking, progress, stepProgress, sessionEnded } = useConversation({
     sessionId, studentId, studentNickname,
     ttsSpeed: settings.tts_speed,
     currentBook: settings.current_book,
@@ -962,6 +962,7 @@ export default function StudentPage() {
 
   const handleMicStart = useCallback(async () => {
     if (!isSupported) { addLog('Web Speech API 미지원 브라우저', 'error'); return }
+    if (sessionEnded) { addLog('오늘 대화가 종료되어 마이크가 비활성화되었습니다', 'info'); return }
     if (isHolding) return
     console.group('🎤 [PAGE] handleMicStart')
     console.log('① isHolding = true')
@@ -979,7 +980,7 @@ export default function StudentPage() {
     console.groupEnd()
     addLog('마이크 시작', 'info')
     startListening()
-  }, [isSupported, isHolding, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog, seenHints])
+  }, [isSupported, sessionEnded, isHolding, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog, seenHints])
 
   const handleMicStop = useCallback(async () => {
     if (!isHolding) return  // 이미 중지된 경우 무시
@@ -1244,7 +1245,7 @@ export default function StudentPage() {
                 setTimeout(() => { isTouchRef.current = false }, 300)
               }}
               onContextMenu={(e) => e.preventDefault()}
-              disabled={!isSupported}
+              disabled={!isSupported || sessionEnded}
               className={cn(
                 'w-24 h-24 rounded-full flex items-center justify-center text-4xl',
                 'transition-all duration-150 shadow-2xl select-none',
@@ -1254,15 +1255,17 @@ export default function StudentPage() {
                   : 'bg-gradient-to-br from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600'
               )}
             >
-              {isHolding ? '🎙️' : '🎤'}
+              {sessionEnded ? '👋' : isHolding ? '🎙️' : '🎤'}
             </button>
 
             {/* 가공본 재생 — Deepgram에 실제로 전송된 음성 */}
             <PlaybackButton key={lastProcessedBlobUrl ?? 'proc'} url={lastProcessedBlobUrl} label="가공본" accent="bg-violet-600 hover:bg-violet-700" />
           </div>
 
-          <p className="text-xs text-slate-500 text-center">
-            {isHolding ? '손을 떼면 전송됩니다' : '누르고 있는 동안 말하세요 (Push-to-Talk)'}
+          <p className={cn('text-xs text-center', sessionEnded ? 'text-emerald-400 font-medium' : 'text-slate-500')}>
+            {sessionEnded
+              ? '👋 오늘 수업이 끝났어요. 내일 또 만나요!'
+              : isHolding ? '손을 떼면 전송됩니다' : '누르고 있는 동안 말하세요 (Push-to-Talk)'}
           </p>
 
           <div className="flex justify-center gap-4">
