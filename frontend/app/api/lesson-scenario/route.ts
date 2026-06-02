@@ -25,6 +25,19 @@ interface ProgressRow {
   completed_at?: string | null
 }
 
+// 학생의 전체 학습 이력 여부 — Book/Unit 무관, lesson_progress 행이 하나라도 있으면 true
+// (첫 학습 = 이력 전무 → 환영 카드 / 이력 있음 → 지난 시간 복습 카드)
+async function hasAnyHistory(
+  supabase: ReturnType<typeof getSupabase>,
+  studentId: string
+): Promise<boolean> {
+  const { count } = await supabase
+    .from('lesson_progress')
+    .select('id', { count: 'exact', head: true })
+    .eq('student_id', studentId)
+  return (count ?? 0) > 0
+}
+
 // 회차 통계 — 해당 (학생·시나리오) 전체 기간 누적
 async function attemptStats(
   supabase: ReturnType<typeof getSupabase>,
@@ -55,8 +68,11 @@ export async function GET(req: NextRequest) {
     const bookSlug = searchParams.get('book_slug')
       || (searchParams.get('book') ? toBookSlug(searchParams.get('book')!) : null)
 
+    // 전체 학습 이력 여부 (Book/Unit 무관) — 모든 응답에 포함
+    const has_history = studentId ? await hasAnyHistory(supabase, studentId) : false
+
     if (!bookSlug || !unit) {
-      return NextResponse.json({ scenario: null, attempt_count: 0, completed_count: 0, resume: null })
+      return NextResponse.json({ scenario: null, attempt_count: 0, completed_count: 0, resume: null, has_history })
     }
 
     // 1) 공용 시나리오 템플릿 조회
@@ -69,7 +85,7 @@ export async function GET(req: NextRequest) {
       .maybeSingle()
 
     if (!scenario) {
-      return NextResponse.json({ scenario: null, attempt_count: 0, completed_count: 0, resume: null })
+      return NextResponse.json({ scenario: null, attempt_count: 0, completed_count: 0, resume: null, has_history })
     }
 
     // 2) 회차 통계 + (요청 시) 이어할 회차 행
@@ -95,10 +111,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ scenario, attempt_count, completed_count, resume })
+    return NextResponse.json({ scenario, attempt_count, completed_count, resume, has_history })
   } catch (error) {
     console.error('lesson-scenario 조회 오류:', error)
-    return NextResponse.json({ scenario: null, attempt_count: 0, completed_count: 0, resume: null }, { status: 500 })
+    return NextResponse.json({ scenario: null, attempt_count: 0, completed_count: 0, resume: null, has_history: false }, { status: 500 })
   }
 }
 

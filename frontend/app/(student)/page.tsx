@@ -707,19 +707,18 @@ interface LogEntry {
 
 // ── 수업 시작 확인 카드 (로그인 직후) ──────────────────
 function ConfirmStartCard({
-  book, unit, scenario, attemptCount, completedCount, onStart, onPick, onExit,
+  book, unit, scenario, attemptCount, completedCount, isFirstTime, onStart, onPick, onExit,
 }: {
   book: string
   unit: number
   scenario: LessonScenario | null
   attemptCount: number
   completedCount: number
+  isFirstTime: boolean   // 학생 전체 학습 이력이 전무한 경우(Book/Unit 무관)
   onStart: () => void
   onPick: () => void
   onExit: () => void
 }) {
-  // 첫 학습 = 이 Unit에 회차/완료 기록이 전혀 없음 → 복습할 게 없으므로 환영 + Unit 선택만 노출
-  const isFirstTime = attemptCount === 0 && completedCount === 0
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
@@ -761,10 +760,12 @@ function ConfirmStartCard({
               {!scenario && <p className="text-[11px] text-slate-500 mt-1">이 Unit은 자유 대화로 진행해요</p>}
             </div>
 
-            <p className="text-center text-xs text-slate-400">
-              지금까지 <span className="text-violet-300 font-semibold">{attemptCount}번</span> 했어요
-              {completedCount > 0 && <> · <span className="text-emerald-400 font-semibold">{completedCount}회 완료</span></>}
-            </p>
+            {(attemptCount > 0 || completedCount > 0) && (
+              <p className="text-center text-xs text-slate-400">
+                지금까지 <span className="text-violet-300 font-semibold">{attemptCount}번</span> 했어요
+                {completedCount > 0 && <> · <span className="text-emerald-400 font-semibold">{completedCount}회 완료</span></>}
+              </p>
+            )}
 
             <div className="space-y-2">
               <button
@@ -900,6 +901,7 @@ export default function StudentPage() {
   const [attemptNumber, setAttemptNumber] = useState(0)   // 현재 회차 번호 (몇 번째 진행)
   const [attemptCount, setAttemptCount] = useState(0)     // 지금까지 누적 시도 횟수
   const [completedCount, setCompletedCount] = useState(0) // 누적 완료 횟수
+  const [hasHistory, setHasHistory] = useState(false)     // 학생 전체 학습 이력(Book/Unit 무관) — false면 첫 학습
   const initedRef = useRef(false)
 
   const { sendToGPT, isSpeaking, stopSpeaking, progress, stepProgress, sessionEnded, start, reset } = useConversation({
@@ -926,6 +928,7 @@ export default function StudentPage() {
       setActiveScenario(data?.scenario ?? null)
       setAttemptCount(data?.attempt_count ?? 0)
       setCompletedCount(data?.completed_count ?? 0)
+      setHasHistory(data?.has_history ?? false)
     } catch {
       setActiveBook(book)
       setActiveUnit(unit)
@@ -944,6 +947,7 @@ export default function StudentPage() {
       setActiveScenario(data?.scenario ?? null)
       setAttemptCount(data?.attempt_count ?? 0)
       setCompletedCount(data?.completed_count ?? 0)
+      setHasHistory(data?.has_history ?? false)
       if (data?.resume) {
         setResumeProgress(data.resume)
         setAttemptNumber(data.resume.attempt ?? 0)
@@ -966,6 +970,7 @@ export default function StudentPage() {
     setActiveBook(book)
     setActiveUnit(unit)
     setLessonState('active')
+    setHasHistory(true)   // 수업을 시작하면 학습 이력 생성 → 이후 카드는 복습 변형
 
     let scen: LessonScenario | null = fallbackScenario
     let pid: string | null = null
@@ -1676,6 +1681,7 @@ export default function StudentPage() {
           scenario={activeScenario}
           attemptCount={attemptCount}
           completedCount={completedCount}
+          isFirstTime={!hasHistory}
           onStart={() => startAttempt(activeBook, activeUnit)}
           onPick={() => setLessonState('picking')}
           onExit={handleExit}
