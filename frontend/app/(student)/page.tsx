@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
-import { useConversation, type ProgressState } from '@/hooks/useConversation'
+import { useConversation, type LessonScenario, type StepProgress } from '@/hooks/useConversation'
 import { useStudentSession, type StudentSettings } from '@/hooks/useStudentSession'
 import { useCurriculum } from '@/hooks/useCurriculum'
 import { NavBar } from '@/components/common/NavBar'
@@ -365,44 +365,31 @@ function AudioProcessingModal({
   )
 }
 
-// ── 📊 학습 진행 상황 모달 ────────────────────────────
+// ── 📊 학습 진행 상황 모달 (step 기반) ───────────────────
 function ProgressModal({
-  progressState,
+  scenario,
+  stepProgress,
   book,
   unit,
   unitTitle,
   onClose,
 }: {
-  progressState: ProgressState | null
+  scenario: LessonScenario | null
+  stepProgress: StepProgress | null
   book: string
   unit: number
   unitTitle?: string | null
   onClose: () => void
 }) {
-  const stages = progressState?.stages || []
-  const words = stages.filter(s => s.type === 'word')
-  const patterns = stages.filter(s => s.type === 'pattern')
-  const progress = progressState?.progress || 0
-  const wordsDone = words.filter(s => s.completed).length
-  const patternsDone = patterns.filter(s => s.completed).length
+  const progress = stepProgress?.progress_rate || 0
+  const naturalSet = new Set(stepProgress?.natural_steps || [])
+  const hintSet = new Set(stepProgress?.hint_used_steps || [])
+  const allSteps = (scenario?.phases || []).flatMap(p => p.steps || [])
+  const naturalDone = naturalSet.size
+  const totalSteps = scenario?.total_steps || allSteps.length
 
-  const StageRow = ({ s }: { s: ProgressState['stages'][number] }) => (
-    <div className="space-y-0.5">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-slate-200">{s.target}</span>
-        <span className="text-xs">
-          {s.completed
-            ? <span className="text-emerald-400">✅ {s.current_count}회</span>
-            : s.current_count > 0
-              ? <span className="text-amber-400">🔄 {s.current_count}/{s.min_uses}회</span>
-              : <span className="text-slate-600">⬜</span>}
-        </span>
-      </div>
-      {s.usage_log.length > 0 && (
-        <p className="text-[11px] text-slate-500 pl-2 truncate">└ {s.usage_log.slice(-4).join(' / ')}</p>
-      )}
-    </div>
-  )
+  const stepLabel = (s: LessonScenario['phases'][number]['steps'][number]) =>
+    s.target_word || s.expected_pattern || `Step ${s.step}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
@@ -421,9 +408,10 @@ function ProgressModal({
           <p className="text-xs text-slate-400">Unit {unit}{unitTitle ? ` — ${unitTitle}` : ''}</p>
         </div>
 
-        {/* 진행률 바 */}
+        {/* 진행률 바 — 힌트 없이 스스로 말한 step 기준 */}
         <div className="space-y-1">
-          <div className="flex justify-end">
+          <div className="flex justify-between">
+            <span className="text-xs text-slate-500">스스로 말한 단어 {naturalDone}/{totalSteps}</span>
             <span className={cn('text-xs font-bold tabular-nums',
               progress >= 80 ? 'text-emerald-400' : progress >= 50 ? 'text-amber-400' : 'text-slate-400'
             )}>{progress}%</span>
@@ -435,23 +423,30 @@ function ProgressModal({
           </div>
         </div>
 
-        {stages.length === 0 ? (
-          <p className="text-sm text-slate-500 text-center py-4">수업 시나리오를 준비하고 있어요...</p>
+        {allSteps.length === 0 ? (
+          <p className="text-sm text-slate-500 text-center py-4">오늘은 자유 대화 모드예요. 마이크를 누르고 말해보세요!</p>
         ) : (
-          <>
-            {words.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-slate-400">단어 ({wordsDone}/{words.length})</p>
-                <div className="space-y-1.5">{words.map((s, i) => <StageRow key={`w${i}`} s={s} />)}</div>
-              </div>
-            )}
-            {patterns.length > 0 && (
-              <div className="space-y-2 border-t border-slate-800 pt-3">
-                <p className="text-xs font-medium text-slate-400">패턴 ({patternsDone}/{patterns.length})</p>
-                <div className="space-y-1.5">{patterns.map((s, i) => <StageRow key={`p${i}`} s={s} />)}</div>
-              </div>
-            )}
-          </>
+          <div className="space-y-1.5">
+            {allSteps.map((s) => {
+              const isNatural = naturalSet.has(s.step)
+              const isHint = hintSet.has(s.step)
+              return (
+                <div key={s.step} className="flex items-center justify-between">
+                  <span className="text-sm text-slate-200">
+                    <span className="text-slate-600 text-xs mr-1.5">{s.step}.</span>
+                    {stepLabel(s)}
+                  </span>
+                  <span className="text-xs">
+                    {isNatural
+                      ? <span className="text-emerald-400">✅ 스스로</span>
+                      : isHint
+                        ? <span className="text-amber-400">💡 힌트</span>
+                        : <span className="text-slate-600">⬜</span>}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
     </div>
@@ -589,17 +584,15 @@ export default function StudentPage() {
     setInterimWords, setFinalWords,
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage } = useUIStore()
-  const { studentId, sessionId, studentNickname, settings, persona, scenario: loadedScenario, updateSettings } = useStudentSession()
-  const { sendToGPT, isSpeaking, stopSpeaking, progress, progressState } = useConversation({
+  const { studentId, sessionId, studentNickname, settings, persona, scenario: loadedScenario, lessonProgress, updateSettings } = useStudentSession()
+  const { sendToGPT, isSpeaking, stopSpeaking, progress, stepProgress } = useConversation({
     sessionId, studentId, studentNickname,
     ttsSpeed: settings.tts_speed,
     currentBook: settings.current_book,
     currentUnit: settings.current_unit,
     persona,
     scenario: loadedScenario,
-    onBookUnitChange: (book, unit) => {
-      updateSettings({ current_book: book, current_unit: unit })
-    },
+    initialProgress: lessonProgress,
   })
   const [showSettings, setShowSettings] = useState(false)
   const [showAudioSettings, setShowAudioSettings] = useState(false)
@@ -625,10 +618,14 @@ export default function StudentPage() {
   const unitWords = unitForKeywords?.words
     ? unitForKeywords.words.split(',').map(w => w.trim()).filter(Boolean)
     : []
-  const stageWords = (progressState?.stages || []).flatMap(s => tokenize(s.target))
+  // 시나리오 target 단어/패턴 핵심어 → STT keyword boosting
+  const scenarioWords = [
+    ...(loadedScenario?.target_words || []),
+    ...(loadedScenario?.target_patterns || []).flatMap(p => tokenize(p)),
+  ]
   const lastAiText = [...messages].reverse().find(m => m.role === 'ai')?.content || ''
   const aiWords = tokenize(lastAiText)
-  const sttKeywords = [...unitWords, ...stageWords, ...aiWords]
+  const sttKeywords = [...unitWords, ...scenarioWords, ...aiWords]
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null)
@@ -1044,8 +1041,8 @@ export default function StudentPage() {
         {/* ③ 하단 컨트롤 영역 (고정) */}
         <div className="shrink-0 px-4 pb-4 pt-2 space-y-3">
 
-          {/* 진행률 바 — 시나리오/진도가 있으면 표시 */}
-          {((progressState && progressState.stages.length > 0) || progress > 0) && (
+          {/* 진행률 바 — 시나리오가 있으면 표시 */}
+          {(loadedScenario || progress > 0) && (
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-400 truncate mr-2">
@@ -1184,10 +1181,11 @@ export default function StudentPage() {
       {/* 학습 진행 상황 모달 */}
       {showProgress && (
         <ProgressModal
-          progressState={progressState}
+          scenario={loadedScenario}
+          stepProgress={stepProgress}
           book={settings.current_book}
           unit={settings.current_unit}
-          unitTitle={loadedScenario?.unit_title}
+          unitTitle={loadedScenario?.title}
           onClose={() => setShowProgress(false)}
         />
       )}

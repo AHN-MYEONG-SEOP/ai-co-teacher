@@ -85,7 +85,7 @@ ai-co-teacher/
 │   │       ├── study-log/route.ts
 │   │       ├── lesson-report/route.ts
 │   │       ├── persona/route.ts          # 페르소나 조회/누적merge
-│   │       ├── lesson-scenario/route.ts  # 시나리오 생성/조회/진도update
+│   │       ├── lesson-scenario/route.ts  # 시나리오 템플릿 + 오늘 진도 로드(GET)
 │   │       ├── curriculum/route.ts
 │   │       └── deepgram-token/route.ts
 │   ├── components/
@@ -102,9 +102,12 @@ ai-co-teacher/
 │   ├── store/
 │   │   ├── audioStore.ts
 │   │   └── uiStore.ts
+│   ├── prompts/system-prompt.ts # buildSystemPrompt(scenario,persona,nickname) — Coty
 │   ├── data/curriculum.json     # 506개 유닛 교재 데이터
 │   ├── types/index.ts
-│   └── lib/supabase.ts
+│   └── lib/
+│       ├── supabase.ts
+│       └── lesson.ts            # kstToday/toBookSlug/progressRate/pushUnique
 │
 ├── backend/                     # FastAPI Whisper Fallback 서버
 │   ├── app/
@@ -149,24 +152,22 @@ transcript + confidence + words 반환
 
 ## 5. Conversation Flow
 
-### LessonPhase 상태 머신
+### 시나리오 step 워크스루 (v4.0)
 ```
-greeting → weather → review → confirm_unit → study
+인사(시나리오 첫 step ai_line) → step 1 → step 2 → ... → step N → closing
 ```
 
-| Phase | 설명 |
-|-------|------|
-| greeting | 날짜/요일/시간대 인사 + 날씨 질문 |
-| weather | 날씨 답변 → 이전 Unit 복습 시작 |
-| review | 이전 Unit 3문장씩 설명 + Q&A |
-| confirm_unit | 오늘 Unit 확인 → Yes: study / No: 학생 요구 반영 |
-| study | 교재 단어/패턴 기반 대화 + 진행률 측정 |
+- 오늘 Unit의 `lesson_scenarios` 템플릿을 로드해 `phases[].steps[]`를 **순서대로** 진행.
+- 매 학생 발화마다 `chat/route.ts`가 시나리오 전체를 system prompt로 GPT에 주고, GPT가 현재 step을 판단·진행.
+- step 완료 시 `lesson_progress`에 누적 (`natural_steps` = 힌트 없이 스스로 말한 step).
+- 템플릿이 없는 교재/Unit → 일반 Coty 자유 대화로 폴백 (진도 추적 없음).
+- `system-prompt.ts`의 `buildSystemPrompt(scenario, persona, nickname)`가 프롬프트 생성. AI 이름은 **Coty**.
 
-### GPT 지침 (기본 규칙 — 모든 phase 공통)
-1. 최대 3문장, 의문문은 마지막 문장에만 1개
-2. 한국어 사용 금지
-3. 문맥 불일치 시 → 지적하고 같은 질문 다시
-4. 가끔 한국어 → 영어 번역 질문
+### GPT 지침 (기본 규칙)
+1. 항상 영어만 사용, 한국어 금지
+2. 먼저 정답을 말하지 않음 — 학생이 스스로 말하도록 유도
+3. hint는 학생이 모를 때만 (hint_used 표시)
+4. step을 건너뛰지 않고 순서대로 진행
 
 ### 교재 수준별 언어 조절
 - Phonics / Builder → 3-5단어 짧은 문장 (6-7세)
@@ -224,21 +225,32 @@ student_personas (
   created_at timestamptz, updated_at timestamptz
 )
 
--- 수업 시나리오 (로그인 시 GPT 생성, 24h 만료)
+-- 수업 시나리오 (공용 템플릿, book_slug+unit 으로 조회. 미리 INSERT)
 lesson_scenarios (
-  id uuid PK, student_id uuid,
-  book text, unit integer, unit_title text,
-  scenario jsonb,          -- GPT 생성 시나리오 (opening/bridge/stages/...)
-  persona_snapshot jsonb,  -- 생성 시 페르소나 스냅샷
-  progress_state jsonb,    -- { progress, stages[{target,weight,current_count,completed,usage_log}] }
-  status text,             -- 'ready' | 'used' | 'expired'
-  created_at timestamptz, updated_at timestamptz, expires_at timestamptz
+  id uuid PK,
+  book text, book_slug text, unit integer, title text,
+  target_words text[], target_patterns text[], total_steps integer,
+  phases jsonb,    -- [{ phase, label, steps[{ step, target_word, scene_kr, ai_line, expected_pattern, accept_variants, hint_line, reaction }] }]
+  closing jsonb, gpt_rules jsonb, is_active boolean,
+  created_at timestamptz, updated_at timestamptz
+)
+
+-- 수업 진도 (학생·시나리오·일자별 1행, step 워크스루 추적)
+lesson_progress (
+  id uuid PK, student_id uuid, scenario_id uuid, session_date date,
+  current_step integer,
+  completed_steps integer[],   -- 완료된 step
+  natural_steps integer[],     -- 힌트 없이 스스로 말한 step (← 진도율 산정 기준)
+  hint_used_steps integer[],   -- 힌트 보고 말한 step
+  completed boolean, completed_at timestamptz,
+  created_at timestamptz, updated_at timestamptz
 )
 ```
 
-> 페르소나/진도는 chat 응답의 `persona_update`/`stage_progress`로 갱신 (별도 LLM 호출 없음).
-> study phase의 chat 호출은 `response_format: json_object`로 `{ text, stage_progress, persona_update }` 반환.
-> 진도율 = target 단어/패턴을 **힌트 없이 자연스럽게 3회** 사용 시 완료 (변형 인정).
+> 시나리오는 로그인 시 `GET /api/lesson-scenario?student_id&book_slug&unit` 로 로드(없으면 일반 Coty 대화 폴백). 같은 호출이 오늘자 `lesson_progress` 행을 생성/반환.
+> chat 호출은 `response_format: json_object`로 `{ message, step_completed, hint_used, word_spoken_naturally, persona_update }` 반환. step 완료 시 chat route가 `lesson_progress` 영속화.
+> 페르소나는 chat 응답의 `persona_update`를 `/api/persona`로 누적 merge.
+> **진도율 = natural_steps.length / total_steps × 100** (힌트/선택지 버튼 사용 step은 제외).
 
 ---
 
@@ -258,7 +270,7 @@ lesson_scenarios (
 | 힌트 보기 | 선택지 3개 표시 (클릭 불가, 보기만) |
 | 번역 보기 | AI 메시지 한국어 번역 버튼 |
 | 🔁 다시듣기 | AI 메시지 TTS 재생 |
-| 진행률 바 | 마이크 위, study phase에서만 표시 |
+| 진행률 바 | 마이크 위, 시나리오 있을 때 표시 (natural_steps 기준) |
 | 피드백 카드 | 문법/유창성/어휘 점수 + 교정 + 팁 |
 | hint_used | 힌트 보고 말했는지 DB 저장 |
 

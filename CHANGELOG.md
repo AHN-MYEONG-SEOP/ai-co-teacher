@@ -46,6 +46,14 @@
 
 ### 최근 추가된 기능
 
+- [x] **수업 시나리오 step 워크스루 v4.0 (2026-06-02)** — `lesson_scenarios`(공용 템플릿: `book_slug`/`phases`/`closing`/`gpt_rules`/`target_words`/`total_steps`) + `lesson_progress`(학생·시나리오·일자별 진도) 기반 선형 step 1..N 진행
+  - `frontend/prompts/system-prompt.ts` 신규 — 시나리오/페르소나/닉네임 → Coty system prompt 빌더
+  - `chat/route.ts` 전면 교체 — step 기반 엔진. 응답 `{ message, step_completed, hint_used, word_spoken_naturally, persona_update }` 파싱, `lesson_progress` 영속화. 템플릿 없는 교재는 일반 Coty 대화로 폴백
+  - `lesson-scenario/route.ts` 전면 교체 — GET으로 템플릿 + 오늘 진도 로드/생성 (GPT 생성·`progress_state`·`expires_at` 폐기)
+  - 진도율 = `natural_steps`(힌트 없이 스스로 말한 step) / `total_steps`
+  - 📊 진행 모달 step 기반(✅ 스스로 / 💡 힌트 / ⬜ 미완)으로 개편
+  - `frontend/lib/lesson.ts` 신규 — `kstToday`/`toBookSlug`/`progressRate`/`pushUnique` 공용 헬퍼
+  - AI 이름은 **Coty** 유지 (지시서의 Junny 미채택)
 - [x] 개인화 학습 시스템 v3.0 — 페르소나 자동 구축(`student_personas`) + 수업 시나리오 자동 생성(`lesson_scenarios`) + 자연 사용 3회 기반 진도율
 - [x] `/api/persona`, `/api/lesson-scenario` 엔드포인트 추가
 - [x] 학생 📊 진행 상황 모달 (단어/패턴별 달성 현황)

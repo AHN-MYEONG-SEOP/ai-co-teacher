@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import type { LessonScenario } from './useConversation'
+import { toBookSlug } from '@/lib/lesson'
+import type { LessonScenario, StepProgress } from './useConversation'
 
 export interface StudentSettings {
   tts_speed: 'slow' | 'normal' | 'fast'
@@ -27,6 +28,7 @@ interface StudentSession {
   settings: StudentSettings
   persona: Record<string, unknown> | null
   scenario: LessonScenario | null
+  lessonProgress: StepProgress | null
   updateSettings: (settings: Partial<StudentSettings>) => Promise<void>
 }
 
@@ -41,6 +43,7 @@ export function useStudentSession(): StudentSession {
   const [settings, setSettings] = useState<StudentSettings>(DEFAULT_SETTINGS)
   const [persona, setPersona] = useState<Record<string, unknown> | null>(null)
   const [scenario, setScenario] = useState<LessonScenario | null>(null)
+  const [lessonProgress, setLessonProgress] = useState<StepProgress | null>(null)
 
   useEffect(() => {
     const init = async () => {
@@ -78,14 +81,14 @@ export function useStudentSession(): StudentSession {
         .then(d => { if (d?.persona) setPersona(d.persona) })
         .catch(() => {})
 
-      // ② 오늘 수업 시나리오 생성 (백그라운드 — 수업 시작 전 준비)
-      fetch('/api/lesson-scenario?action=generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student_id: user.id, book, unit }),
-      })
+      // ② 오늘 수업 시나리오(공용 템플릿) + 진도 로드 (수업 시작 전 준비)
+      //    book_slug + unit 으로 lesson_scenarios 조회, lesson_progress 생성/로드
+      fetch(`/api/lesson-scenario?student_id=${user.id}&book_slug=${toBookSlug(book)}&unit=${unit}`)
         .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d?.scenario) setScenario(d.scenario) })
+        .then(d => {
+          if (d?.scenario) setScenario(d.scenario)
+          if (d?.progress) setLessonProgress(d.progress)
+        })
         .catch(() => {})
 
       try {
@@ -128,5 +131,5 @@ export function useStudentSession(): StudentSession {
       .eq('id', studentId)
   }
 
-  return { studentId: studentId ?? undefined, sessionId, studentName, studentNickname, isLoggedIn, settings, persona, scenario, updateSettings }
+  return { studentId: studentId ?? undefined, sessionId, studentName, studentNickname, isLoggedIn, settings, persona, scenario, lessonProgress, updateSettings }
 }
