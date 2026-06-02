@@ -46,6 +46,7 @@
 
 ### 최근 추가된 기능
 
+- [x] **로그아웃 시 진도·리포트 초기화 (2026-06-02)** — 로그아웃 = 새 수업으로 재시작. `POST /api/reset-progress` 신규(오늘자 KST `lesson_progress` + KST/UTC `lesson_reports` 삭제), `NavBar.handleLogout`에서 signOut 전에 호출. 같은 날 재로그인해도 0%부터 시작.
 - [x] **클로징 2턴 매끄럽게 처리 + 세션 종료 UI (2026-06-02)**
   - `system-prompt.ts` closing 지침을 2턴 흐름으로 명확화. ① 모든 step 완료 후 첫 마무리 턴에서 칭찬 + "See you tomorrow!" 작별 인사 (종료 안 함, 학생 인사 대기) → ② 학생이 인사로 답하면 짧은 칭찬과 함께 message 끝에 한국어 `오늘 대화는 여기까지입니다.`를 덧붙여 종료 (영어 전용 규칙의 유일한 예외)
   - `chat/route.ts` — AI 응답에 종료 문장 포함 시 `session_ended: true` 반환 (`SESSION_END_MARK` 상수), 종료 턴에는 힌트 선택지 생략

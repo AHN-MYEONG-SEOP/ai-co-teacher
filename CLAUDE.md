@@ -86,6 +86,7 @@ ai-co-teacher/
 │   │       ├── lesson-report/route.ts
 │   │       ├── persona/route.ts          # 페르소나 조회/누적merge
 │   │       ├── lesson-scenario/route.ts  # 시나리오 템플릿 + 오늘 진도 로드(GET)
+│   │       ├── reset-progress/route.ts   # 로그아웃 시 오늘 진도·리포트 삭제(POST)
 │   │       ├── curriculum/route.ts
 │   │       └── deepgram-token/route.ts
 │   ├── components/
