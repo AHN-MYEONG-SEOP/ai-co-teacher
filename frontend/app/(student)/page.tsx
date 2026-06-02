@@ -969,40 +969,48 @@ export default function StudentPage() {
   // 새 회차 시작 — 진도율 0부터, 기존 회차는 누적 보존 (시작하기/한 번 더/Unit 선택)
   const startAttempt = useCallback(async (book: string, unit: number) => {
     if (!studentId) return
+    // POST 실패(예: DB attempt 컬럼 미반영) 시에도 같은 단원이면 직전 시나리오를 유지해 진도 바가 사라지지 않게
+    const fallbackScenario = (activeBook === book && activeUnit === unit) ? activeScenario : null
     reset()
     clearMessages()
     setResumeProgress(null)
     setActiveBook(book)
     setActiveUnit(unit)
     setLessonState('active')
+
+    let scen: LessonScenario | null = fallbackScenario
+    let pid: string | null = null
     try {
       const res = await fetch('/api/lesson-scenario', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'start', student_id: studentId, book, unit }),
       })
-      const data = res.ok ? await res.json() : null
-      const scen: LessonScenario | null = data?.scenario ?? null
-      const pid: string | null = data?.progress?.id ?? null
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        console.error(`회차 시작 실패 (HTTP ${res.status}) — DB attempt 컬럼/마이그레이션 확인 필요:`, data)
+      }
+      if (data?.scenario) scen = data.scenario
+      pid = data?.progress?.id ?? null
       setActiveScenario(scen)
       setProgressId(pid)
       setAttemptNumber(data?.attempt_number ?? 1)
       setAttemptCount(data?.attempt_number ?? 1)
       setCompletedCount(data?.completed_count ?? 0)
-      if (pid) {
-        sessionStorage.setItem('activeProgressId', pid)
-        sessionStorage.setItem('activeBook', book)
-        sessionStorage.setItem('activeUnit', String(unit))
-      } else {
-        sessionStorage.removeItem('activeProgressId')
-      }
-      start({ scenario: scen, progressId: pid, book, unit })
-    } catch {
-      setActiveScenario(null)
-      setProgressId(null)
-      start({ scenario: null, progressId: null, book, unit })
+    } catch (e) {
+      console.error('회차 시작 오류:', e)
+      setActiveScenario(scen)
     }
-  }, [studentId, reset, clearMessages, start])
+
+    if (pid) {
+      sessionStorage.setItem('activeProgressId', pid)
+      sessionStorage.setItem('activeBook', book)
+      sessionStorage.setItem('activeUnit', String(unit))
+    } else {
+      sessionStorage.removeItem('activeProgressId')
+    }
+    start({ scenario: scen, progressId: pid, book, unit })
+  }, [studentId, activeBook, activeUnit, activeScenario, reset, clearMessages, start])
 
   // 오늘은 끝내기 — 마이크 비활성화 + 이어하기 정보 제거
   const finishToday = useCallback(() => {

@@ -46,6 +46,9 @@
 
 ### 최근 추가된 기능
 
+- [x] **🐞 FIX: 진행률 바가 안 나오던 버그 (2026-06-02)** — 마이크 화면에서 진행률 바가 사라지던 문제. **원인**: 회차 모델 도입 시 새 제약 `lesson_progress_attempt_uniq`(…·attempt)만 추가하고 **옛 제약 `lesson_progress_unique_session`(student_id, scenario_id, session_date)을 DROP하지 않음** → 같은 날 같은 Unit 두 번째 회차 시작 시 INSERT가 `23505 duplicate key`로 실패 → 회차 행 미생성·`progressId=null` → `activeScenario`가 null로 덮여 바 사라짐.
+  - **조치**: `db/2026-06-02_drop_old_unique_session.sql`을 Supabase SQL Editor에서 실행해 옛 제약/인덱스 제거. (`db/2026-06-02_lesson_progress_attempt.sql`의 DROP 블록이 누락 실행된 환경 보정)
+  - **코드 보강**: `page.tsx`의 `startAttempt` — POST 실패 시에도 같은 단원이면 직전 `activeScenario`를 유지해 진도 바가 사라지지 않도록 방어(`data.scenario` 있을 때만 덮어쓰기).
 - [x] **회차(attempt) 모델 + 수업 시작/완료 선택 흐름 (2026-06-02, v2026-06-02.6)** — 로그인/로그아웃마다 진도율을 새 회차로 시작하되 기존 자료는 모두 누적 보존. 진도율 바 위에 `N번째 진행 · ✅ 완료 X회` 표시.
   - **DB**: `lesson_progress.attempt integer` 컬럼 추가 → 날짜당 1행 → **회차당 1행**. (`db/2026-06-02_lesson_progress_attempt.sql` 실행 필요. (학생·시나리오·날짜) 유니크 제약 제거 후 (…·attempt) 재설정)
   - **흐름**: ① 로그인 직후 `ConfirmStartCard` — 오늘 Book/Unit 안내 + `🚀 시작하기` / `📖 다른 Unit 고르기`(`BookUnitPickerCard`). ② Unit 모든 step 완료 시 `UnitCompleteCard` — `🔁 한 번 더` / `➡️ 다음 Unit(직접 고르기)` / `👋 오늘은 끝내기`.
