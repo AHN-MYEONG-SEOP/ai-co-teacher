@@ -46,6 +46,9 @@
 
 ### 최근 추가된 기능
 
+- [x] **첫 학습 환영 카드 + 버튼명 정리 (2026-06-02, v2026-06-02.9)** — `ConfirmStartCard`에 첫 학습 분기 추가.
+  - **첫 학습**(해당 Unit `attemptCount===0 && completedCount===0`): 👋 "첫 수업에 오신 것을 환영합니다 / 학습할 내용을 선택해 주세요." + `📖 Unit 선택하기` · `🚪 종료`만 표시(복습하기·Unit 정보 박스 숨김).
+  - **버튼명**: `📖 다른 Unit 고르기` → `📖 Unit 선택하기` (복습 변형에도 동일 적용).
 - [x] **수업 종료 흐름 개편 + 복습/종료 카드 (2026-06-02, v2026-06-02.8)** — 모든 step 완료 → Coty 마무리 인사 → 자동으로 복습/종료 선택 카드.
   - **마무리 메시지 영어화**: 종료 문장을 `That's all for today's conversation. 👋` 로 변경(기존 한국어 `오늘 대화는 여기까지입니다`). `system-prompt.ts` 지침 + `chat/route.ts`의 `SESSION_END_MARK` 동기화. 감지는 아포스트로피/대소문자 무시 매칭.
   - **종료 카드 타이밍**: step 완료 즉시 카드를 띄우지 않고, 마무리 인사 2턴(`sessionEnded`)이 끝난 뒤 표시. `useConversation`에서 `setSessionEnded`를 closing 메시지 표시·TTS 이후로 이동.

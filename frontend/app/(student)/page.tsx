@@ -718,49 +718,76 @@ function ConfirmStartCard({
   onPick: () => void
   onExit: () => void
 }) {
+  // 첫 학습 = 이 Unit에 회차/완료 기록이 전혀 없음 → 복습할 게 없으므로 환영 + Unit 선택만 노출
+  const isFirstTime = attemptCount === 0 && completedCount === 0
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700/50 rounded-3xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-300">
-        <div className="text-center space-y-1">
-          <p className="text-3xl">📚</p>
-          <h2 className="text-white font-bold text-lg">지난 시간에 배운 내용이에요</h2>
-        </div>
+        {isFirstTime ? (
+          <>
+            <div className="text-center space-y-2">
+              <p className="text-3xl">👋</p>
+              <h2 className="text-white font-bold text-lg">첫 수업에 오신 것을 환영합니다</h2>
+              <p className="text-sm text-slate-400">학습할 내용을 선택해 주세요.</p>
+            </div>
 
-        <div className="bg-slate-800/60 rounded-2xl p-4 space-y-1 text-center">
-          <p className="text-sm text-emerald-300 font-medium">{book}</p>
-          <p className="text-base text-white font-bold">Unit {unit}</p>
-          {scenario?.title && <p className="text-xs text-slate-400">{scenario.title}</p>}
-          {!scenario && <p className="text-[11px] text-slate-500 mt-1">이 Unit은 자유 대화로 진행해요</p>}
-        </div>
+            <div className="space-y-2">
+              <button
+                onClick={onPick}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3.5 text-sm font-bold transition-colors"
+              >
+                📖 Unit 선택하기
+              </button>
+              <button
+                onClick={onExit}
+                className="w-full text-slate-400 hover:text-white rounded-2xl py-2.5 text-sm font-medium transition-colors"
+              >
+                🚪 종료
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-center space-y-1">
+              <p className="text-3xl">📚</p>
+              <h2 className="text-white font-bold text-lg">지난 시간에 배운 내용이에요</h2>
+            </div>
 
-        {(attemptCount > 0 || completedCount > 0) && (
-          <p className="text-center text-xs text-slate-400">
-            지금까지 <span className="text-violet-300 font-semibold">{attemptCount}번</span> 했어요
-            {completedCount > 0 && <> · <span className="text-emerald-400 font-semibold">{completedCount}회 완료</span></>}
-          </p>
+            <div className="bg-slate-800/60 rounded-2xl p-4 space-y-1 text-center">
+              <p className="text-sm text-emerald-300 font-medium">{book}</p>
+              <p className="text-base text-white font-bold">Unit {unit}</p>
+              {scenario?.title && <p className="text-xs text-slate-400">{scenario.title}</p>}
+              {!scenario && <p className="text-[11px] text-slate-500 mt-1">이 Unit은 자유 대화로 진행해요</p>}
+            </div>
+
+            <p className="text-center text-xs text-slate-400">
+              지금까지 <span className="text-violet-300 font-semibold">{attemptCount}번</span> 했어요
+              {completedCount > 0 && <> · <span className="text-emerald-400 font-semibold">{completedCount}회 완료</span></>}
+            </p>
+
+            <div className="space-y-2">
+              <button
+                onClick={onStart}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3.5 text-sm font-bold transition-colors"
+              >
+                🔁 복습하기
+              </button>
+              <button
+                onClick={onPick}
+                className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-2xl py-3 text-sm font-medium transition-colors"
+              >
+                📖 Unit 선택하기
+              </button>
+              <button
+                onClick={onExit}
+                className="w-full text-slate-400 hover:text-white rounded-2xl py-2.5 text-sm font-medium transition-colors"
+              >
+                🚪 종료
+              </button>
+            </div>
+          </>
         )}
-
-        <div className="space-y-2">
-          <button
-            onClick={onStart}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3.5 text-sm font-bold transition-colors"
-          >
-            🔁 복습하기
-          </button>
-          <button
-            onClick={onPick}
-            className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-2xl py-3 text-sm font-medium transition-colors"
-          >
-            📖 다른 Unit 고르기
-          </button>
-          <button
-            onClick={onExit}
-            className="w-full text-slate-400 hover:text-white rounded-2xl py-2.5 text-sm font-medium transition-colors"
-          >
-            🚪 종료
-          </button>
-        </div>
       </div>
     </div>
   )
