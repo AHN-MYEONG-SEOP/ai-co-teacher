@@ -30,19 +30,8 @@ export function NavBar({ logCount = 0, onLogClick, onSettingsClick }: NavBarProp
   }, [])
 
   const handleLogout = async () => {
-    // 오늘 진도 + 리포트 초기화 (로그아웃 = 새 수업으로 재시작) — signOut 전에 user id 확보
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await fetch('/api/reset-progress', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ student_id: user.id }),
-        })
-      }
-    } catch { /* 초기화 실패해도 로그아웃은 진행 */ }
-
-    // 대화 내용 + 인사말 기록 전부 초기화
+    // 진도·로그·리포트는 DB에 그대로 누적 보존 (삭제하지 않음)
+    // 화면용 대화 내용 + 인사말 기록만 초기화
     clearMessages()
     sessionStorage.clear()
     await supabase.auth.signOut()
