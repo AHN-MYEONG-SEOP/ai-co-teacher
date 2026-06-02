@@ -442,7 +442,8 @@ export function useConversation({
         setStepProgress(p)
 
         setProgress(prev => {
-          const merged = Math.max(prev, p.progress_rate)
+          // 회차의 모든 step 완료 시에는 힌트 사용과 무관하게 100%로 표시
+          const merged = p.completed ? 100 : Math.max(prev, p.progress_rate)
           if (reportIdRef.current && merged > prev) {
             fetch('/api/lesson-report', {
               method: 'POST',
@@ -476,9 +477,6 @@ export function useConversation({
         }
       }
 
-      // 세션 종료 신호 (클로징 마지막 턴) → 마이크 비활성화 트리거
-      if (data.session_ended === true) setSessionEnded(true)
-
       historyRef.current.push({ role: 'assistant', content: aiText })
       setAIResponding(false)
       await speak(aiText)
@@ -491,6 +489,10 @@ export function useConversation({
         choices: data.choices?.length ? data.choices : undefined,
         createdAt: new Date().toISOString(),
       })
+
+      // 세션 종료 신호 (클로징 마지막 턴) → 마무리 인사 메시지를 보여주고 TTS까지 마친 뒤 트리거
+      // (page.tsx가 이 신호로 마이크 비활성화 + 복습/종료 카드 표시)
+      if (data.session_ended === true) setSessionEnded(true)
 
       // 로그 저장
       const logId = await logIdPromise

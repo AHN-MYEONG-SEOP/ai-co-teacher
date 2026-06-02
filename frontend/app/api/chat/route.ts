@@ -7,8 +7,8 @@ import { progressRate, pushUnique } from '@/lib/lesson'
 
 export const dynamic = 'force-dynamic'
 
-// 클로징 종료 신호 — system-prompt.ts의 마지막 종료 문장과 동일해야 함
-const SESSION_END_MARK = '오늘 대화는 여기까지입니다'
+// 클로징 종료 신호 — system-prompt.ts의 마지막 종료 문장에 포함되는 영어 문구
+const SESSION_END_MARK = "That's all for today"
 
 const curriculum = curriculumData as {
   level_order: string[]
@@ -313,7 +313,9 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
     const rate = progressRate(naturalSteps, scenario.total_steps)
 
     // ── 세션 종료 신호 감지 (클로징 마지막 턴) ───────────
-    const sessionEnded = aiText.includes(SESSION_END_MARK)
+    // 아포스트로피(' vs ')·대소문자 차이를 무시하고 매칭
+    const normalize = (s: string) => s.toLowerCase().replace(/[’']/g, "'")
+    const sessionEnded = normalize(aiText).includes(normalize(SESSION_END_MARK))
 
     // ── 힌트 선택지 + 번역 ───────────────────────────────
     // 세션 종료 턴에는 답할 차례가 없으므로 힌트 선택지 생략

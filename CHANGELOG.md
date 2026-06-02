@@ -46,6 +46,12 @@
 
 ### 최근 추가된 기능
 
+- [x] **수업 종료 흐름 개편 + 복습/종료 카드 (2026-06-02, v2026-06-02.8)** — 모든 step 완료 → Coty 마무리 인사 → 자동으로 복습/종료 선택 카드.
+  - **마무리 메시지 영어화**: 종료 문장을 `That's all for today's conversation. 👋` 로 변경(기존 한국어 `오늘 대화는 여기까지입니다`). `system-prompt.ts` 지침 + `chat/route.ts`의 `SESSION_END_MARK` 동기화. 감지는 아포스트로피/대소문자 무시 매칭.
+  - **종료 카드 타이밍**: step 완료 즉시 카드를 띄우지 않고, 마무리 인사 2턴(`sessionEnded`)이 끝난 뒤 표시. `useConversation`에서 `setSessionEnded`를 closing 메시지 표시·TTS 이후로 이동.
+  - **진행도 100%**: 회차의 모든 step 완료 시 힌트 사용과 무관하게 진행률 바를 100%로 표시(`useConversation` `progress` 강제 100). 학습 결과는 기존대로 `lesson_progress`/`lesson_report`에 저장.
+  - **카드 통합(`ConfirmStartCard`)**: 로그인 직후·수업 완료 후 동일 카드 사용. 문구 `오늘 배울 내용이에요`→`지난 시간에 배운 내용이에요`, 버튼 `🚀 시작하기`→`🔁 복습하기`. `🚪 종료` 버튼 추가(누르면 로그아웃: `clearMessages`+`sessionStorage.clear`+`signOut`+`/login`).
+  - **제거**: 기존 `UnitCompleteCard`(🎉 Unit 완료! / 한 번 더 / 다음 Unit / 오늘은 끝내기) 및 `lessonState 'choosing'`·`finishToday`·`endSession` 사용 제거.
 - [x] **🐞 FIX: 진행률 바가 안 나오던 버그 (2026-06-02)** — 마이크 화면에서 진행률 바가 사라지던 문제. **원인**: 회차 모델 도입 시 새 제약 `lesson_progress_attempt_uniq`(…·attempt)만 추가하고 **옛 제약 `lesson_progress_unique_session`(student_id, scenario_id, session_date)을 DROP하지 않음** → 같은 날 같은 Unit 두 번째 회차 시작 시 INSERT가 `23505 duplicate key`로 실패 → 회차 행 미생성·`progressId=null` → `activeScenario`가 null로 덮여 바 사라짐.
   - **조치**: `db/2026-06-02_drop_old_unique_session.sql`을 Supabase SQL Editor에서 실행해 옛 제약/인덱스 제거. (`db/2026-06-02_lesson_progress_attempt.sql`의 DROP 블록이 누락 실행된 환경 보정)
   - **코드 보강**: `page.tsx`의 `startAttempt` — POST 실패 시에도 같은 단원이면 직전 `activeScenario`를 유지해 진도 바가 사라지지 않도록 방어(`data.scenario` 있을 때만 덮어쓰기).

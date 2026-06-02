@@ -152,17 +152,18 @@ transcript + confidence + words 반환
 
 ## 5. Conversation Flow
 
-### 시나리오 step 워크스루 (v4.1 — 회차/시작·완료 선택)
+### 시나리오 step 워크스루 (v4.2 — 회차 + 복습/종료 카드)
 ```
-로그인 → [시작 확인 카드: Book/Unit 안내 · 시작하기 / 다른 Unit 고르기]
+로그인 → [복습/시작 카드 ConfirmStartCard: "지난 시간에 배운 내용" · 🔁복습하기 / 📖다른 Unit / 🚪종료(logout)]
        → 새 회차(attempt) 생성 → 인사(시나리오 첫 step ai_line)
-       → step 1 → ... → step N
-       → [완료 선택 카드: 한 번 더 / 다음 Unit(Book·Unit 직접 선택) / 오늘은 끝내기]
+       → step 1 → ... → step N (모두 완료 시 진행도 100% 표시·저장)
+       → Coty 마무리 인사 2턴 (마지막 메시지에 "That's all for today's conversation. 👋")
+       → [같은 복습/종료 카드 자동 표시]
 ```
 
 - **회차(attempt) 모델**: 로그인/시작마다 `lesson_progress`에 새 회차 행을 만들어 진도율을 0%부터 시작. 기존 회차는 **삭제하지 않고 누적**. 진도율 바 위에 `N번째 진행 · ✅ 완료 X회`(해당 Unit 전체 기간 누적) 표시.
-- **시작 확인**: 로그인 직후 `ConfirmStartCard`로 오늘 Book/Unit 안내·확인. "다른 Unit 고르기" → `BookUnitPickerCard`.
-- **완료 선택**: 한 회차의 모든 step 완료 시 `UnitCompleteCard`. "한 번 더"=같은 Unit 새 회차, "다음 Unit"=Book·Unit 카드 선택 후 새 회차, "끝내기"=마이크 비활성화.
+- **복습/시작 카드(`ConfirmStartCard`)**: 로그인 직후 **및** 수업 완료 후 동일 카드 사용. `🔁 복습하기`=같은 Unit 새 회차, `📖 다른 Unit 고르기`→`BookUnitPickerCard`, `🚪 종료`=로그아웃.
+- **수업 완료 흐름**: 모든 step 완료 시 즉시 카드를 띄우지 않음. 진행도를 **100%로 표시**(힌트 무관)하고 결과 저장 후, Coty가 마무리 인사 2턴을 끝내면(`sessionEnded`, 종료 문장 `That's all for today's conversation.`) 자동으로 복습/종료 카드 표시.
 - **이어하기**: 새로고침은 `sessionStorage(activeProgressId/activeBook/activeUnit)`로 진행 중 회차 복구(인사·회차 생성 없음). 로그아웃·탭 종료 후 다음 로그인은 새 회차.
 - 오케스트레이션은 `page.tsx`가 담당(`useStudentSession`은 프로필/세션만 + `ready` 플래그 노출).
 

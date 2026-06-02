@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase'
 import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
 import { useConversation, type LessonScenario, type StepProgress } from '@/hooks/useConversation'
@@ -705,7 +707,7 @@ interface LogEntry {
 
 // ── 수업 시작 확인 카드 (로그인 직후) ──────────────────
 function ConfirmStartCard({
-  book, unit, scenario, attemptCount, completedCount, onStart, onPick,
+  book, unit, scenario, attemptCount, completedCount, onStart, onPick, onExit,
 }: {
   book: string
   unit: number
@@ -714,6 +716,7 @@ function ConfirmStartCard({
   completedCount: number
   onStart: () => void
   onPick: () => void
+  onExit: () => void
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -721,7 +724,7 @@ function ConfirmStartCard({
       <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700/50 rounded-3xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-300">
         <div className="text-center space-y-1">
           <p className="text-3xl">📚</p>
-          <h2 className="text-white font-bold text-lg">오늘 배울 내용이에요</h2>
+          <h2 className="text-white font-bold text-lg">지난 시간에 배운 내용이에요</h2>
         </div>
 
         <div className="bg-slate-800/60 rounded-2xl p-4 space-y-1 text-center">
@@ -743,13 +746,19 @@ function ConfirmStartCard({
             onClick={onStart}
             className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3.5 text-sm font-bold transition-colors"
           >
-            🚀 시작하기
+            🔁 복습하기
           </button>
           <button
             onClick={onPick}
             className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-2xl py-3 text-sm font-medium transition-colors"
           >
             📖 다른 Unit 고르기
+          </button>
+          <button
+            onClick={onExit}
+            className="w-full text-slate-400 hover:text-white rounded-2xl py-2.5 text-sm font-medium transition-colors"
+          >
+            🚪 종료
           </button>
         </div>
       </div>
@@ -838,58 +847,6 @@ function BookUnitPickerCard({
   )
 }
 
-// ── 회차 완료 선택 카드 (Unit 끝나면) ──────────────────
-function UnitCompleteCard({
-  book, unit, progress, completedCount, onRepeat, onNext, onFinish,
-}: {
-  book: string
-  unit: number
-  progress: number
-  completedCount: number
-  onRepeat: () => void
-  onNext: () => void
-  onFinish: () => void
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700/50 rounded-3xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-300">
-        <div className="text-center space-y-1">
-          <p className="text-4xl">🎉</p>
-          <h2 className="text-white font-bold text-lg">Unit {unit} 완료!</h2>
-          <p className="text-xs text-slate-400">{book}</p>
-          <p className="text-xs text-emerald-400 font-semibold">
-            진도율 {progress}% · 누적 완료 {completedCount}회
-          </p>
-        </div>
-
-        <p className="text-center text-sm text-slate-300">이제 어떻게 할까요?</p>
-
-        <div className="space-y-2">
-          <button
-            onClick={onRepeat}
-            className="w-full bg-violet-600 hover:bg-violet-500 text-white rounded-2xl py-3.5 text-sm font-bold transition-colors"
-          >
-            🔁 한 번 더
-          </button>
-          <button
-            onClick={onNext}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3.5 text-sm font-bold transition-colors"
-          >
-            ➡️ 다음 Unit (직접 고르기)
-          </button>
-          <button
-            onClick={onFinish}
-            className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-2xl py-3 text-sm font-medium transition-colors"
-          >
-            👋 오늘은 끝내기
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── 메인 페이지 ───────────────────────────────────────
 export default function StudentPage() {
   const {
@@ -900,9 +857,13 @@ export default function StudentPage() {
   const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage, clearMessages } = useUIStore()
   const { studentId, sessionId, studentNickname, ready, settings, persona, updateSettings } = useStudentSession()
 
+  const router = useRouter()
+  const supabase = createClient()
+
   // ── 회차(attempt) 기반 수업 오케스트레이션 ──────────────
-  // lessonState: loading→confirm(시작 확인)→active(수업중)→choosing(완료 선택) / picking(Book·Unit 선택)
-  type LessonState = 'loading' | 'confirm' | 'picking' | 'active' | 'choosing'
+  // lessonState: loading→confirm(복습/시작 확인)→active(수업중) / picking(Book·Unit 선택)
+  // 수업 완료 후 Coty의 마무리 인사가 끝나면(sessionEnded) 다시 confirm 카드로 복귀
+  type LessonState = 'loading' | 'confirm' | 'picking' | 'active'
   const [lessonState, setLessonState] = useState<LessonState>('loading')
   const [activeBook, setActiveBook] = useState<string>(settings.current_book)
   const [activeUnit, setActiveUnit] = useState<number>(settings.current_unit)
@@ -914,7 +875,7 @@ export default function StudentPage() {
   const [completedCount, setCompletedCount] = useState(0) // 누적 완료 횟수
   const initedRef = useRef(false)
 
-  const { sendToGPT, isSpeaking, stopSpeaking, progress, stepProgress, sessionEnded, start, reset, endSession } = useConversation({
+  const { sendToGPT, isSpeaking, stopSpeaking, progress, stepProgress, sessionEnded, start, reset } = useConversation({
     sessionId, studentId, studentNickname,
     ttsSpeed: settings.tts_speed,
     currentBook: activeBook,
@@ -923,7 +884,8 @@ export default function StudentPage() {
     scenario: activeScenario,
     initialProgress: resumeProgress,
     progressId,
-    onUnitComplete: () => { setCompletedCount(c => c + 1); setLessonState('choosing') },
+    // 모든 step 완료 → 누적 완료 횟수만 +1. 카드는 마무리 인사 후 sessionEnded 신호로 표시.
+    onUnitComplete: () => { setCompletedCount(c => c + 1) },
   })
 
   // 시나리오 + 회차 통계 로드 (행 생성 없음)
@@ -1012,14 +974,20 @@ export default function StudentPage() {
     start({ scenario: scen, progressId: pid, book, unit })
   }, [studentId, activeBook, activeUnit, activeScenario, reset, clearMessages, start])
 
-  // 오늘은 끝내기 — 마이크 비활성화 + 이어하기 정보 제거
-  const finishToday = useCallback(() => {
-    endSession()
-    sessionStorage.removeItem('activeProgressId')
-    sessionStorage.removeItem('activeBook')
-    sessionStorage.removeItem('activeUnit')
-    setLessonState('active')
-  }, [endSession])
+  // 종료 — 진도·로그·리포트는 DB에 누적 보존, 화면/세션만 정리하고 로그아웃
+  const handleExit = useCallback(async () => {
+    clearMessages()
+    sessionStorage.clear()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }, [clearMessages, supabase, router])
+
+  // 수업 완료 후 Coty의 마무리 인사가 끝나면 → 복습/종료 선택 카드로 복귀
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (sessionEnded) setLessonState('confirm')
+  }, [sessionEnded])
 
   // Book·Unit 선택 완료 → 프로필에 저장하고 새 회차 시작
   const handlePickUnit = useCallback((book: string, unit: number) => {
@@ -1673,7 +1641,7 @@ export default function StudentPage() {
         />
       )}
 
-      {/* 수업 시작 확인 카드 (로그인 직후) */}
+      {/* 복습/시작 확인 카드 (로그인 직후 · 수업 완료 후) */}
       {lessonState === 'confirm' && (
         <ConfirmStartCard
           book={activeBook}
@@ -1683,6 +1651,7 @@ export default function StudentPage() {
           completedCount={completedCount}
           onStart={() => startAttempt(activeBook, activeUnit)}
           onPick={() => setLessonState('picking')}
+          onExit={handleExit}
         />
       )}
 
@@ -1693,19 +1662,6 @@ export default function StudentPage() {
           initialUnit={activeUnit}
           onSelect={handlePickUnit}
           onCancel={() => setLessonState('confirm')}
-        />
-      )}
-
-      {/* 회차 완료 선택 카드 */}
-      {lessonState === 'choosing' && (
-        <UnitCompleteCard
-          book={activeBook}
-          unit={activeUnit}
-          progress={progress}
-          completedCount={completedCount}
-          onRepeat={() => startAttempt(activeBook, activeUnit)}
-          onNext={() => setLessonState('picking')}
-          onFinish={finishToday}
         />
       )}
 
