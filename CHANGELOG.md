@@ -46,6 +46,7 @@
 
 ### 최근 추가된 기능
 
+- [x] **📋 시나리오·지침 인스펙터 모달 (2026-06-02, 교사/운영자용)** — 학생 페이지 하단 `📋 시나리오 · 지침` 버튼 → 오늘 Unit의 전체 시나리오 대본(phase/step별 scene_kr·ai_line·expected_pattern·accept_variants·hint_line·reaction)과 AI 진행 지침(`gpt_rules.flow`/`counting_rules`)·마무리(closing)를 펼쳐 확인. 이미 로드된 `loadedScenario` 재사용(추가 fetch 없음), `{{nickname}}` 치환 미리보기. 시나리오 없는 교재는 폴백 안내.
 - [x] **수업 시나리오 step 워크스루 v4.0 (2026-06-02)** — `lesson_scenarios`(공용 템플릿: `book_slug`/`phases`/`closing`/`gpt_rules`/`target_words`/`total_steps`) + `lesson_progress`(학생·시나리오·일자별 진도) 기반 선형 step 1..N 진행
   - `frontend/prompts/system-prompt.ts` 신규 — 시나리오/페르소나/닉네임 → Coty system prompt 빌더
   - `chat/route.ts` 전면 교체 — step 기반 엔진. 응답 `{ message, step_completed, hint_used, word_spoken_naturally, persona_update }` 파싱, `lesson_progress` 영속화. 템플릿 없는 교재는 일반 Coty 대화로 폴백

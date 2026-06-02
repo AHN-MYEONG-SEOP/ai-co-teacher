@@ -453,6 +453,133 @@ function ProgressModal({
   )
 }
 
+// ── 📋 시나리오·지침 인스펙터 모달 (교사/운영자용) ───────
+interface GptRulesShape {
+  flow?: string[]
+  counting_rules?: { count_yes?: string; count_no?: string[] }
+}
+function ScenarioInspectorModal({
+  scenario,
+  nickname,
+  onClose,
+}: {
+  scenario: LessonScenario | null
+  nickname?: string | null
+  onClose: () => void
+}) {
+  // {{nickname}} 치환 — system-prompt 빌더와 동일하게 미리보기
+  const fill = (s?: string | null) =>
+    (s ?? '').replace(/\{\{nickname\}\}/g, nickname || '학생')
+
+  const rules = (scenario?.gpt_rules ?? {}) as GptRulesShape
+  const flow = rules.flow ?? []
+  const countYes = rules.counting_rules?.count_yes
+  const countNo = rules.counting_rules?.count_no ?? []
+  const closing = scenario?.closing as { ai_line?: string } | string | null | undefined
+  const closingLine =
+    typeof closing === 'string' ? closing : closing?.ai_line ?? ''
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-lg bg-slate-900 border border-slate-700/50 rounded-t-3xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-300 max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-white font-semibold text-base">📋 시나리오 · 지침</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-sm">✕</button>
+        </div>
+
+        {!scenario ? (
+          <p className="text-sm text-slate-500 text-center py-6">
+            오늘 교재/Unit에는 시나리오 템플릿이 없어요.<br />
+            일반 Coty 자유 대화 모드입니다.
+          </p>
+        ) : (
+          <>
+            {/* 개요 */}
+            <div className="space-y-0.5">
+              <p className="text-sm text-white font-medium">{scenario.book}</p>
+              <p className="text-xs text-slate-400">
+                Unit {scenario.unit}{scenario.title ? ` — ${scenario.title}` : ''} · 총 {scenario.total_steps} steps
+              </p>
+              {scenario.target_words?.length > 0 && (
+                <p className="text-xs text-emerald-400">🎯 단어: {scenario.target_words.join(', ')}</p>
+              )}
+              {scenario.target_patterns?.length > 0 && (
+                <p className="text-xs text-violet-300">💬 패턴: {scenario.target_patterns.join(', ')}</p>
+              )}
+            </div>
+
+            {/* AI 지침 (gpt_rules) */}
+            {(flow.length > 0 || countYes || countNo.length > 0) && (
+              <div className="bg-slate-800/50 rounded-xl p-3 space-y-2 border border-slate-700/40">
+                <p className="text-xs font-semibold text-amber-300">🧭 AI 진행 지침</p>
+                {flow.length > 0 && (
+                  <ol className="list-decimal list-inside space-y-0.5">
+                    {flow.map((r, i) => (
+                      <li key={i} className="text-xs text-slate-300 leading-relaxed">{fill(r)}</li>
+                    ))}
+                  </ol>
+                )}
+                {(countYes || countNo.length > 0) && (
+                  <div className="text-xs space-y-0.5 pt-1 border-t border-slate-700/40">
+                    {countYes && <p className="text-emerald-400">✅ 진도 카운트 O: {countYes}</p>}
+                    {countNo.map((c, i) => (
+                      <p key={i} className="text-slate-500">🚫 카운트 X: {c}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 시나리오 phases → steps */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-slate-400">🎬 수업 시나리오</p>
+              {(scenario.phases || []).map((phase) => (
+                <div key={phase.phase} className="space-y-1.5">
+                  <p className="text-xs font-medium text-slate-300">
+                    Phase {phase.phase}{phase.label ? ` · ${phase.label}` : ''}
+                  </p>
+                  <div className="space-y-2 pl-2 border-l border-slate-700/50">
+                    {(phase.steps || []).map((s) => (
+                      <div key={s.step} className="space-y-0.5">
+                        <p className="text-xs text-slate-200">
+                          <span className="text-slate-600 mr-1">{s.step}.</span>
+                          {s.target_word && <span className="text-emerald-400 font-medium">{s.target_word}</span>}
+                          {s.expected_pattern && (
+                            <span className="text-violet-300 ml-1">— “{s.expected_pattern}”</span>
+                          )}
+                        </p>
+                        {s.scene_kr && <p className="text-[11px] text-slate-500 pl-3">🎭 {s.scene_kr}</p>}
+                        {s.ai_line && <p className="text-[11px] text-sky-300/80 pl-3">🗣️ {fill(s.ai_line)}</p>}
+                        {s.accept_variants && s.accept_variants.length > 0 && (
+                          <p className="text-[11px] text-slate-500 pl-3">✔️ 인정: {s.accept_variants.join(' / ')}</p>
+                        )}
+                        {s.hint_line && <p className="text-[11px] text-amber-300/70 pl-3">💡 {fill(s.hint_line)}</p>}
+                        {s.reaction && <p className="text-[11px] text-slate-500 pl-3">🎉 {fill(s.reaction)}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* closing */}
+            {closingLine && (
+              <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/40">
+                <p className="text-xs font-semibold text-slate-400 mb-1">🏁 마무리</p>
+                <p className="text-[11px] text-sky-300/80">🗣️ {fill(closingLine)}</p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── 상단 상태 인디케이터 (아바타 대체 — 공간 최소화) ──
 function StatusBar({ status }: { status: string }) {
   const STATUS_LABEL: Record<string, string> = {
@@ -597,6 +724,7 @@ export default function StudentPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [showAudioSettings, setShowAudioSettings] = useState(false)
   const [showProgress, setShowProgress] = useState(false)
+  const [showScenario, setShowScenario] = useState(false)
 
   // 오디오 가공 설정 (localStorage 유지) — useWebSpeech 파이프라인에 전달
   const { config: audioConfig, setConfig: setAudioConfig, resetConfig: resetAudioConfig, hydrate: hydrateAudioConfig } = useAudioConfigStore()
@@ -1137,12 +1265,19 @@ export default function StudentPage() {
             {isHolding ? '손을 떼면 전송됩니다' : '누르고 있는 동안 말하세요 (Push-to-Talk)'}
           </p>
 
-          <div className="flex justify-center">
+          <div className="flex justify-center gap-4">
             <button
               onClick={() => setShowAudioSettings(true)}
               className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1"
             >
               🎛️ 오디오 가공 설정
+            </button>
+            <button
+              onClick={() => setShowScenario(true)}
+              className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1"
+              title="오늘 수업 시나리오와 AI 지침 보기 (교사용)"
+            >
+              📋 시나리오 · 지침
             </button>
           </div>
 
@@ -1187,6 +1322,15 @@ export default function StudentPage() {
           unit={settings.current_unit}
           unitTitle={loadedScenario?.title}
           onClose={() => setShowProgress(false)}
+        />
+      )}
+
+      {/* 시나리오·지침 인스펙터 모달 (교사/운영자용) */}
+      {showScenario && (
+        <ScenarioInspectorModal
+          scenario={loadedScenario}
+          nickname={studentNickname}
+          onClose={() => setShowScenario(false)}
         />
       )}
 
