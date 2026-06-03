@@ -488,6 +488,55 @@ export function useConversation({
         }
       }
 
+      // chat 응답에서 feedback 처리
+      if (data.feedback) {
+        const fb = data.feedback
+        const feedbackData = {
+          grammar: fb.grammar ?? 0,
+          overall: fb.overall ?? 0,
+          correction: fb.retry_reason ?? null,
+        }
+        setFeedback(feedbackData)
+        updateMessageFeedback(studentMsgId, feedbackData)
+        if (fb.grammar) grammarScoresRef.current.push(fb.grammar)
+        if (fb.overall) overallScoresRef.current.push(fb.overall)
+        if (fb.retry_reason) correctionsRef.current.push(fb.retry_reason)
+        if (fb.overall >= 70) correctTurnsRef.current++
+
+        const avg = (arr: number[]) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : undefined
+        if (reportIdRef.current) {
+          fetch('/api/lesson-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update',
+              report_id: reportIdRef.current,
+              total_turns: totalTurnsRef.current,
+              correct_turns: correctTurnsRef.current,
+              hint_used_count: hintUsedCountRef.current,
+              avg_grammar: avg(grammarScoresRef.current),
+              avg_overall: avg(overallScoresRef.current),
+            }),
+          })
+        }
+
+        // log에 feedback 업데이트
+        const logId = await logIdPromise
+        if (logId) {
+          fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              log_id: logId,
+              ai_text: aiText,
+              grammar: fb.grammar,
+              overall: fb.overall,
+              retry_reason: fb.retry_reason,
+            }),
+          })
+        }
+      }
+
       historyRef.current.push({ role: 'assistant', content: aiText })
       setAIResponding(false)
 

@@ -1514,25 +1514,19 @@ export default function StudentPage() {
                   {/* 점수 한 줄 요약 */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-xs text-slate-400">
-                      <span>문법 <span className={cn('font-bold font-mono', msg.feedback.grammar >= 80 ? 'text-emerald-400' : msg.feedback.grammar >= 60 ? 'text-amber-400' : 'text-red-400')}>{msg.feedback.grammar}</span></span>
-                      <span>유창성 <span className={cn('font-bold font-mono', msg.feedback.fluency >= 80 ? 'text-emerald-400' : msg.feedback.fluency >= 60 ? 'text-amber-400' : 'text-red-400')}>{msg.feedback.fluency}</span></span>
-                      <span>어휘 <span className={cn('font-bold font-mono', msg.feedback.vocabulary >= 80 ? 'text-emerald-400' : msg.feedback.vocabulary >= 60 ? 'text-amber-400' : 'text-red-400')}>{msg.feedback.vocabulary}</span></span>
+                      <span>문법 <span className={cn('font-bold font-mono', (msg.feedback.grammar ?? 0) >= 80 ? 'text-emerald-400' : (msg.feedback.grammar ?? 0) >= 60 ? 'text-amber-400' : 'text-red-400')}>{msg.feedback.grammar ?? 0}</span></span>
                     </div>
                     <span className={cn(
                       'text-sm font-bold font-mono',
-                      msg.feedback.overall >= 80 ? 'text-emerald-400' : msg.feedback.overall >= 60 ? 'text-amber-400' : 'text-red-400'
-                    )}>{msg.feedback.overall}</span>
+                      (msg.feedback.overall ?? 0) >= 80 ? 'text-emerald-400' : (msg.feedback.overall ?? 0) >= 60 ? 'text-amber-400' : 'text-red-400'
+                    )}>{msg.feedback.overall ?? 0}</span>
                   </div>
-                  {/* 교정 */}
+                  {/* 틀린 이유 (retry_reason) */}
                   {msg.feedback.correction && (
                     <p className="text-xs text-amber-300">
-                      <span className="opacity-60">💡 </span>{msg.feedback.correction}
+                      <span className="opacity-60">⚠️ </span>{msg.feedback.correction}
                     </p>
                   )}
-                  {/* 팁 */}
-                  <p className="text-xs text-emerald-300">
-                    <span className="opacity-60">✨ </span>{msg.feedback.tip}
-                  </p>
                 </div>
               )}
             </div>

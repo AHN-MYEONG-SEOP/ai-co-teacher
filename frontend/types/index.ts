@@ -18,11 +18,11 @@ export interface WhisperResponse {
 // 피드백 데이터 (인라인 표시용)
 export interface MessageFeedback {
   grammar: number
-  fluency: number
-  vocabulary: number
   overall: number
-  correction: string | null
-  tip: string
+  correction: string | null  // retry_reason 저장
+  fluency?: number
+  vocabulary?: number
+  tip?: string | null
 }
 // 단어별 인식 결과
 export interface WordResult {

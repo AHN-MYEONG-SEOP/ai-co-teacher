@@ -4,11 +4,11 @@ import { cn } from '@/lib/utils'
 
 export interface FeedbackData {
   grammar: number
-  fluency: number
-  vocabulary: number
   overall: number
   correction: string | null
-  tip: string
+  fluency?: number
+  vocabulary?: number
+  tip?: string | null
 }
 
 function ScoreBar({ label, score }: { label: string; score: number }) {
@@ -50,9 +50,8 @@ export function FeedbackCard({ feedback, onClose }: { feedback: FeedbackData; on
           {!expanded && (
             <div className="flex items-center gap-1.5 ml-1">
               {[
-                { v: feedback.grammar,    color: feedback.grammar    >= 80 ? 'text-emerald-400' : feedback.grammar    >= 60 ? 'text-amber-400' : 'text-red-400' },
-                { v: feedback.fluency,    color: feedback.fluency    >= 80 ? 'text-emerald-400' : feedback.fluency    >= 60 ? 'text-amber-400' : 'text-red-400' },
-                { v: feedback.vocabulary, color: feedback.vocabulary >= 80 ? 'text-emerald-400' : feedback.vocabulary >= 60 ? 'text-amber-400' : 'text-red-400' },
+                { v: feedback.grammar, color: (feedback.grammar ?? 0) >= 80 ? 'text-emerald-400' : (feedback.grammar ?? 0) >= 60 ? 'text-amber-400' : 'text-red-400' },
+                { v: feedback.overall, color: (feedback.overall ?? 0) >= 80 ? 'text-emerald-400' : (feedback.overall ?? 0) >= 60 ? 'text-amber-400' : 'text-red-400' },
               ].map((s, i) => (
                 <span key={i} className={cn('text-xs font-mono font-bold', s.color)}>{s.v}</span>
               ))}
@@ -81,9 +80,8 @@ export function FeedbackCard({ feedback, onClose }: { feedback: FeedbackData; on
         <div className="px-4 pb-4 space-y-3 border-t border-slate-700/50 pt-3">
           {/* 점수 바 */}
           <div className="space-y-2">
-            <ScoreBar label="문법 (Grammar)"      score={feedback.grammar} />
-            <ScoreBar label="유창성 (Fluency)"    score={feedback.fluency} />
-            <ScoreBar label="어휘 (Vocabulary)"   score={feedback.vocabulary} />
+            <ScoreBar label="문법 (Grammar)" score={feedback.grammar ?? 0} />
+            <ScoreBar label="종합 (Overall)" score={feedback.overall ?? 0} />
           </div>
 
           {/* 교정 */}

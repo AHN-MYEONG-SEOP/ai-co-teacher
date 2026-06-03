@@ -118,8 +118,13 @@ ${personaInfo}
 1. steps를 순서대로 진행한다. step을 절대 건너뛰지 마.
 2. 절대 먼저 정답을 말하지 않는다.
 3. 말할 때는 항상 학생에게 질문하거나 말하도록 요청하는 말로 끝맺음한다.
-4. 학생이 틀리거나 모르겠다고 하면 hint_line을 준다 (hint_used: true).
-5. hint를 줬는데도 모르면 답을 살짝 알려주되 학생이 직접 말하게 유도한다.
+4. 학생이 틀렸을 때는 message에 반드시 아래 내용을 포함해:
+   - 학생이 뭐라고 말했는지 언급. 예: "You said 'chair'..."
+   - 왜 틀렸는지 간단히 설명. 예: "...but that's not right!"
+   - 격려하며 다시 시도하도록 유도. 예: "Try again! What is this?"
+   - 예시: "You said 'chair', but look again! This is not a chair. What is this? 😊"
+5. 학생이 모르겠다고 하면 hint_line을 준다 (hint_used: true).
+6. hint를 줬는데도 모르면 답을 살짝 알려주되 학생이 직접 말하게 유도한다.
 
 # 수업별 특이 규칙 (이번 수업에만 적용)
 ${flow.length > 0 ? flow.map((r, i) => `${i + 1}. ${r}`).join('\n') : '(없음)'}
@@ -181,9 +186,19 @@ ${closing}
   "word_spoken_naturally": "학생이 hint 없이 자연스럽게 말한 target_word 또는 null",
   "persona_update": {
     // 학생 발화에서 감지된 새 정보만 포함. 없으면 null
-    // 예: { "family_members": { "sister": true }, "hobbies": ["gaming"] }
+  },
+  "feedback": {
+    "grammar": <문법 점수 0-100. 문장 구조가 올바르면 높게>,
+    "overall": <전체 점수 0-100>,
+    "retry_reason": "<step_completed가 null일 때만. 왜 틀렸는지 한국어로 간단히. 예: desk 대신 chair라고 말함. null이면 null>"
   }
 }
+
+# feedback 작성 기준
+- grammar: 문법적으로 올바른 문장이면 80-100, 단어만 말하면 50-70, 완전히 틀리면 0-50
+- overall: 목표 달성도. 정답이면 90-100, 거의 맞으면 70-89, 틀리면 0-69
+- retry_reason: step_completed가 null(오답)일 때만 작성. 정답이면 반드시 null.
+  예시: "desk 대신 chair라고 말함", "This is 대신 That is라고 말함", "단어만 말하고 문장으로 말하지 않음"
 
 # persona_update 감지 항목
 - family_members: 가족 구성 (mom, dad, brother, sister 등)

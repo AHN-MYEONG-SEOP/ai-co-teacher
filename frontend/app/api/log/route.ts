@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
       session_id, student_id,
       student_text, ai_text,
       stt_path, confidence, latency_ms,
-      grammar, fluency, vocabulary, overall, correction, tip,
+      grammar, overall, retry_reason,
       hint_used,
       log_id,
     } = await req.json()
@@ -43,11 +43,8 @@ export async function POST(req: NextRequest) {
           confidence: confidence || null,
           latency_ms: latency_ms || null,
           grammar: grammar || null,
-          fluency: fluency || null,
-          vocabulary: vocabulary || null,
           overall: overall || null,
-          correction: correction || null,
-          tip: tip || null,
+          retry_reason: retry_reason || null,
           hint_used: hint_used ?? false,
         })
         .select('id')

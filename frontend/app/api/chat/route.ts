@@ -242,6 +242,9 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
     let gptHintUsed = false
     let wordSpokenNaturally: string | null = null
     let personaUpdate: Record<string, unknown> | null = null
+    let feedbackGrammar: number | null = null
+    let feedbackOverall: number | null = null
+    let retryReason: string | null = null
     try {
       const parsed = JSON.parse(rawContent.replace(/```json|```/g, '').trim())
       aiText = typeof parsed.message === 'string' ? parsed.message
@@ -252,6 +255,11 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
       if (parsed.persona_update && typeof parsed.persona_update === 'object' &&
           Object.keys(parsed.persona_update).length > 0) {
         personaUpdate = parsed.persona_update
+      }
+      if (parsed.feedback && typeof parsed.feedback === 'object') {
+        feedbackGrammar = parsed.feedback.grammar ?? null
+        feedbackOverall = parsed.feedback.overall ?? null
+        retryReason = parsed.feedback.retry_reason ?? null
       }
     } catch {
       console.error('chat JSON 파싱 실패. raw:', rawContent)
@@ -348,6 +356,11 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
       hint_line: hintLine || undefined,
       accept_variants: acceptVariants.length > 0 ? acceptVariants : undefined,
       translation,
+      feedback: {
+        grammar: feedbackGrammar,
+        overall: feedbackOverall,
+        retry_reason: retryReason,
+      },
       role: 'assistant',
     })
 
