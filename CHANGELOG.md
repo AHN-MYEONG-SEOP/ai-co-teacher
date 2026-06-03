@@ -46,6 +46,12 @@
 
 ### 최근 추가된 기능
 
+- [x] **교사 대시보드 시나리오 편집 UI (2026-06-03)** — 교사 페이지에 `🎬 시나리오` 탭 추가. `lesson_scenarios` 템플릿을 폼으로 직접 생성/수정/삭제(기존엔 Supabase DB 직접 INSERT만 가능).
+  - **신규 API**: `app/api/teacher/scenarios/route.ts` — GET(목록 / `?id=`단일) · POST(upsert, id 있으면 update) · DELETE(`?id=`). 서비스 롤 키 사용(`create-student` 패턴).
+  - **신규 컴포넌트**: `components/teacher/ScenarioEditor.tsx` — 개요(교재/Unit/제목/목표단어·패턴/활성화) + AI 진행 지침(flow·count_yes·count_no) + phases/steps 중첩 편집(Phase·Step 추가/삭제) + closing 폼.
+  - **`total_steps` 자동 산정**: 저장 시 phases의 step 수 합계로 계산(진도율 산정 기준과 일치). `step` 번호도 phase 순서대로 전역 자동 재부여.
+  - **문자열 배열 입력은 줄바꿈 구분**: `target_patterns`("Yes, it is.")·`accept_variants`가 쉼표·마침표를 포함하므로 한 줄에 하나씩 입력.
+  - `book_slug`는 저장 시 `toBookSlug(book)`로 서버에서 자동 생성.
 - [x] **첫 학습 판정을 학생 전체 이력 기준으로 (2026-06-02, v2026-06-02.10)** — 첫 학습 = **Book/Unit 무관, `lesson_progress` 행이 하나도 없는** 경우로 변경(이전엔 현재 Unit 기준).
   - `lesson-scenario` GET이 `has_history`(학생 전체 이력 여부) 반환. `page.tsx`가 `hasHistory` 상태로 보관하고 `isFirstTime={!hasHistory}` 전달. 수업 시작(`startAttempt`) 시 즉시 `hasHistory=true` → 완료 후 카드는 복습 변형.
   - 이력 있는 학생은 현재 Unit(=마지막 학습 내용)을 "지난 시간에 배운 내용"으로 표시. 현재 Unit 회차 기록이 없으면 "지금까지 N번" 통계 줄은 숨김.

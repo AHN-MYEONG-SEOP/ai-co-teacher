@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import ScenarioEditor from '@/components/teacher/ScenarioEditor'
 
 interface ConversationLog {
   id: string
@@ -115,7 +116,7 @@ export default function TeacherDashboard() {
   const [personas, setPersonas] = useState<PersonaRow[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students'>('realtime')
+  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students' | 'scenarios'>('realtime')
   const [newStudent, setNewStudent] = useState<NewStudent>({ name: '', nickname: '', email: '', password: '' })
   const [createLoading, setCreateLoading] = useState(false)
   const [createMessage, setCreateMessage] = useState<{ text: string; ok: boolean } | null>(null)
@@ -306,12 +307,12 @@ export default function TeacherDashboard() {
 
         {/* 탭 */}
         <div className="flex gap-2 flex-wrap">
-          {(['realtime', 'history', 'reports', 'personas', 'students'] as const).map(tab => (
+          {(['realtime', 'history', 'reports', 'personas', 'students', 'scenarios'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={cn('px-4 py-2 rounded-xl text-sm transition-colors',
                 activeTab === tab ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
               )}>
-              {tab === 'realtime' ? '🔴 실시간' : tab === 'history' ? '📋 대화기록' : tab === 'reports' ? '📊 학습이력' : tab === 'personas' ? '👤 페르소나' : '👨‍🎓 학생관리'}
+              {tab === 'realtime' ? '🔴 실시간' : tab === 'history' ? '📋 대화기록' : tab === 'reports' ? '📊 학습이력' : tab === 'personas' ? '👤 페르소나' : tab === 'students' ? '👨‍🎓 학생관리' : '🎬 시나리오'}
             </button>
           ))}
           <button onClick={() => { fetchLogs(); fetchReports(selectedStudentId || undefined); const ids = students.map(s => s.id); fetchScenarios(ids); fetchPersonas(ids) }} className="ml-auto px-4 py-2 rounded-xl text-sm bg-slate-800 text-slate-400 hover:text-white transition-colors">
@@ -596,6 +597,9 @@ export default function TeacherDashboard() {
             </div>
           </div>
         )}
+
+        {/* 시나리오 편집 */}
+        {activeTab === 'scenarios' && <ScenarioEditor />}
       </div>
     </main>
   )

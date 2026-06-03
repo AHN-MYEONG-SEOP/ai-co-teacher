@@ -86,6 +86,9 @@ ai-co-teacher/
 │   │       ├── lesson-report/route.ts
 │   │       ├── persona/route.ts          # 페르소나 조회/누적merge
 │   │       ├── lesson-scenario/route.ts  # GET 시나리오+회차통계 / POST start 새 회차 생성
+│   │       ├── teacher/
+│   │       │   ├── create-student/route.ts  # 학생 계정 생성
+│   │       │   └── scenarios/route.ts       # 시나리오 템플릿 CRUD (GET 목록·단일 / POST upsert / DELETE)
 │   │       ├── curriculum/route.ts
 │   │       └── deepgram-token/route.ts
 │   ├── components/
