@@ -87,7 +87,10 @@ ai-co-teacher/
 │   │       ├── persona/route.ts          # 페르소나 조회/누적merge
 │   │       ├── lesson-scenario/route.ts  # GET 시나리오+회차통계 / POST start 새 회차 생성
 │   │       ├── teacher/
-│   │       │   ├── create-student/route.ts  # 학생 계정 생성
+│   │       │   ├── create-student/route.ts  # 학생 계정 생성 (class_id 배정 포함)
+│   │       │   ├── teachers/route.ts        # 교사 CRUD (GET 목록 / POST 등록 role=teacher / DELETE)
+│   │       │   ├── classes/route.ts         # 반 CRUD (GET 전체 반+담임+학생/미배정 / POST 생성·이름·담임변경 / DELETE)
+│   │       │   ├── assign-student/route.ts  # 학생 반 배정/이동/해제 (profiles.class_id)
 │   │       │   └── scenarios/route.ts       # 시나리오 템플릿 CRUD (GET 목록·단일 / POST upsert / DELETE)
 │   │       ├── curriculum/route.ts
 │   │       └── deepgram-token/route.ts

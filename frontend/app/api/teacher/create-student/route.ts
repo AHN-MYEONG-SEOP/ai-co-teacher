@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const { email, password, name, nickname } = await req.json()
+    const { email, password, name, nickname, class_id: classId } = await req.json()
 
     if (!email || !password || !name) {
       return NextResponse.json({ error: '이메일, 비밀번호, 이름은 필수입니다.' }, { status: 400 })
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
         role: 'student',
         name,
         nickname: nickname || name,  // nickname 없으면 name 사용
+        class_id: classId || null,   // 반 미선택 시 미배정
       })
 
     if (profileError) throw profileError

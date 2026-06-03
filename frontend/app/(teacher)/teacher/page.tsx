@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import ScenarioEditor from '@/components/teacher/ScenarioEditor'
+import ClassManager from '@/components/teacher/ClassManager'
+import TeacherManager from '@/components/teacher/TeacherManager'
 
 interface ConversationLog {
   id: string
@@ -101,6 +103,19 @@ interface NewStudent {
   nickname: string
   email: string
   password: string
+  class_id: string
+}
+
+interface TeacherClass {
+  id: string
+  name: string
+}
+
+interface RosterStudent {
+  id: string
+  name: string
+  nickname: string | null
+  class_id: string | null
 }
 
 export default function TeacherDashboard() {
@@ -116,8 +131,10 @@ export default function TeacherDashboard() {
   const [personas, setPersonas] = useState<PersonaRow[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students' | 'scenarios'>('realtime')
-  const [newStudent, setNewStudent] = useState<NewStudent>({ name: '', nickname: '', email: '', password: '' })
+  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students' | 'scenarios' | 'classes' | 'teachers'>('realtime')
+  const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([])
+  const [allStudents, setAllStudents] = useState<RosterStudent[]>([])
+  const [newStudent, setNewStudent] = useState<NewStudent>({ name: '', nickname: '', email: '', password: '', class_id: '' })
   const [createLoading, setCreateLoading] = useState(false)
   const [createMessage, setCreateMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
@@ -133,7 +150,9 @@ export default function TeacherDashboard() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setCreateMessage({ text: `✅ ${newStudent.name} 학생 계정 생성 완료!`, ok: true })
-      setNewStudent({ name: '', nickname: '', email: '', password: '' })
+      setNewStudent({ name: '', nickname: '', email: '', password: '', class_id: '' })
+      fetchStudents()
+      fetchClassData()
     } catch (err) {
       setCreateMessage({ text: `❌ ${err instanceof Error ? err.message : '생성 실패'}`, ok: false })
     } finally {
@@ -211,6 +230,31 @@ export default function TeacherDashboard() {
     }
   }, [supabase, teacherId, fetchScenarios, fetchPersonas])
 
+  // 반 목록 + 전체 학생 명단 (학생 생성 드롭다운 · 학생관리 명단 공용)
+  const fetchClassData = useCallback(async () => {
+    const res = await fetch('/api/teacher/classes')
+    const data = await res.json()
+    if (!res.ok) return
+    const cls = (data.classes ?? []) as { id: string; name: string; students: RosterStudent[] }[]
+    setTeacherClasses(cls.map(c => ({ id: c.id, name: c.name })))
+    const roster: RosterStudent[] = [
+      ...cls.flatMap(c => c.students),
+      ...((data.unassigned ?? []) as RosterStudent[]),
+    ].sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+    setAllStudents(roster)
+  }, [])
+
+  // 학생 반 배정/이동/해제 (학생관리 명단용)
+  const assignStudentClass = async (studentId: string, classId: string | null) => {
+    await fetch('/api/teacher/assign-student', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: studentId, class_id: classId }),
+    })
+    fetchClassData()
+    fetchStudents()
+  }
+
   const fetchReports = useCallback(async (studentId?: string) => {
     let query = supabase
       .from('lesson_reports')
@@ -225,6 +269,7 @@ export default function TeacherDashboard() {
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
   useEffect(() => { fetchStudents() }, [fetchStudents])
+  useEffect(() => { fetchClassData() }, [fetchClassData])
   useEffect(() => { fetchReports(selectedStudentId || undefined) }, [fetchReports, selectedStudentId])
 
   useEffect(() => {
@@ -307,12 +352,12 @@ export default function TeacherDashboard() {
 
         {/* 탭 */}
         <div className="flex gap-2 flex-wrap">
-          {(['realtime', 'history', 'reports', 'personas', 'students', 'scenarios'] as const).map(tab => (
+          {(['realtime', 'history', 'reports', 'personas', 'students', 'classes', 'teachers', 'scenarios'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={cn('px-4 py-2 rounded-xl text-sm transition-colors',
                 activeTab === tab ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
               )}>
-              {tab === 'realtime' ? '🔴 실시간' : tab === 'history' ? '📋 대화기록' : tab === 'reports' ? '📊 학습이력' : tab === 'personas' ? '👤 페르소나' : tab === 'students' ? '👨‍🎓 학생관리' : '🎬 시나리오'}
+              {tab === 'realtime' ? '🔴 실시간' : tab === 'history' ? '📋 대화기록' : tab === 'reports' ? '📊 학습이력' : tab === 'personas' ? '👤 페르소나' : tab === 'students' ? '👨‍🎓 학생관리' : tab === 'classes' ? '🏫 반 관리' : tab === 'teachers' ? '👩‍🏫 교사관리' : '🎬 시나리오'}
             </button>
           ))}
           <button onClick={() => { fetchLogs(); fetchReports(selectedStudentId || undefined); const ids = students.map(s => s.id); fetchScenarios(ids); fetchPersonas(ids) }} className="ml-auto px-4 py-2 rounded-xl text-sm bg-slate-800 text-slate-400 hover:text-white transition-colors">
@@ -579,7 +624,20 @@ export default function TeacherDashboard() {
                   onChange={e => setNewStudent(p => ({ ...p, password: e.target.value }))}
                   className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
+                <select
+                  value={newStudent.class_id}
+                  onChange={e => setNewStudent(p => ({ ...p, class_id: e.target.value }))}
+                  className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">반 미배정</option>
+                  {teacherClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
+              {teacherClasses.length === 0 && (
+                <p className="text-xs text-slate-500">
+                  배정할 반이 없습니다. &ldquo;🏫 반 관리&rdquo; 탭에서 먼저 반을 만들 수 있어요. (미배정으로도 생성 가능)
+                </p>
+              )}
               <button
                 onClick={handleCreateStudent}
                 disabled={createLoading || !newStudent.name || !newStudent.email || !newStudent.password}
@@ -595,8 +653,42 @@ export default function TeacherDashboard() {
                 </p>
               )}
             </div>
+
+            {/* 학생 명단 + 반 배정 */}
+            <div className="space-y-2">
+              <span className="text-sm text-slate-400">📒 학생 명단 ({allStudents.length}명) · 반 배정</span>
+              {allStudents.length === 0 ? (
+                <div className="bg-slate-900/40 border border-slate-700/30 rounded-2xl p-6 text-center">
+                  <p className="text-slate-500 text-sm">등록된 학생이 없습니다. 위에서 학생을 생성하세요.</p>
+                </div>
+              ) : (
+                <div className="bg-slate-900/40 border border-slate-700/30 rounded-2xl p-4 space-y-1.5">
+                  {allStudents.map(s => (
+                    <div key={s.id} className="flex items-center justify-between gap-2 bg-slate-800/40 rounded-lg px-3 py-2">
+                      <span className="text-sm text-slate-200 truncate">
+                        {s.name}{s.nickname && s.nickname !== s.name && <span className="text-slate-500 ml-1">({s.nickname})</span>}
+                      </span>
+                      <select
+                        value={s.class_id ?? ''}
+                        onChange={e => assignStudentClass(s.id, e.target.value || null)}
+                        className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500 shrink-0"
+                      >
+                        <option value="">미배정</option>
+                        {teacherClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
+
+        {/* 반 관리 */}
+        {activeTab === 'classes' && teacherId && <ClassManager teacherId={teacherId} />}
+
+        {/* 교사 관리 */}
+        {activeTab === 'teachers' && teacherId && <TeacherManager currentTeacherId={teacherId} />}
 
         {/* 시나리오 편집 */}
         {activeTab === 'scenarios' && <ScenarioEditor />}

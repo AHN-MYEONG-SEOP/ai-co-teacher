@@ -46,6 +46,15 @@
 
 ### 최근 추가된 기능
 
+- [x] **교사 관리 + 담임 지정 + 학생관리 반배정 (2026-06-03)** — 반/학생/교사 관리를 한 대시보드에서.
+  - **👩‍🏫 교사관리 탭(신규)**: `app/api/teacher/teachers/route.ts`(GET 목록·담임반수 / POST 교사 계정 등록 role=teacher / DELETE 담임 반 있으면 차단) + `components/teacher/TeacherManager.tsx`(등록 폼 + 교사 목록·삭제).
+  - **반 담임 지정**: `classes` GET이 전체 반+담임(`teacher_id`/`teacher_name`) 반환(관리자 관점), POST가 생성·수정 시 `teacher_id` 처리. `ClassManager`에 담임 선택(생성 폼) + 반별 담임 변경 드롭다운.
+  - **학생관리 탭 반배정**: 기존 학생 명단 + 학생별 반 배정/이동 드롭다운 추가(`assign-student` 재사용). `page.tsx`가 `/api/teacher/classes`로 전체 명단·반 목록을 함께 로드.
+- [x] **반(class) 관리 기능 + 대시보드 학생목록 복구 (2026-06-03)** — 교사 페이지에 `🏫 반 관리` 탭 추가. 그동안 반 생성 UI/학생 배정이 없어 `classes` 행이 비어 대시보드 학생목록이 **항상 0명**이던 문제를 복구.
+  - **신규 API**: `app/api/teacher/classes/route.ts`(GET 반+소속학생/미배정 풀 · POST 생성·이름변경 · DELETE 삭제 시 소속학생 미배정 처리) · `app/api/teacher/assign-student/route.ts`(POST `profiles.class_id` 배정/이동/해제). 모두 서비스 롤 키.
+  - **신규 컴포넌트**: `components/teacher/ClassManager.tsx` — 반 생성/이름변경/삭제 + 반별 학생 목록 + 미배정 학생 풀, 학생별 드롭다운으로 반 배정/이동.
+  - **학생 생성 폼**: `create-student` API가 `class_id`를 받아 생성과 동시 배정. 교사 페이지 생성 폼에 `반 선택` 드롭다운 추가.
+  - **미배정 학생 풀**: `class_id`가 비어 어떤 교사에도 속하지 않은 학생은 공용 미배정 풀로 노출(소규모 단일 학원 가정).
 - [x] **교사 대시보드 시나리오 편집 UI (2026-06-03)** — 교사 페이지에 `🎬 시나리오` 탭 추가. `lesson_scenarios` 템플릿을 폼으로 직접 생성/수정/삭제(기존엔 Supabase DB 직접 INSERT만 가능).
   - **신규 API**: `app/api/teacher/scenarios/route.ts` — GET(목록 / `?id=`단일) · POST(upsert, id 있으면 update) · DELETE(`?id=`). 서비스 롤 키 사용(`create-student` 패턴).
   - **신규 컴포넌트**: `components/teacher/ScenarioEditor.tsx` — 개요(교재/Unit/제목/목표단어·패턴/활성화) + AI 진행 지침(flow·count_yes·count_no) + phases/steps 중첩 편집(Phase·Step 추가/삭제) + closing 폼.
