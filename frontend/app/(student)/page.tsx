@@ -514,10 +514,30 @@ function ScenarioInspectorModal({
               )}
             </div>
 
-            {/* AI 지침 (gpt_rules) */}
+            {/* AI 공통 지침 (system-prompt.ts) */}
+            <div className="bg-slate-800/50 rounded-xl p-3 space-y-2 border border-slate-700/40">
+              <p className="text-xs font-semibold text-amber-300">🧭 AI 공통 지침 (모든 수업 적용)</p>
+              <ol className="list-decimal list-inside space-y-0.5">
+                {[
+                  'steps를 순서대로 진행한다. step을 절대 건너뛰지 마.',
+                  '절대 먼저 정답을 말하지 않는다.',
+                  '말할 때는 항상 학생에게 질문하거나 말하도록 요청하는 말로 끝맺음한다.',
+                  '학생이 틀리거나 모르겠다고 하면 hint_line을 준다 (hint_used: true).',
+                  'hint를 줬는데도 모르면 답을 살짝 알려주되 학생이 직접 말하게 유도한다.',
+                  '새 step 시작 시 반드시 해당 step의 ai_line을 그대로 사용한다.',
+                  'message의 마지막 문장은 반드시 학생에게 하는 질문이어야 한다.',
+                  "It's = It is, That's = That is 등 축약형/비축약형 동일하게 인정한다.",
+                  'target_word가 포함되어 있으면 정답으로 인정한다.',
+                ].map((r, i) => (
+                  <li key={i} className="text-xs text-slate-300 leading-relaxed">{r}</li>
+                ))}
+              </ol>
+            </div>
+
+            {/* AI 수업별 지침 (gpt_rules) */}
             {(flow.length > 0 || countYes || countNo.length > 0) && (
               <div className="bg-slate-800/50 rounded-xl p-3 space-y-2 border border-slate-700/40">
-                <p className="text-xs font-semibold text-amber-300">🧭 AI 진행 지침</p>
+                <p className="text-xs font-semibold text-amber-300">🧭 수업별 특이 지침</p>
                 {flow.length > 0 && (
                   <ol className="list-decimal list-inside space-y-0.5">
                     {flow.map((r, i) => (
