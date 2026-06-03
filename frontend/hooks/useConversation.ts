@@ -107,6 +107,7 @@ export function useConversation({
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackData | null>(null)
   const [sessionEnded, setSessionEnded] = useState(false)
+  const [currentScene, setCurrentScene] = useState<string | null>(null)  // AI 발화 전 보여줄 한국어 상황 설명
   const [progress, setProgress] = useState(initialProgress?.progress_rate ?? 0)
   const [stepProgress, setStepProgress] = useState<StepProgress>(initialProgress ?? EMPTY_PROGRESS)
 
@@ -211,6 +212,7 @@ export function useConversation({
     correctionsRef.current = []
     setFeedback(null)
     setSessionEnded(false)
+    setCurrentScene(null)
     setProgress(0)
     setStepProgress(EMPTY_PROGRESS)
     stepProgressRef.current = EMPTY_PROGRESS
@@ -249,6 +251,7 @@ export function useConversation({
       if (!res.ok) throw new Error()
       const data = await res.json()
       const greetingText = data.message || data.text
+      const sceneKr: string = data.scene_kr || ''
 
       historyRef.current.push({ role: 'assistant', content: greetingText })
 
@@ -281,12 +284,16 @@ export function useConversation({
         })
       }
 
+      // 상황 설명을 먼저 보여준 뒤 Coty가 말하도록
+      if (sceneKr) setCurrentScene(sceneKr)
       await speakRef.current(greetingText)
       addMessageRef.current({
         id: `greeting_${Date.now()}`, role: 'ai', content: greetingText,
         choices: data.choices?.length ? data.choices : undefined,
+        sceneKr: sceneKr || undefined,
         createdAt: new Date().toISOString(),
       })
+      setCurrentScene(null)
     } catch {
       const fallback = `Hi ${studentNickname}! Are you ready to start?`
       historyRef.current.push({ role: 'assistant', content: fallback })
@@ -479,6 +486,10 @@ export function useConversation({
 
       historyRef.current.push({ role: 'assistant', content: aiText })
       setAIResponding(false)
+
+      // 상황 설명(scene_kr)을 먼저 보여준 뒤 Coty가 말하도록
+      const sceneKr: string = data.scene_kr || ''
+      if (sceneKr) setCurrentScene(sceneKr)
       await speak(aiText)
 
       addMessageRef.current({
@@ -487,8 +498,10 @@ export function useConversation({
         content: aiText,
         translation: translation || undefined,
         choices: data.choices?.length ? data.choices : undefined,
+        sceneKr: sceneKr || undefined,
         createdAt: new Date().toISOString(),
       })
+      setCurrentScene(null)
 
       // 세션 종료 신호 (클로징 마지막 턴) → 마무리 인사 메시지를 보여주고 TTS까지 마친 뒤 트리거
       // (page.tsx가 이 신호로 마이크 비활성화 + 복습/종료 카드 표시)
@@ -514,7 +527,7 @@ export function useConversation({
   return {
     sendToGPT, isSpeaking, stopSpeaking, feedback,
     clearFeedback: () => setFeedback(null),
-    progress, stepProgress, sessionEnded,
+    progress, stepProgress, sessionEnded, currentScene,
     start, reset, endSession,
   }
 }

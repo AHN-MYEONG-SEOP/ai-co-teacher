@@ -46,6 +46,15 @@
 
 ### 최근 추가된 기능
 
+- [x] **AI 영어 문장 기본 숨김 + "다시 듣기"/"영문 보기" 버튼 (2026-06-03, v2026-06-03.5)** — 영어 음성 재생 후 영어 문장을 자동으로 보여주지 않고, 학생이 `👀 영문 보기`를 눌러야 표시(`🙈 영문 숨기기`로 토글). 듣기로 따라오는 학생은 문장 없이 대화 지속.
+  - `app/(student)/page.tsx`: `EnglishBox` 컴포넌트(기본 숨김, 토글) 추가. AI 말풍선 본문을 `EnglishBox`로 교체. **`👀 영문 보기` 버튼 왼쪽에 `🔁 다시 듣기` 버튼** 배치(재생 중 비활성화) — 기존 헤더의 🔁 아이콘은 제거하고 라벨 버튼으로 통합. 🎭 상황 설명·🇰🇷 번역·💡 힌트는 그대로. 학생 메시지는 변경 없음.
+
+- [x] **학습 화면 상황 안내(scene_kr) 표시 (2026-06-03, v2026-06-03.3)** — 시나리오 step마다 Coty가 영어로 말하기 **직전에** 해당 step의 한국어 상황 설명(`scene_kr`)을 보여줘 학생이 맥락을 먼저 이해하도록.
+  - `app/api/chat/route.ts`: 인사(첫 step) 및 일반 턴 응답에 현재 step의 `scene_kr` 포함(완료 단계 제외).
+  - `hooks/useConversation.ts`: TTS 재생 직전 `currentScene` 배너 노출 → 발화 후 말풍선 상단(`sceneKr`)으로 영구 보존. `reset()` 시 초기화.
+  - `app/(student)/page.tsx`: 🎭 상황 배너(발화 전) + AI 말풍선 상단 상황 설명 렌더링.
+  - `types/index.ts`: `ConversationMessage.sceneKr?` 추가.
+
 - [x] **교사 관리 + 담임 지정 + 학생관리 반배정 (2026-06-03)** — 반/학생/교사 관리를 한 대시보드에서.
   - **👩‍🏫 교사관리 탭(신규)**: `app/api/teacher/teachers/route.ts`(GET 목록·담임반수 / POST 교사 계정 등록 role=teacher / DELETE 담임 반 있으면 차단) + `components/teacher/TeacherManager.tsx`(등록 폼 + 교사 목록·삭제).
   - **반 담임 지정**: `classes` GET이 전체 반+담임(`teacher_id`/`teacher_name`) 반환(관리자 관점), POST가 생성·수정 시 `teacher_id` 처리. `ClassManager`에 담임 선택(생성 폼) + 반별 담임 변경 드롭다운.

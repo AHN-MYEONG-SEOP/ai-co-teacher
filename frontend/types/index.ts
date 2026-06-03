@@ -44,6 +44,7 @@ export interface ConversationMessage {
   words?: WordResult[]
   translation?: string
   choices?: string[]   // AI가 제시하는 선택지
+  sceneKr?: string     // 현재 step의 한국어 상황 설명 (AI 발화 전 안내)
 }
 // Supabase 테이블 타입
 export interface Profile {

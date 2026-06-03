@@ -136,6 +136,7 @@ export async function POST(req: NextRequest) {
       const name = studentText.replace('__GREETING__:', '').trim() || nickname || 'friend'
       let openingText = ''
       let unitTitle = ''
+      let openingScene = ''
 
       if (scenarioId) {
         const supabase = getSupabase()
@@ -149,6 +150,7 @@ export async function POST(req: NextRequest) {
         if (firstStep?.ai_line) {
           openingText = String(firstStep.ai_line).replace(/\{\{nickname\}\}/g, name)
         }
+        if (firstStep?.scene_kr) openingScene = String(firstStep.scene_kr)
       }
 
       if (!openingText) {
@@ -167,6 +169,7 @@ export async function POST(req: NextRequest) {
       const choices = await generateChoices(openai, openingText, levelGuide)
       return NextResponse.json({
         text: openingText, message: openingText, unitTitle, choices,
+        ...(openingScene ? { scene_kr: openingScene } : {}),
         role: 'assistant',
       })
     }
@@ -312,6 +315,15 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
 
     const rate = progressRate(naturalSteps, scenario.total_steps)
 
+    // ── 현재 step의 한국어 상황 설명 (AI 발화 전 안내용) ──
+    // completed(모든 step 완료)면 마무리 단계이므로 scene 없음
+    let sceneKr = ''
+    if (!completed) {
+      const steps = (scenario.phases ?? []).flatMap(p => p?.steps ?? [])
+      const cur = steps.find(s => s?.step === currentStep)
+      if (cur?.scene_kr) sceneKr = String(cur.scene_kr)
+    }
+
     // ── 세션 종료 신호 감지 (클로징 마지막 턴) ───────────
     // 아포스트로피(' vs ')·대소문자 차이를 무시하고 매칭
     const normalize = (s: string) => s.toLowerCase().replace(/[’']/g, "'")
@@ -340,6 +352,7 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
         completed,
       },
       ...(personaUpdate ? { persona_update: personaUpdate } : {}),
+      ...(sceneKr ? { scene_kr: sceneKr } : {}),
       choices,
       translation,
       role: 'assistant',

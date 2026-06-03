@@ -677,6 +677,37 @@ function HintBox({
   )
 }
 
+// ── 영문 보기 박스 컴포넌트 ─────────────────────────────
+// AI 영어 문장은 기본 숨김 — 듣기로 따라오는 학생은 보지 않고 대화 지속,
+// 필요한 학생만 "영문 보기"를 눌러 확인. 왼쪽 "다시 듣기"로 음성 재생.
+function EnglishBox({ text, onReplay, replayDisabled }: {
+  text: string
+  onReplay: () => void
+  replayDisabled: boolean
+}) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={onReplay}
+          disabled={replayDisabled}
+          className="text-xs text-violet-400/60 hover:text-violet-300 disabled:opacity-30 border border-violet-700/40 hover:border-violet-500 rounded-full px-3 py-1 transition-colors"
+        >
+          🔁 다시 듣기
+        </button>
+        <button
+          onClick={() => setVisible(v => !v)}
+          className="text-xs text-violet-400/60 hover:text-violet-300 border border-violet-700/40 hover:border-violet-500 rounded-full px-3 py-1 transition-colors"
+        >
+          {visible ? '🙈 영문 숨기기' : '👀 영문 보기'}
+        </button>
+      </div>
+      {visible && <span className="text-sm block">{text}</span>}
+    </div>
+  )
+}
+
 // ── 번역 박스 컴포넌트 ─────────────────────────────────
 function TranslationBox({ translation }: { translation: string }) {
   const [visible, setVisible] = useState(false)
@@ -904,7 +935,7 @@ export default function StudentPage() {
   const [hasHistory, setHasHistory] = useState(false)     // 학생 전체 학습 이력(Book/Unit 무관) — false면 첫 학습
   const initedRef = useRef(false)
 
-  const { sendToGPT, isSpeaking, stopSpeaking, progress, stepProgress, sessionEnded, start, reset } = useConversation({
+  const { sendToGPT, isSpeaking, stopSpeaking, progress, stepProgress, sessionEnded, currentScene, start, reset } = useConversation({
     sessionId, studentId, studentNickname,
     ttsSpeed: settings.tts_speed,
     currentBook: activeBook,
@@ -1355,22 +1386,18 @@ export default function StudentPage() {
                   ? 'bg-emerald-900/40 text-emerald-200 text-right border border-emerald-700/30'
                   : 'bg-violet-900/40 text-violet-200 border border-violet-700/30'
               )}>
-                {/* 헤더 — AI일 때 다시듣기 버튼 포함 */}
-                <div className={cn('flex items-center mb-1', msg.role === 'ai' ? 'justify-between' : 'justify-end')}>
+                {/* 헤더 */}
+                <div className="flex items-center mb-1 justify-end">
                   <span className="text-xs opacity-50">
                     {msg.role === 'student' ? '🧑 나' : '🤖 AI'}
                   </span>
-                  {msg.role === 'ai' && (
-                    <button
-                      onClick={() => replayTTS(msg.content)}
-                      disabled={isSpeaking}
-                      className="text-xs text-violet-400/60 hover:text-violet-300 disabled:opacity-30 transition-colors ml-2"
-                      title="다시 듣기"
-                    >
-                      🔁
-                    </button>
-                  )}
                 </div>
+                {/* AI 메시지 — 현재 상황 설명 (한국어) */}
+                {msg.role === 'ai' && msg.sceneKr && (
+                  <p className="text-[11px] text-amber-300/80 mb-2 pb-2 border-b border-violet-700/20">
+                    🎭 {msg.sceneKr}
+                  </p>
+                )}
                 {/* 학생 메시지 — words 있으면 단어별 색상 표시 */}
                 {msg.role === 'student' && msg.words && msg.words.length > 0 ? (
                   <div className="flex flex-wrap gap-x-2 gap-y-1 justify-end">
@@ -1404,6 +1431,13 @@ export default function StudentPage() {
                       })
                     })()}
                   </div>
+                ) : msg.role === 'ai' ? (
+                  // AI 영어 문장은 기본 숨김 — "영문 보기"를 눌러야 표시, 왼쪽 "다시 듣기"로 재생
+                  <EnglishBox
+                    text={msg.content}
+                    onReplay={() => replayTTS(msg.content)}
+                    replayDisabled={isSpeaking}
+                  />
                 ) : (
                   <span>{msg.content}</span>
                 )}
@@ -1450,6 +1484,14 @@ export default function StudentPage() {
               )}
             </div>
           ))}
+
+          {/* 상황 안내 — Coty가 말하기 직전 보여주는 한국어 상황 설명 */}
+          {currentScene && (
+            <div className="bg-amber-900/20 border border-amber-700/30 rounded-2xl px-4 py-3 max-w-[85%] mr-auto">
+              <p className="text-[11px] text-amber-300/70 mb-0.5">🎭 상황</p>
+              <p className="text-sm text-amber-100/90 leading-relaxed">{currentScene}</p>
+            </div>
+          )}
 
           {/* 실시간 자막 */}
           {(isSpeaking || isHolding || interimText) && (
