@@ -644,10 +644,11 @@ function HintBox({
   onHintSeen: (id: string) => void
   alreadySeen: boolean
 }) {
-  const [visible, setVisible] = useState(alreadySeen)
+  const [hintVisible, setHintVisible] = useState(alreadySeen)
+  const [variantsVisible, setVariantsVisible] = useState(false)
 
-  const handleShow = () => {
-    setVisible(true)
+  const handleShowHint = () => {
+    setHintVisible(true)
     onHintSeen(msgId)
   }
 
@@ -655,37 +656,49 @@ function HintBox({
 
   return (
     <div className="max-w-[85%] mt-1.5">
-      {!visible ? (
+      {!hintVisible ? (
+        // 1단계: 힌트 보기 버튼
         <button
-          onClick={handleShow}
+          onClick={handleShowHint}
           className="text-xs text-slate-500 hover:text-slate-300 border border-slate-700/50 hover:border-slate-500 rounded-full px-3 py-1 transition-colors"
         >
           💡 힌트 보기
         </button>
       ) : (
         <div className="bg-slate-800/60 border border-amber-700/30 rounded-xl p-3 space-y-2">
-          {/* hint_line: 학생이 생각할 수 있는 클루 */}
+          {/* 2단계: hint_line 표시 */}
           {hintLine && (
             <div>
               <p className="text-[10px] text-amber-400/70 font-semibold mb-1">💡 힌트</p>
               <p className="text-xs text-amber-200/90">{hintLine}</p>
             </div>
           )}
-          {/* accept_variants: 가능한 답변 목록 */}
+          {/* 가능한 답변 버튼 또는 목록 */}
           {acceptVariants && acceptVariants.length > 0 && (
-            <div>
-              <p className="text-[10px] text-slate-400/70 font-semibold mb-1">가능한 답변 (말로 해보세요!)</p>
-              <div className="flex flex-wrap gap-1.5">
-                {acceptVariants.map((variant, i) => (
-                  <span
-                    key={i}
-                    className="bg-slate-700/80 border border-slate-600/40 text-slate-300 text-xs px-3 py-1.5 rounded-full select-none"
-                  >
-                    {variant}
-                  </span>
-                ))}
+            !variantsVisible ? (
+              // 3단계: 가능한 답변 보기 버튼
+              <button
+                onClick={() => setVariantsVisible(true)}
+                className="text-xs text-slate-500 hover:text-slate-300 border border-slate-700/50 hover:border-slate-500 rounded-full px-3 py-1 transition-colors"
+              >
+                📝 가능한 답변 보기
+              </button>
+            ) : (
+              // 4단계: 가능한 답변 목록 표시
+              <div>
+                <p className="text-[10px] text-slate-400/70 font-semibold mb-1">가능한 답변 (말로 해보세요!)</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {acceptVariants.map((variant, i) => (
+                    <span
+                      key={i}
+                      className="bg-slate-700/80 border border-slate-600/40 text-slate-300 text-xs px-3 py-1.5 rounded-full select-none"
+                    >
+                      {variant}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )
           )}
         </div>
       )}

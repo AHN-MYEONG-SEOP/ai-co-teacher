@@ -291,7 +291,8 @@ export function useConversation({
       await speakRef.current(greetingText)
       addMessageRef.current({
         id: `greeting_${Date.now()}`, role: 'ai', content: greetingText,
-        choices: data.choices?.length ? data.choices : undefined,
+        hintLine: data.hint_line || undefined,
+        acceptVariants: data.accept_variants?.length ? data.accept_variants : undefined,
         sceneKr: sceneKr || undefined,
         sceneStep: sceneKr ? sceneStep : undefined,
         createdAt: new Date().toISOString(),
