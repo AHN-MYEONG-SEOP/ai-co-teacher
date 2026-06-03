@@ -314,10 +314,12 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
     const normalize = (s: string) => s.toLowerCase().replace(/[’']/g, "'")
     const sessionEnded = normalize(aiText).includes(normalize(SESSION_END_MARK))
 
-    // ── 현재 step의 hint_line + accept_variants 추출 ──────
-    // GPT 즉석 생성 choices 대신 시나리오 데이터 직접 사용
+    // ── hint_line + accept_variants 추출 ─────────────────
+    // step 완료 턴: 다음 step(currentStep) 기준
+    // 오답/진행 중 턴: 현재 도전 중인 step(attemptingStep) 기준
     const allSteps = (scenario.phases ?? []).flatMap(p => p?.steps ?? [])
-    const activeStep = allSteps.find(s => s?.step === attemptingStep)
+    const hintTargetStep = (stepCompleted != null && !completed) ? currentStep : attemptingStep
+    const activeStep = allSteps.find(s => s?.step === hintTargetStep)
     const hintLine: string = activeStep?.hint_line
       ? String(activeStep.hint_line).replace(/\{\{nickname\}\}/g, nickname || 'student')
       : ''
