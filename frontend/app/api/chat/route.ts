@@ -137,6 +137,7 @@ export async function POST(req: NextRequest) {
       let openingText = ''
       let unitTitle = ''
       let openingScene = ''
+      let openingSceneStep = 0
 
       if (scenarioId) {
         const supabase = getSupabase()
@@ -150,7 +151,10 @@ export async function POST(req: NextRequest) {
         if (firstStep?.ai_line) {
           openingText = String(firstStep.ai_line).replace(/\{\{nickname\}\}/g, name)
         }
-        if (firstStep?.scene_kr) openingScene = String(firstStep.scene_kr)
+        if (firstStep?.scene_kr) {
+          openingScene = String(firstStep.scene_kr)
+          openingSceneStep = typeof firstStep.step === 'number' ? firstStep.step : 1
+        }
       }
 
       if (!openingText) {
@@ -169,7 +173,7 @@ export async function POST(req: NextRequest) {
       const choices = await generateChoices(openai, openingText, levelGuide)
       return NextResponse.json({
         text: openingText, message: openingText, unitTitle, choices,
-        ...(openingScene ? { scene_kr: openingScene } : {}),
+        ...(openingScene ? { scene_kr: openingScene, scene_step: openingSceneStep } : {}),
         role: 'assistant',
       })
     }
@@ -315,13 +319,16 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
 
     const rate = progressRate(naturalSteps, scenario.total_steps)
 
-    // ── 현재 step의 한국어 상황 설명 (AI 발화 전 안내용) ──
-    // completed(모든 step 완료)면 마무리 단계이므로 scene 없음
+    // ── 새 step 진입 시에만 한국어 상황 설명 안내 ──
+    // step을 완료해 다음 step으로 넘어간 턴에만 표시한다.
+    // (오답으로 같은 step을 다시 질문하는 턴(stepCompleted==null)에는 보내지 않아
+    //  '다음 step의 scene_kr이 미리 노출'되는 문제를 방지)
     let sceneKr = ''
-    if (!completed) {
+    let sceneStep = 0
+    if (stepCompleted != null && !completed) {
       const steps = (scenario.phases ?? []).flatMap(p => p?.steps ?? [])
       const cur = steps.find(s => s?.step === currentStep)
-      if (cur?.scene_kr) sceneKr = String(cur.scene_kr)
+      if (cur?.scene_kr) { sceneKr = String(cur.scene_kr); sceneStep = currentStep }
     }
 
     // ── 세션 종료 신호 감지 (클로징 마지막 턴) ───────────
@@ -352,7 +359,7 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
         completed,
       },
       ...(personaUpdate ? { persona_update: personaUpdate } : {}),
-      ...(sceneKr ? { scene_kr: sceneKr } : {}),
+      ...(sceneKr ? { scene_kr: sceneKr, scene_step: sceneStep } : {}),
       choices,
       translation,
       role: 'assistant',

@@ -46,6 +46,12 @@
 
 ### 최근 추가된 기능
 
+- [x] **scene_kr step별 구분 + 오답 재질문 시 다음 step 노출 버그 수정 (2026-06-03, v2026-06-03.7)** — 학생 오답으로 AI가 같은 step을 다시 질문하는데도 다음 step의 scene_kr이 보이던 문제 수정.
+  - `app/api/chat/route.ts`: scene_kr을 **새 step 진입 턴에만** 전송(인사=step1, `step_completed`로 다음 step 진입). 오답 재질문 턴(`step_completed=null`)에는 미전송. 응답에 `scene_step`(step 번호) 추가.
+  - `hooks/useConversation.ts`: `currentScene`을 `{step,text}`로, 메시지에 `sceneStep` 보존.
+  - `app/(student)/page.tsx`: 상황 배너·말풍선에 `Step N` 라벨 표시로 step별 구분 명확화.
+  - `types/index.ts`: `ConversationMessage.sceneStep?` 추가.
+
 - [x] **TTS ElevenLabs 실패 시 OpenAI 자동 폴백 (2026-06-03, v2026-06-03.6)** — ElevenLabs API 키 만료·쿼터 소진으로 `/api/tts`가 500을 반환해 AI 음성이 안 나오던 문제 대응. `app/api/tts/route.ts`: provider=elevenlabs 호출 실패 시 OpenAI TTS(`tts-1`)로 자동 폴백(응답 헤더 `X-TTS-Provider: openai-fallback`). ⚠️ 근본 원인(ElevenLabs 쿼터/키)은 별도 점검 필요.
 
 - [x] **AI 영어 문장 기본 숨김 + "다시 듣기"/"영문 보기" 버튼 (2026-06-03, v2026-06-03.5)** — 영어 음성 재생 후 영어 문장을 자동으로 보여주지 않고, 학생이 `👀 영문 보기`를 눌러야 표시(`🙈 영문 숨기기`로 토글). 듣기로 따라오는 학생은 문장 없이 대화 지속.

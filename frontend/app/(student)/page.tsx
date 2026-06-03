@@ -1392,11 +1392,14 @@ export default function StudentPage() {
                     {msg.role === 'student' ? '🧑 나' : '🤖 AI'}
                   </span>
                 </div>
-                {/* AI 메시지 — 현재 상황 설명 (한국어) */}
+                {/* AI 메시지 — 현재 상황 설명 (한국어, 새 step 진입 시) */}
                 {msg.role === 'ai' && msg.sceneKr && (
-                  <p className="text-[11px] text-amber-300/80 mb-2 pb-2 border-b border-violet-700/20">
-                    🎭 {msg.sceneKr}
-                  </p>
+                  <div className="mb-2 pb-2 border-b border-violet-700/20">
+                    {msg.sceneStep && msg.sceneStep > 0 && (
+                      <p className="text-[10px] text-amber-400/70 font-semibold mb-0.5">🎭 Step {msg.sceneStep} 상황</p>
+                    )}
+                    <p className="text-[11px] text-amber-300/80">{msg.sceneKr}</p>
+                  </div>
                 )}
                 {/* 학생 메시지 — words 있으면 단어별 색상 표시 */}
                 {msg.role === 'student' && msg.words && msg.words.length > 0 ? (
@@ -1485,11 +1488,13 @@ export default function StudentPage() {
             </div>
           ))}
 
-          {/* 상황 안내 — Coty가 말하기 직전 보여주는 한국어 상황 설명 */}
+          {/* 상황 안내 — Coty가 말하기 직전 보여주는 한국어 상황 설명 (새 step 진입 시) */}
           {currentScene && (
             <div className="bg-amber-900/20 border border-amber-700/30 rounded-2xl px-4 py-3 max-w-[85%] mr-auto">
-              <p className="text-[11px] text-amber-300/70 mb-0.5">🎭 상황</p>
-              <p className="text-sm text-amber-100/90 leading-relaxed">{currentScene}</p>
+              <p className="text-[11px] text-amber-300/70 mb-0.5">
+                🎭 상황{currentScene.step > 0 && <span className="ml-1 font-semibold">· Step {currentScene.step}</span>}
+              </p>
+              <p className="text-sm text-amber-100/90 leading-relaxed">{currentScene.text}</p>
             </div>
           )}
 

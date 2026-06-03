@@ -107,7 +107,8 @@ export function useConversation({
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackData | null>(null)
   const [sessionEnded, setSessionEnded] = useState(false)
-  const [currentScene, setCurrentScene] = useState<string | null>(null)  // AI 발화 전 보여줄 한국어 상황 설명
+  // AI 발화 전 보여줄 한국어 상황 설명 (새 step 진입 시에만, step 번호 포함)
+  const [currentScene, setCurrentScene] = useState<{ step: number; text: string } | null>(null)
   const [progress, setProgress] = useState(initialProgress?.progress_rate ?? 0)
   const [stepProgress, setStepProgress] = useState<StepProgress>(initialProgress ?? EMPTY_PROGRESS)
 
@@ -252,6 +253,7 @@ export function useConversation({
       const data = await res.json()
       const greetingText = data.message || data.text
       const sceneKr: string = data.scene_kr || ''
+      const sceneStep: number = data.scene_step || 0
 
       historyRef.current.push({ role: 'assistant', content: greetingText })
 
@@ -285,12 +287,13 @@ export function useConversation({
       }
 
       // 상황 설명을 먼저 보여준 뒤 Coty가 말하도록
-      if (sceneKr) setCurrentScene(sceneKr)
+      if (sceneKr) setCurrentScene({ step: sceneStep, text: sceneKr })
       await speakRef.current(greetingText)
       addMessageRef.current({
         id: `greeting_${Date.now()}`, role: 'ai', content: greetingText,
         choices: data.choices?.length ? data.choices : undefined,
         sceneKr: sceneKr || undefined,
+        sceneStep: sceneKr ? sceneStep : undefined,
         createdAt: new Date().toISOString(),
       })
       setCurrentScene(null)
@@ -487,9 +490,10 @@ export function useConversation({
       historyRef.current.push({ role: 'assistant', content: aiText })
       setAIResponding(false)
 
-      // 상황 설명(scene_kr)을 먼저 보여준 뒤 Coty가 말하도록
+      // 상황 설명(scene_kr)을 먼저 보여준 뒤 Coty가 말하도록 (새 step 진입 시에만 전달됨)
       const sceneKr: string = data.scene_kr || ''
-      if (sceneKr) setCurrentScene(sceneKr)
+      const sceneStep: number = data.scene_step || 0
+      if (sceneKr) setCurrentScene({ step: sceneStep, text: sceneKr })
       await speak(aiText)
 
       addMessageRef.current({
@@ -499,6 +503,7 @@ export function useConversation({
         translation: translation || undefined,
         choices: data.choices?.length ? data.choices : undefined,
         sceneKr: sceneKr || undefined,
+        sceneStep: sceneKr ? sceneStep : undefined,
         createdAt: new Date().toISOString(),
       })
       setCurrentScene(null)

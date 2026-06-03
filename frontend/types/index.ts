@@ -45,6 +45,7 @@ export interface ConversationMessage {
   translation?: string
   choices?: string[]   // AI가 제시하는 선택지
   sceneKr?: string     // 현재 step의 한국어 상황 설명 (AI 발화 전 안내)
+  sceneStep?: number   // 해당 상황 설명이 속한 step 번호 (step별 구분 표시용)
 }
 // Supabase 테이블 타입
 export interface Profile {
