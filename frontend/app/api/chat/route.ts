@@ -46,36 +46,6 @@ function getLevelGuide(book: string): string {
   return 'Use natural sentences appropriate for middle school level.'
 }
 
-// AI 질문에 대한 학생 답변 선택지 3개 생성 (힌트 버튼용)
-async function generateChoices(openai: OpenAI, aiText: string, levelGuide: string): Promise<string[]> {
-  if (!aiText) return []
-  try {
-    const res = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `Generate 3 short English answer choices for this teacher's question.
-${levelGuide}
-Rules:
-- Each choice max 6 words
-- Make them natural and varied
-- If yes/no question, include yes and no variants
-- Respond ONLY with JSON array: ["choice1", "choice2", "choice3"]
-- No other text`,
-        },
-        { role: 'user', content: `Teacher: "${aiText}"\nGenerate 3 student response choices.` },
-      ],
-      max_tokens: 80,
-      temperature: 0.7,
-    })
-    const raw = res.choices[0]?.message?.content || '[]'
-    return JSON.parse(raw.replace(/```json|```/g, '').trim())
-  } catch {
-    return []
-  }
-}
-
 // 영어 → 한국어 번역 (번역 보기 버튼용)
 async function translate(openai: OpenAI, text: string): Promise<string> {
   if (!text) return ''
@@ -139,6 +109,7 @@ export async function POST(req: NextRequest) {
       let openingScene = ''
       let openingSceneStep = 0
 
+      let greetingFirstStep: Record<string, unknown> | null = null
       if (scenarioId) {
         const supabase = getSupabase()
         const { data: scenario } = await supabase
@@ -148,6 +119,7 @@ export async function POST(req: NextRequest) {
           .maybeSingle()
         unitTitle = scenario?.title || ''
         const firstStep = scenario?.phases?.[0]?.steps?.[0]
+        greetingFirstStep = firstStep ?? null
         if (firstStep?.ai_line) {
           openingText = String(firstStep.ai_line).replace(/\{\{nickname\}\}/g, name)
         }
@@ -170,9 +142,16 @@ export async function POST(req: NextRequest) {
         openingText = res.choices[0]?.message?.content || `Hi ${name}! How are you today?`
       }
 
-      const choices = await generateChoices(openai, openingText, levelGuide)
+      // GREETING: 첫 step의 hint_line + accept_variants 반환
+      // greetingFirstStep은 위에서 이미 추출됨
+      const greetingHintLine = greetingFirstStep?.hint_line
+        ? String(greetingFirstStep.hint_line).replace(/\{\{nickname\}\}/g, name)
+        : undefined
+      const greetingAcceptVariants = (greetingFirstStep?.accept_variants as string[]) ?? []
       return NextResponse.json({
-        text: openingText, message: openingText, unitTitle, choices,
+        text: openingText, message: openingText, unitTitle,
+        hint_line: greetingHintLine,
+        accept_variants: greetingAcceptVariants.length > 0 ? greetingAcceptVariants : undefined,
         ...(openingScene ? { scene_kr: openingScene, scene_step: openingSceneStep } : {}),
         role: 'assistant',
       })
@@ -230,11 +209,8 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
         temperature: 0.7,
       })
       const aiText = res.choices[0]?.message?.content || ''
-      const [choices, translation] = await Promise.all([
-        generateChoices(openai, aiText, levelGuide),
-        translate(openai, aiText),
-      ])
-      return NextResponse.json({ text: aiText, message: aiText, choices, translation, role: 'assistant' })
+      const translation = await translate(openai, aiText)
+      return NextResponse.json({ text: aiText, message: aiText, translation, role: 'assistant' })
     }
 
     // ── 페르소나 로드 ────────────────────────────────────
@@ -338,12 +314,17 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
     const normalize = (s: string) => s.toLowerCase().replace(/[’']/g, "'")
     const sessionEnded = normalize(aiText).includes(normalize(SESSION_END_MARK))
 
-    // ── 힌트 선택지 + 번역 ───────────────────────────────
-    // 세션 종료 턴에는 답할 차례가 없으므로 힌트 선택지 생략
-    const [choices, translation] = await Promise.all([
-      sessionEnded ? Promise.resolve([] as string[]) : generateChoices(openai, aiText, levelGuide),
-      translate(openai, aiText),
-    ])
+    // ── 현재 step의 hint_line + accept_variants 추출 ──────
+    // GPT 즉석 생성 choices 대신 시나리오 데이터 직접 사용
+    const allSteps = (scenario.phases ?? []).flatMap(p => p?.steps ?? [])
+    const activeStep = allSteps.find(s => s?.step === attemptingStep)
+    const hintLine: string = activeStep?.hint_line
+      ? String(activeStep.hint_line).replace(/\{\{nickname\}\}/g, nickname || 'student')
+      : ''
+    const acceptVariants: string[] = activeStep?.accept_variants ?? []
+
+    // ── 번역 ─────────────────────────────────────────────
+    const translation = sessionEnded ? '' : await translate(openai, aiText)
 
     return NextResponse.json({
       text: aiText,
@@ -362,7 +343,8 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
       },
       ...(personaUpdate ? { persona_update: personaUpdate } : {}),
       ...(sceneKr ? { scene_kr: sceneKr, scene_step: sceneStep } : {}),
-      choices,
+      hint_line: hintLine || undefined,
+      accept_variants: acceptVariants.length > 0 ? acceptVariants : undefined,
       translation,
       role: 'assistant',
     })

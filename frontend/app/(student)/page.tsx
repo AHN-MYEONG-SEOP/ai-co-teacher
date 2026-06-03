@@ -633,12 +633,14 @@ function WordConfidenceDisplay({ words }: { words: WordResult[] }) {
 // ── 힌트 박스 컴포넌트 ─────────────────────────────────
 function HintBox({
   msgId,
-  choices,
+  hintLine,
+  acceptVariants,
   onHintSeen,
   alreadySeen,
 }: {
   msgId: string
-  choices: string[]
+  hintLine?: string
+  acceptVariants?: string[]
   onHintSeen: (id: string) => void
   alreadySeen: boolean
 }) {
@@ -648,6 +650,8 @@ function HintBox({
     setVisible(true)
     onHintSeen(msgId)
   }
+
+  if (!hintLine && (!acceptVariants || acceptVariants.length === 0)) return null
 
   return (
     <div className="max-w-[85%] mt-1.5">
@@ -659,18 +663,30 @@ function HintBox({
           💡 힌트 보기
         </button>
       ) : (
-        <div className="space-y-1">
-          <p className="text-xs text-slate-500 mb-1">💡 힌트 (말로 대답해보세요!)</p>
-          <div className="flex flex-wrap gap-1.5">
-            {choices.map((choice, i) => (
-              <span
-                key={i}
-                className="bg-slate-800/80 border border-slate-600/40 text-slate-300 text-xs px-3 py-1.5 rounded-full select-none"
-              >
-                {choice}
-              </span>
-            ))}
-          </div>
+        <div className="bg-slate-800/60 border border-amber-700/30 rounded-xl p-3 space-y-2">
+          {/* hint_line: 학생이 생각할 수 있는 클루 */}
+          {hintLine && (
+            <div>
+              <p className="text-[10px] text-amber-400/70 font-semibold mb-1">💡 힌트</p>
+              <p className="text-xs text-amber-200/90">{hintLine}</p>
+            </div>
+          )}
+          {/* accept_variants: 가능한 답변 목록 */}
+          {acceptVariants && acceptVariants.length > 0 && (
+            <div>
+              <p className="text-[10px] text-slate-400/70 font-semibold mb-1">가능한 답변 (말로 해보세요!)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {acceptVariants.map((variant, i) => (
+                  <span
+                    key={i}
+                    className="bg-slate-700/80 border border-slate-600/40 text-slate-300 text-xs px-3 py-1.5 rounded-full select-none"
+                  >
+                    {variant}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1454,7 +1470,8 @@ export default function StudentPage() {
                 {msg.role === 'ai' && msg.choices && msg.choices.length > 0 && (
                   <HintBox
                     msgId={msg.id}
-                    choices={msg.choices}
+                    hintLine={msg.hintLine}
+                    acceptVariants={msg.acceptVariants}
                     onHintSeen={(msgId) => setSeenHints(prev => new Set(prev).add(msgId))}
                     alreadySeen={seenHints.has(msg.id)}
                   />
