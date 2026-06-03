@@ -1467,7 +1467,7 @@ export default function StudentPage() {
               </div>
 
                 {/* AI 메시지 — 힌트 버튼 */}
-                {msg.role === 'ai' && msg.choices && msg.choices.length > 0 && (
+                {msg.role === 'ai' && (msg.hintLine || (msg.acceptVariants && msg.acceptVariants.length > 0)) && (
                   <HintBox
                     msgId={msg.id}
                     hintLine={msg.hintLine}
