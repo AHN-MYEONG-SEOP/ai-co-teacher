@@ -48,7 +48,7 @@
 
 - [x] **scene_kr step별 구분 + 오답 재질문 시 다음 step 노출 버그 수정 (2026-06-03, v2026-06-03.7)** — 학생 오답으로 AI가 같은 step을 다시 질문하는데도 다음 step의 scene_kr이 보이던 문제 수정.
 - [x] **🐞 FIX: step 완료 판정 강화 — 오답 시 다음 scene_kr 노출 버그 2차 수정 (2026-06-03, v2026-06-03.8)** — 학생이 틀린 답을 해도 GPT가 step_completed를 반환해 다음 step의 scene_kr이 노출되던 근본 원인 수정.
-- [x] **refactor: system-prompt.ts 공통 규칙 통합 + 인스펙터 모달 개선 (2026-06-03, v2026-06-03.12)**
+- [x] **refactor: system-prompt.ts 공통 규칙 통합 + ai_line 강제 + 판정 유연화 + 인스펙터 모달 개선 (2026-06-03, v2026-06-03.12)**
 - [x] **feat: feedback를 chat에 통합 + retry_reason DB 저장 (2026-06-03, v2026-06-03.13)** — /api/feedback(GPT 별도 호출) 제거. chat/route.ts의 GPT 응답에 feedback 포함. GPT 호출 1회 절감 + 문맥 기반 정확한 분석.
   * `prompts/system-prompt.ts`: GPT 응답 형식에 feedback 필드 추가 (grammar, overall, retry_reason). retry_reason은 오답 시에만 한국어로 작성.
   * `app/api/chat/route.ts`: GPT 응답에서 feedback 파싱 후 반환.
