@@ -61,9 +61,17 @@ export async function POST(req: NextRequest) {
 
     const provider = process.env.TTS_PROVIDER || 'openai'
     let buffer: Buffer
+    let usedProvider = provider
 
     if (provider === 'elevenlabs') {
-      buffer = await ttsElevenLabs(text, voiceId || ELEVENLABS_DEFAULT_VOICE_ID)
+      // ElevenLabs 실패(키 만료·쿼터 소진 등) 시 OpenAI TTS로 자동 폴백 — 음성이 끊기지 않도록
+      try {
+        buffer = await ttsElevenLabs(text, voiceId || ELEVENLABS_DEFAULT_VOICE_ID)
+      } catch (elevenErr) {
+        console.error('ElevenLabs TTS 실패 → OpenAI 폴백:', elevenErr)
+        buffer = await ttsOpenAI(text, voice)
+        usedProvider = 'openai-fallback'
+      }
     } else {
       buffer = await ttsOpenAI(text, voice)
     }
@@ -72,7 +80,7 @@ export async function POST(req: NextRequest) {
       headers: {
         'Content-Type': 'audio/mpeg',
         'Content-Length': buffer.length.toString(),
-        'X-TTS-Provider': provider,
+        'X-TTS-Provider': usedProvider,
       },
     })
   } catch (error) {
