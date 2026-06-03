@@ -47,6 +47,10 @@
 ### 최근 추가된 기능
 
 - [x] **scene_kr step별 구분 + 오답 재질문 시 다음 step 노출 버그 수정 (2026-06-03, v2026-06-03.7)** — 학생 오답으로 AI가 같은 step을 다시 질문하는데도 다음 step의 scene_kr이 보이던 문제 수정.
+- [x] **🐞 FIX: step 완료 판정 강화 — 오답 시 다음 scene_kr 노출 버그 2차 수정 (2026-06-03, v2026-06-03.8)** — 학생이 틀린 답을 해도 GPT가 step_completed를 반환해 다음 step의 scene_kr이 노출되던 근본 원인 수정.
+  * `prompts/system-prompt.ts`: `buildSystemPrompt`에 `currentStep` 파라미터 추가. 현재 도전 중인 step 번호·목표 단어·기대 답안·accept_variants를 프롬프트에 명시. 오답·단답·불완전 문장일 때 `step_completed = null` 보수적 판단 규칙 추가.
+  * `app/api/chat/route.ts`: `attemptingStep = progressData?.current_step ?? 1`을 추출해 `buildSystemPrompt`에 전달.
+
   - `app/api/chat/route.ts`: scene_kr을 **새 step 진입 턴에만** 전송(인사=step1, `step_completed`로 다음 step 진입). 오답 재질문 턴(`step_completed=null`)에는 미전송. 응답에 `scene_step`(step 번호) 추가.
   - `hooks/useConversation.ts`: `currentScene`을 `{step,text}`로, 메시지에 `sceneStep` 보존.
   - `app/(student)/page.tsx`: 상황 배너·말풍선에 `Step N` 라벨 표시로 step별 구분 명확화.
