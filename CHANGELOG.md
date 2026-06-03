@@ -48,6 +48,19 @@
 
 - [x] **scene_kr step별 구분 + 오답 재질문 시 다음 step 노출 버그 수정 (2026-06-03, v2026-06-03.7)** — 학생 오답으로 AI가 같은 step을 다시 질문하는데도 다음 step의 scene_kr이 보이던 문제 수정.
 - [x] **🐞 FIX: step 완료 판정 강화 — 오답 시 다음 scene_kr 노출 버그 2차 수정 (2026-06-03, v2026-06-03.8)** — 학생이 틀린 답을 해도 GPT가 step_completed를 반환해 다음 step의 scene_kr이 노출되던 근본 원인 수정.
+- [x] **refactor: system-prompt.ts 공통 규칙 통합 + 인스펙터 모달 개선 (2026-06-03, v2026-06-03.12)**
+  * `prompts/system-prompt.ts`: 공통 규칙을 코드로 통합. DB gpt_rules.flow는 수업별 특이사항만 관리.
+  * 공통 규칙: steps 순서 진행, 정답 먼저 말하지 않기, 질문으로 끝맺음, hint_line 제공, ai_line 강제 사용, 질문 생략 금지.
+  * step_completed 판정 유연화: It's=It is 축약형 인정, target_word 포함 시 인정, 관사 차이 허용.
+  * `app/(student)/page.tsx`: 시나리오 인스펙터 모달에 공통 지침 섹션 추가.
+
+- [x] **feat: 힌트 버튼 UI 개선 — hint_line + accept_variants 단계적 표시 (2026-06-03, v2026-06-03.10)**
+  * `app/api/chat/route.ts`: generateChoices(GPT 즉석 생성) 제거 → 시나리오의 hint_line + accept_variants 직접 반환. GPT 호출 1회 절감.
+  * `app/(student)/page.tsx`: HintBox 단계적 표시 — ① 힌트 보기 버튼 → ② hint_line 표시 + 가능한 답변 보기 버튼 → ③ accept_variants 목록 표시.
+  * `hooks/useConversation.ts`: GREETING 응답에도 hintLine/acceptVariants 저장 (Step 1 힌트 누락 수정).
+  * `types/index.ts`: ConversationMessage에 hintLine, acceptVariants 타입 추가.
+  * hint_line/accept_variants를 올바른 step 기준으로 반환 (step 완료 턴: 다음 step 기준, 오답 턴: 현재 step 기준).
+
   * `prompts/system-prompt.ts`: `buildSystemPrompt`에 `currentStep` 파라미터 추가. 현재 도전 중인 step 번호·목표 단어·기대 답안·accept_variants를 프롬프트에 명시. 오답·단답·불완전 문장일 때 `step_completed = null` 보수적 판단 규칙 추가.
   * `app/api/chat/route.ts`: `attemptingStep = progressData?.current_step ?? 1`을 추출해 `buildSystemPrompt`에 전달.
 
