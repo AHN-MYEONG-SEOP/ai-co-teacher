@@ -729,12 +729,14 @@ function HintBox({
 // ── 영문 보기 박스 컴포넌트 ─────────────────────────────
 // AI 영어 문장은 기본 숨김 — 듣기로 따라오는 학생은 보지 않고 대화 지속,
 // 필요한 학생만 "영문 보기"를 눌러 확인. 왼쪽 "다시 듣기"로 음성 재생.
-function EnglishBox({ text, onReplay, replayDisabled }: {
+function EnglishBox({ text, onReplay, replayDisabled, translation }: {
   text: string
   onReplay: () => void
   replayDisabled: boolean
+  translation?: string
 }) {
   const [visible, setVisible] = useState(false)
+  const [translationVisible, setTranslationVisible] = useState(false)
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-1.5">
@@ -746,13 +748,32 @@ function EnglishBox({ text, onReplay, replayDisabled }: {
           🔁 다시 듣기
         </button>
         <button
-          onClick={() => setVisible(v => !v)}
+          onClick={() => { setVisible(v => !v); if (visible) setTranslationVisible(false) }}
           className="text-xs text-violet-400/60 hover:text-violet-300 border border-violet-700/40 hover:border-violet-500 rounded-full px-3 py-1 transition-colors"
         >
           {visible ? '🙈 영문 숨기기' : '👀 영문 보기'}
         </button>
       </div>
-      {visible && <span className="text-sm block">{text}</span>}
+      {visible && (
+        <div className="space-y-1">
+          <span className="text-sm block">{text}</span>
+          {translation && (
+            <div>
+              <button
+                onClick={() => setTranslationVisible(v => !v)}
+                className="text-xs text-slate-500 hover:text-slate-300 border border-slate-700/50 hover:border-slate-500 rounded-full px-3 py-1 transition-colors"
+              >
+                {translationVisible ? '🙈 한국어 숨기기' : '🇰🇷 한국어 보기'}
+              </button>
+              {translationVisible && (
+                <p className="text-xs text-violet-300/70 border-t border-violet-700/30 pt-2 mt-1 leading-relaxed">
+                  {translation}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -1491,13 +1512,10 @@ export default function StudentPage() {
                     text={msg.content}
                     onReplay={() => replayTTS(msg.content)}
                     replayDisabled={isSpeaking}
+                    translation={msg.translation}
                   />
                 ) : (
                   <span>{msg.content}</span>
-                )}
-                {/* AI 메시지 — 한국어 번역 버튼 */}
-                {msg.role === 'ai' && msg.translation && (
-                  <TranslationBox translation={msg.translation} />
                 )}
               </div>
 
