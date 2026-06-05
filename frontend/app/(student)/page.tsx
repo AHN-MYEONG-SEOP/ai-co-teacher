@@ -1208,6 +1208,9 @@ export default function StudentPage() {
 
   // Path B: Blob → Whisper 서버
   const handleBlobReady = useCallback(async (blob: Blob) => {
+    // Blob URL을 미리 생성해서 ref에 저장
+    if (pendingBlobUrlRef.current) URL.revokeObjectURL(pendingBlobUrlRef.current)
+    pendingBlobUrlRef.current = URL.createObjectURL(blob)
     addLog(`Path B: Whisper 전송 중... (${(blob.size / 1024).toFixed(1)}KB)`, 'warning')
     setAvatarStatus('processing')
     const whisperUrl = process.env.NEXT_PUBLIC_WHISPER_SERVER_URL || 'http://localhost:8000'
@@ -1243,6 +1246,7 @@ export default function StudentPage() {
   })
   const lastBlobUrlRef = useRef<string | null>(null)
   useEffect(() => { lastBlobUrlRef.current = lastBlobUrl }, [lastBlobUrl])
+  const pendingBlobUrlRef = useRef<string | null>(null)
 
   const handleInterim = useCallback((text: string, words?: WordResult[]) => {
     setInterimText(text)
@@ -1263,7 +1267,8 @@ export default function StudentPage() {
     setInterimText('')
     setInterimWords([])
     if (words) setFinalWords(words)
-    const currentBlobUrl = lastBlobUrlRef.current || undefined
+    const currentBlobUrl = pendingBlobUrlRef.current || lastBlobUrlRef.current || undefined
+    pendingBlobUrlRef.current = null  // 사용 후 초기화
     discardBlob()
     addLog(`Path A: "${punctuated}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
     sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current, blobUrl: currentBlobUrl }, words)
