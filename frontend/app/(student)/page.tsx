@@ -1241,6 +1241,8 @@ export default function StudentPage() {
     onBlobReady: handleBlobReady,
     onBlobSaved: handleBlobSaved,
   })
+  const lastBlobUrlRef = useRef<string | null>(null)
+  useEffect(() => { lastBlobUrlRef.current = lastBlobUrl }, [lastBlobUrl])
 
   const handleInterim = useCallback((text: string, words?: WordResult[]) => {
     setInterimText(text)
@@ -1261,7 +1263,7 @@ export default function StudentPage() {
     setInterimText('')
     setInterimWords([])
     if (words) setFinalWords(words)
-    const currentBlobUrl = lastBlobUrl || undefined
+    const currentBlobUrl = lastBlobUrlRef.current || undefined
     discardBlob()
     addLog(`Path A: "${punctuated}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
     sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current, blobUrl: currentBlobUrl }, words)
