@@ -16,6 +16,8 @@ interface DeepgramOptions {
   processingConfig?: AudioProcessingConfig
   // 오늘 배우는 target 단어들 — Deepgram keyword boosting(문맥 힌트)에 사용
   keywords?: string[]
+  // 현재 step의 accept_variants — 정답 후보 단어도 boosting
+  acceptVariants?: string[]
 }
 
 export function useWebSpeech({
@@ -27,6 +29,7 @@ export function useWebSpeech({
   confidenceThreshold = CONFIDENCE_THRESHOLD,
   processingConfig = DEFAULT_AUDIO_CONFIG,
   keywords = [],
+  acceptVariants = [],
 }: DeepgramOptions) {
   const mrRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -56,6 +59,7 @@ export function useWebSpeech({
   const confidenceThresholdRef = useRef(confidenceThreshold)
   const processingConfigRef = useRef(processingConfig)
   const keywordsRef = useRef(keywords)
+  const acceptVariantsRef = useRef(acceptVariants)
 
   // ref 동기화
   useEffect(() => { onFinalResultRef.current = onFinalResult }, [onFinalResult])
@@ -66,6 +70,7 @@ export function useWebSpeech({
   useEffect(() => { confidenceThresholdRef.current = confidenceThreshold }, [confidenceThreshold])
   useEffect(() => { processingConfigRef.current = processingConfig }, [processingConfig])
   useEffect(() => { keywordsRef.current = keywords }, [keywords])
+  useEffect(() => { acceptVariantsRef.current = acceptVariants }, [acceptVariants])
 
   // 가공본 blob을 재생용 URL로 저장 (이전 URL은 즉시 revoke — 1개만 유지, 누수 방지)
   const saveProcessedBlob = useCallback((blob: Blob) => {
@@ -332,7 +337,7 @@ export function useWebSpeech({
 
       const params = new URLSearchParams({
         language: 'multi',
-        model: 'nova-3',
+        model: 'nova-2',
         smart_format: 'true',
         punctuate: 'true',
         utterances: 'true',
@@ -343,12 +348,18 @@ export function useWebSpeech({
       // 문맥 힌트 — 오늘 배우는 target 단어를 keyword boosting으로 전달.
       // 발음이 다소 뭉개져도 해당 단어로 인식될 확률이 올라간다 (연음 인식 보완).
       // 형식: keywords=word:intensifier (intensifier 클수록 강하게 부스트)
-      const kw = Array.from(new Set(
-        (keywordsRef.current || [])
-          .flatMap((w) => w.split(/[,/]/))            // "soccer, ball" → ["soccer","ball"]
+      // accept_variants에서 개별 단어 추출 (문장에서 핵심 단어만)
+      const variantWords = (acceptVariantsRef.current || [])
+        .flatMap((v) => v.split(/\s+/))
+        .map((w) => w.replace(/[^a-zA-Z]/g, '').toLowerCase())
+        .filter((w) => w.length >= 2)
+      const kw = Array.from(new Set([
+        ...(keywordsRef.current || [])
+          .flatMap((w) => w.split(/[,/]/))
           .map((w) => w.trim().replace(/\s+/g, ' '))
-          .filter((w) => w.length >= 2 && w.length <= 30)
-      )).slice(0, 80)                                  // 과다 전송 방지
+          .filter((w) => w.length >= 2 && w.length <= 30),
+        ...variantWords,
+      ])).slice(0, 80)                                  // 과다 전송 방지
       for (const word of kw) {
         params.append('keywords', `${word}:2`)
       }

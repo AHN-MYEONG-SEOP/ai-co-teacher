@@ -1365,6 +1365,12 @@ export default function StudentPage() {
 
   const { isSupported, isListening, startListening, stopListening, lastProcessedBlobUrl } = useWebSpeech({
     onInterimResult: handleInterim,
+    acceptVariants: (() => {
+      if (!activeScenario) return []
+      const allSteps = (activeScenario.phases ?? []).flatMap((p: {steps?: unknown[]}) => p?.steps ?? []) as {step: number, accept_variants?: string[]}[]
+      const cur = allSteps.find(s => s?.step === (stepProgress?.current_step ?? 1))
+      return cur?.accept_variants ?? []
+    })(),
     onFinalResult: handleFinalResult,
     onFallback: handleFallback,
     onError: handleError,
