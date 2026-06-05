@@ -497,8 +497,13 @@ export function useConversation({
       // 상황 설명(scene_kr)을 먼저 보여준 뒤 Coty가 말하도록 (새 step 진입 시에만 전달됨)
       const sceneKr: string = data.scene_kr || ''
       const sceneStep: number = data.scene_step || 0
-      if (sceneKr) setCurrentScene({ step: sceneStep, text: sceneKr })
-      await speak(aiText)
+      const needsAction: boolean = data.needs_action === true
+
+      if (!needsAction) {
+        // 정답/일반 진행: scene_kr 표시 + TTS 재생
+        if (sceneKr) setCurrentScene({ step: sceneStep, text: sceneKr })
+        await speak(aiText)
+      }
 
       addMessageRef.current({
         id: (Date.now() + 1).toString(),
@@ -507,11 +512,13 @@ export function useConversation({
         translation: translation || undefined,
         hintLine: data.hint_line || undefined,
         acceptVariants: data.accept_variants?.length ? data.accept_variants : undefined,
-        sceneKr: sceneKr || undefined,
-        sceneStep: sceneKr ? sceneStep : undefined,
+        sceneKr: !needsAction ? (sceneKr || undefined) : undefined,
+        sceneStep: !needsAction && sceneKr ? sceneStep : undefined,
+        needsAction: needsAction || undefined,
         createdAt: new Date().toISOString(),
       })
-      setCurrentScene(null)
+
+      if (!needsAction) setCurrentScene(null)
 
       // 세션 종료 신호 (클로징 마지막 턴) → 마무리 인사 메시지를 보여주고 TTS까지 마친 뒤 트리거
       // (page.tsx가 이 신호로 마이크 비활성화 + 복습/종료 카드 표시)

@@ -1528,8 +1528,48 @@ export default function StudentPage() {
                       <span className="opacity-60">⚠️ </span>{msg.feedback.correction}
                     </p>
                   )}
+                  {/* 발음 피드백 */}
+                  {msg.feedback.pronunciation && !msg.feedback.pronunciation.is_correct && msg.feedback.pronunciation.tip_kr && (
+                    <div className="bg-violet-900/30 border border-violet-700/30 rounded-xl p-2 space-y-1">
+                      <p className="text-xs text-violet-400">🗣️ 발음 교정</p>
+                      <p className="text-xs text-slate-400">
+                        <span className="text-red-400 font-mono">{msg.feedback.pronunciation.student_said}</span>
+                        {' → '}
+                        <span className="text-emerald-400 font-mono">{msg.feedback.pronunciation.target}</span>
+                      </p>
+                      <p className="text-sm text-violet-200">{msg.feedback.pronunciation.tip_kr}</p>
+                    </div>
+                  )}
                 </div>
               )}
+              {/* 오답 액션 버튼 */}
+              {msg.role === 'student' && (() => {
+                const idx = messages.findIndex(m => m.id === msg.id)
+                const nextAiMsg = messages[idx + 1]
+                if (!nextAiMsg || nextAiMsg.role !== 'ai' || !nextAiMsg.needsAction) return null
+                return (
+                  <div className="mt-2 max-w-[85%] w-full flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => sendToGPT('__PRONUNCIATION__', {})}
+                      className="text-xs bg-violet-800/60 hover:bg-violet-700/60 border border-violet-600/40 text-violet-200 px-3 py-1.5 rounded-full transition-colors"
+                    >
+                      🗣️ 발음 방법 설명
+                    </button>
+                    <button
+                      onClick={() => sendToGPT('__RETRY__', {})}
+                      className="text-xs bg-amber-800/60 hover:bg-amber-700/60 border border-amber-600/40 text-amber-200 px-3 py-1.5 rounded-full transition-colors"
+                    >
+                      🔄 다시 피드백
+                    </button>
+                    <button
+                      onClick={() => sendToGPT('__CONTINUE__', {})}
+                      className="text-xs bg-emerald-800/60 hover:bg-emerald-700/60 border border-emerald-600/40 text-emerald-200 px-3 py-1.5 rounded-full transition-colors"
+                    >
+                      ▶️ 계속 진행
+                    </button>
+                  </div>
+                )
+              })()}
             </div>
           ))}
 

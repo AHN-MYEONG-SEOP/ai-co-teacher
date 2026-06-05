@@ -340,9 +340,13 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
     // ── 번역 ─────────────────────────────────────────────
     const translation = sessionEnded ? '' : await translate(openai, aiText)
 
+    // 오답이면 AI 말 없이 피드백 + 버튼만 표시
+    const needsAction = stepCompleted === null && !sessionEnded && !!scenario
+
     return NextResponse.json({
-      text: aiText,
-      message: aiText,
+      text: needsAction ? '' : aiText,
+      message: needsAction ? '' : aiText,
+      needs_action: needsAction,
       step_completed: stepCompleted,
       hint_used: hintUsed,
       word_spoken_naturally: wordSpokenNaturally,
