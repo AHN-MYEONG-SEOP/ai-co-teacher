@@ -16,10 +16,17 @@ export interface WhisperResponse {
   duration_ms: number
 }
 // 피드백 데이터 (인라인 표시용)
+export interface PronunciationFeedback {
+  student_said: string
+  target: string
+  is_correct: boolean
+  tip_kr: string | null
+}
 export interface MessageFeedback {
   grammar: number
   overall: number
   correction: string | null  // retry_reason 저장
+  pronunciation?: PronunciationFeedback | null
   fluency?: number
   vocabulary?: number
   tip?: string | null

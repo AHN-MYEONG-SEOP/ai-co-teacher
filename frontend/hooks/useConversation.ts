@@ -448,6 +448,7 @@ export function useConversation({
           grammar: fb.grammar ?? 0,
           overall: fb.overall ?? 0,
           correction: fb.retry_reason ?? null,
+          pronunciation: fb.pronunciation ?? null,
         }
         setFeedback(feedbackData)
         updateMessageFeedback(studentMsgId, feedbackData)

@@ -2,10 +2,17 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
+export interface PronunciationFeedback {
+  student_said: string
+  target: string
+  is_correct: boolean
+  tip_kr: string | null
+}
 export interface FeedbackData {
   grammar: number
   overall: number
   correction: string | null
+  pronunciation?: PronunciationFeedback | null
   fluency?: number
   vocabulary?: number
   tip?: string | null
@@ -89,6 +96,23 @@ export function FeedbackCard({ feedback, onClose }: { feedback: FeedbackData; on
             <div className="bg-amber-900/30 border border-amber-700/30 rounded-xl p-3">
               <p className="text-xs text-amber-400 mb-1">💡 교정 제안</p>
               <p className="text-sm text-amber-200">{feedback.correction}</p>
+            </div>
+          )}
+          {/* 발음 피드백 */}
+          {feedback.pronunciation && !feedback.pronunciation.is_correct && feedback.pronunciation.tip_kr && (
+            <div className="bg-violet-900/30 border border-violet-700/30 rounded-xl p-3 space-y-1">
+              <p className="text-xs text-violet-400 mb-1">🗣️ 발음 교정</p>
+              <p className="text-xs text-slate-400">
+                <span className="text-red-400 font-mono">{feedback.pronunciation.student_said}</span>
+                {' → '}
+                <span className="text-emerald-400 font-mono">{feedback.pronunciation.target}</span>
+              </p>
+              <p className="text-sm text-violet-200">{feedback.pronunciation.tip_kr}</p>
+            </div>
+          )}
+          {feedback.pronunciation?.is_correct && (
+            <div className="bg-emerald-900/20 border border-emerald-700/20 rounded-xl p-3">
+              <p className="text-sm text-emerald-300">🗣️ {feedback.pronunciation.tip_kr ?? "발음이 정확해요! 👍"}</p>
             </div>
           )}
 

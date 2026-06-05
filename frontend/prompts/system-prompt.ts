@@ -190,7 +190,13 @@ ${closing}
   "feedback": {
     "grammar": <문법 점수 0-100. 문장 구조가 올바르면 높게>,
     "overall": <전체 점수 0-100>,
-    "retry_reason": "<step_completed가 null일 때만. 왜 틀렸는지 한국어로 간단히. 예: desk 대신 chair라고 말함. null이면 null>"
+    "retry_reason": "<step_completed가 null일 때만. 왜 틀렸는지 한국어로 간단히. null이면 null>",
+    "pronunciation": {
+      "student_said": "<학생이 실제로 말한 단어 또는 문장>",
+      "target": "<목표 단어 또는 문장>",
+      "is_correct": <발음이 목표와 같으면 true, 다르면 false>,
+      "tip_kr": "<is_correct가 false일 때만. 한국어로 발음 교정 팁. null이면 null>"
+    }
   }
 }
 
@@ -198,7 +204,12 @@ ${closing}
 - grammar: 문법적으로 올바른 문장이면 80-100, 단어만 말하면 50-70, 완전히 틀리면 0-50
 - overall: 목표 달성도. 정답이면 90-100, 거의 맞으면 70-89, 틀리면 0-69
 - retry_reason: step_completed가 null(오답)일 때만 작성. 정답이면 반드시 null.
-  예시: "desk 대신 chair라고 말함", "This is 대신 That is라고 말함", "단어만 말하고 문장으로 말하지 않음"
+  예시: "desk 대신 chair라고 말함", "This is 대신 That is라고 말함"
+- pronunciation.tip_kr 작성 기준:
+  * 목표 단어와 학생이 말한 단어의 발음 차이를 한국어로 설명
+  * 구체적인 입모양/혀 위치/성대 울림 차이 포함
+  * 예시: "desk의 'd'는 혀를 윗니 뒤에 대고 성대를 울려 발음해요. task의 't'와 달리 목에서 울림이 느껴져야 해요. '데스크'처럼 발음해보세요."
+  * 발음이 완전히 맞으면 칭찬 한 마디만. 예: "발음이 정확해요! 👍"
 
 # persona_update 감지 항목
 - family_members: 가족 구성 (mom, dad, brother, sister 등)
