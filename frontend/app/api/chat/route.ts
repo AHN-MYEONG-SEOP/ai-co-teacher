@@ -158,6 +158,40 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 인식 불명확 되묻기 ───────────────────────────────
+    // ── 계속 진행 ─────────────────────────────────────────
+    if (studentText === '__CONTINUE__') {
+      const supabase = getSupabase()
+      const { data: scenarioData } = scenarioId ? await supabase
+        .from('lesson_scenarios')
+        .select('phases')
+        .eq('id', scenarioId)
+        .maybeSingle() : { data: null }
+      const attemptingStep = progressData?.current_step ?? 1
+      const allSteps = ((scenarioData?.phases ?? []) as {steps?: {step: number, ai_line?: string, scene_kr?: string}[]}[])
+        .flatMap(p => p?.steps ?? [])
+      const curStep = allSteps.find(s => s?.step === attemptingStep)
+      const aiLine = curStep?.ai_line?.replace(/\{\{nickname\}\}/g, nickname || 'student') ?? "Let's try again!"
+      const sceneKr = curStep?.scene_kr?.replace(/\{\{nickname\}\}/g, nickname || 'student') ?? ''
+      const translation = await translate(openai, aiLine)
+      return NextResponse.json({
+        text: aiLine,
+        message: aiLine,
+        translation,
+        scene_kr: sceneKr || undefined,
+        scene_step: sceneKr ? attemptingStep : undefined,
+        role: 'assistant'
+      })
+    }
+
+    // ── 다시 피드백 (마이크 재활성화만) ──────────────────────
+    if (studentText === '__RETRY__') {
+      return NextResponse.json({
+        text: '',
+        message: '',
+        role: 'assistant'
+      })
+    }
+
     if (studentText.startsWith('__CLARIFY__:')) {
       const partial = studentText.replace('__CLARIFY__:', '').trim()
       const res = await openai.chat.completions.create({

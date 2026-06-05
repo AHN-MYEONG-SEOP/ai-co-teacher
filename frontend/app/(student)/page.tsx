@@ -1540,18 +1540,7 @@ export default function StudentPage() {
                 return (
                   <div className="mt-2 max-w-[85%] w-full space-y-2">
                     <div className="flex gap-2 flex-wrap">
-                      {hasPronunciation && (
-                        <button
-                          onClick={() => setPronunciationVisible(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))}
-                          className={cn("text-xs border px-3 py-1.5 rounded-full transition-colors",
-                            pronunciationVisible[msg.id]
-                              ? "bg-violet-700/60 border-violet-500/60 text-violet-100"
-                              : "bg-violet-800/60 hover:bg-violet-700/60 border-violet-600/40 text-violet-200"
-                          )}
-                        >
-                          🗣️ 발음 방법 {pronunciationVisible[msg.id] ? "숨기기" : "설명"}
-                        </button>
-                      )}
+
                       <button
                         onClick={() => sendToGPT('__RETRY__', {})}
                         className="text-xs bg-amber-800/60 hover:bg-amber-700/60 border border-amber-600/40 text-amber-200 px-3 py-1.5 rounded-full transition-colors"
@@ -1565,7 +1554,7 @@ export default function StudentPage() {
                         ▶️ 계속 진행
                       </button>
                     </div>
-                    {hasPronunciation && pronunciationVisible[msg.id] && (
+                    {hasPronunciation && (
                       <div className="bg-violet-900/30 border border-violet-700/30 rounded-xl p-2 space-y-1">
                         <p className="text-xs text-violet-400">🗣️ 발음 교정</p>
                         <p className="text-xs text-slate-400">
