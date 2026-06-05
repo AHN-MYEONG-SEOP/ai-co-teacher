@@ -57,6 +57,11 @@
   * `types/index.ts`: MessageFeedback에서 fluency/vocabulary 옵셔널로 변경.
   * DB: conversation_logs.correction → retry_reason 컬럼명 변경, tip 컬럼 제거.
 
+- [x] **refactor: system-prompt.ts 공통 규칙 통합 + ai_line 강제 + 판정 유연화 + 인스펙터 모달 개선 (2026-06-03, v2026-06-03.12)**
+  * `prompts/system-prompt.ts`: 공통 규칙 코드로 통합. DB gpt_rules.flow는 수업별 특이사항만 관리.
+  * 공통 규칙: ai_line 강제 사용, 질문으로 끝맺음 강제, 오답 시 이유 설명 후 재시도 유도.
+  * step_completed 판정 유연화: It's=It is 축약형 인정, target_word 포함 시 인정, 관사 차이 허용.
+  * `app/(student)/page.tsx`: 시나리오 인스펙터 모달에 공통 지침 섹션 추가.
 - [x] **feat: 힌트 버튼 UI 개선 — hint_line + accept_variants 단계적 표시 (2026-06-03, v2026-06-03.10)**
   * `app/api/chat/route.ts`: generateChoices(GPT 즉석 생성) 제거 → 시나리오의 hint_line + accept_variants 직접 반환. GPT 호출 1회 절감.
   * `app/(student)/page.tsx`: HintBox 단계적 표시 — ① 힌트 보기 버튼 → ② hint_line 표시 + 가능한 답변 보기 버튼 → ③ accept_variants 목록 표시.
