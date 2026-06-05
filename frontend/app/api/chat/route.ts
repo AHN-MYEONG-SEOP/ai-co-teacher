@@ -227,7 +227,9 @@ ${unitData ? `\nToday's lesson: ${currentBook}, Unit ${currentUnit} - "${unitDat
     // ── 시스템 프롬프트 + GPT 호출 (JSON) ────────────────
     // 현재 학생이 도전 중인 step(이번 발화로 판정할 대상)을 프롬프트에 명시
     const attemptingStep = progressData?.current_step ?? 1
-    const systemPrompt = buildSystemPrompt(scenario, persona, nickname || 'student', attemptingStep)
+    // 이미 모든 step 완료된 상태면 closing 처리
+    const alreadyCompleted = (progressData?.completed_steps ?? []).length >= scenario.total_steps
+    const systemPrompt = buildSystemPrompt(scenario, persona, nickname || 'student', attemptingStep, alreadyCompleted)
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'system', content: systemPrompt }, ...convoHistory],

@@ -66,7 +66,8 @@ export function buildSystemPrompt(
   scenario: LessonScenarioRow,
   persona: PersonaRow,
   nickname: string,
-  currentStep = 1
+  currentStep = 1,
+  alreadyCompleted = false
 ): string {
   const allSteps = (scenario.phases ?? []).flatMap(p => p?.steps ?? [])
   const curStep = allSteps.find(s => s?.step === currentStep)
@@ -99,9 +100,16 @@ ${personaInfo}
 - 교재: ${scenario.book} Unit ${scenario.unit} - ${scenario.title ?? ''}
 - 전체 ${scenario.total_steps}개 step 중 현재 step ${currentStep}번 진행 중
 
+${alreadyCompleted ? `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🏁 모든 step 완료! 지금 당장 해야 할 것
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+모든 step이 완료됐어. 지금 바로 closing 마무리 인사를 해야 해.
+closing JSON의 ai_line 내용으로 오늘 수고했다고 칭찬하고 작별 인사를 해.
+message 맨 끝에 반드시 "That\'s all for today\'s conversation. 👋" 추가.
+step_completed = null, hint_used = false 로 설정.
+` : `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 🔴 지금 당장 해야 할 것 (최우선)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`}
 
 ## 현재 Step ${currentStep}
 - 목표 단어: **${curTargetWord}**
