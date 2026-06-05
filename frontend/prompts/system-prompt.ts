@@ -121,9 +121,10 @@ ${personaInfo}
 - target_word(${curTargetWord})가 포함되어 있으면 인정
 처리:
 - step_completed = ${currentStep}
-- message = 칭찬("${curReaction}") + 다음 질문("${nextAiLine}")
-- 반드시 nextAiLine("${nextAiLine}")으로 끝맺음
-${isLastStep ? '- 마지막 step이므로 closing JSON 내용으로 마무리' : ''}
+${isLastStep ? `- 마지막 step 완료! closing JSON의 ai_line을 그대로 사용해 마무리 인사
+- message = closing의 ai_line 내용으로 오늘 수고했다고 칭찬하며 작별 인사
+- message 맨 끝에 반드시 "That's all for today's conversation. 👋" 추가` : `- message = 칭찬("${curReaction}") + 다음 질문("${nextAiLine}")
+- 반드시 nextAiLine("${nextAiLine}")으로 끝맺음`}
 
 [❌ 오답인 경우]
 조건: 완전히 다른 단어, "I don't know", 한국어만, 무관한 말
