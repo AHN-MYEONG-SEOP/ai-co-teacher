@@ -49,6 +49,26 @@
 - [x] **scene_kr step별 구분 + 오답 재질문 시 다음 step 노출 버그 수정 (2026-06-03, v2026-06-03.7)** — 학생 오답으로 AI가 같은 step을 다시 질문하는데도 다음 step의 scene_kr이 보이던 문제 수정.
 - [x] **🐞 FIX: step 완료 판정 강화 — 오답 시 다음 scene_kr 노출 버그 2차 수정 (2026-06-03, v2026-06-03.8)** — 학생이 틀린 답을 해도 GPT가 step_completed를 반환해 다음 step의 scene_kr이 노출되던 근본 원인 수정.
 - [x] **feat: feedback를 chat에 통합 + retry_reason DB 저장 (2026-06-03, v2026-06-03.13)** — /api/feedback(GPT 별도 호출) 제거. chat/route.ts의 GPT 응답에 feedback 포함. GPT 호출 1회 절감 + 문맥 기반 정확한 분석.
+- [x] **feat: HuggingFace STT 분기 + IPA 발음기호 말풍선 표시 (2026-06-05, v2026-06-05.20)**
+  * `hooks/useWebSpeech.ts`: sttEngine 파라미터 추가. HuggingFace 선택 시 /api/huggingface-stt 호출, IPA 반환.
+  * `app/api/huggingface-stt/route.ts`: HuggingFace Inference API (facebook/wav2vec2-lv-60-espeak-cv-ft) 호출 라우트 생성.
+  * `app/(student)/page.tsx`: 학생 말풍선에 IPA 발음기호 표시 추가.
+  * `types/index.ts`: ConversationMessage에 ipa 필드 추가.
+
+- [x] **feat: STT 엔진 선택 UI 추가 — Deepgram / HuggingFace (2026-06-05, v2026-06-05.19)**
+  * `hooks/useStudentSession.ts`: StudentSettings에 stt_engine 추가. Supabase profiles 테이블 stt_engine 컬럼 추가.
+  * `app/(student)/page.tsx`: 설정 UI에 STT 엔진 선택 버튼 추가 (⚡ Deepgram / 🤗 HuggingFace).
+
+- [x] **fix: Deepgram 400 오류 수정 — accept_variants keywords 전달 제거 (2026-06-05, v2026-06-05.18)**
+  * `hooks/useWebSpeech.ts`: accept_variants를 Deepgram keywords로 전달 시 400 오류 발생. 전달 로직 제거.
+
+- [x] **feat: 학생 발음 듣기 버튼 + 발음 교정 피드백 개선 (2026-06-05, v2026-06-05.15)**
+  * `hooks/useWebSpeech.ts`: onFinalResult 콜백에 blobUrl 직접 전달. pendingBlobUrlRef로 타이밍 문제 해결.
+  * `app/(student)/page.tsx`: 학생 말풍선에 내 발음 듣기 버튼 추가. 영문 보기 시 한국어 보기/숨기기 버튼 통합.
+  * `prompts/system-prompt.ts`: 발음 교정 지침 강화 — 정확한 혀/입술/성대 위치 설명 추가.
+  * `components/student/FeedbackCard.tsx`: fluency/vocabulary 제거, grammar + overall + retry_reason + pronunciation 표시.
+  * `app/api/chat/route.ts`: /api/feedback 완전 제거. chat 응답에 feedback 통합 (grammar, overall, retry_reason, pronunciation).
+
   * `prompts/system-prompt.ts`: GPT 응답 형식에 feedback 필드 추가 (grammar, overall, retry_reason). retry_reason은 오답 시에만 한국어로 작성.
   * `app/api/chat/route.ts`: GPT 응답에서 feedback 파싱 후 반환.
   * `app/api/log/route.ts`: tip/fluency/vocabulary 제거, retry_reason 추가.
