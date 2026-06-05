@@ -8,6 +8,7 @@ export interface StudentSettings {
   show_feedback: boolean
   current_book: string
   current_unit: number
+  stt_engine: 'deepgram' | 'huggingface'
 }
 
 const DEFAULT_SETTINGS: StudentSettings = {
@@ -15,6 +16,7 @@ const DEFAULT_SETTINGS: StudentSettings = {
   show_feedback: true,
   current_book: 'STARLAND Phonics 1 Single Letters',
   current_unit: 1,
+  stt_engine: 'deepgram',
 }
 
 interface StudentSession {
@@ -53,7 +55,7 @@ export function useStudentSession(): StudentSession {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('name, nickname, tts_speed, show_feedback, current_book, current_unit')
+        .select('name, nickname, tts_speed, show_feedback, current_book, current_unit, stt_engine')
         .eq('id', user.id)
         .single()
 
@@ -65,6 +67,7 @@ export function useStudentSession(): StudentSession {
           show_feedback: profile.show_feedback ?? true,
           current_book: profile.current_book || DEFAULT_SETTINGS.current_book,
           current_unit: profile.current_unit || DEFAULT_SETTINGS.current_unit,
+          stt_engine: profile.stt_engine || 'deepgram',
         })
       }
       // 프로필 로드 완료 → page에서 시나리오/회차 로드를 시작할 수 있음
@@ -112,6 +115,7 @@ export function useStudentSession(): StudentSession {
         show_feedback: updated.show_feedback,
         current_book: updated.current_book,
         current_unit: updated.current_unit,
+        stt_engine: updated.stt_engine,
       })
       .eq('id', studentId)
   }

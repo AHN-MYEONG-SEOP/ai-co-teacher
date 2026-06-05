@@ -139,6 +139,29 @@ function SettingsModal({
           </div>
         </div>
 
+        {/* STT 엔진 선택 */}
+        <div className="space-y-2">
+          <div>
+            <p className="text-sm font-medium text-slate-300">🎤 음성 인식 엔진</p>
+            <p className="text-xs text-slate-500 mt-0.5">Deepgram: 빠름 / HuggingFace: IPA 발음 분석</p>
+          </div>
+          <div className="flex gap-2">
+            {(['deepgram', 'huggingface'] as const).map((engine) => (
+              <button
+                key={engine}
+                onClick={() => setLocal(p => ({ ...p, stt_engine: engine }))}
+                className={cn(
+                  'flex-1 py-2 rounded-xl text-sm font-medium transition-colors border',
+                  local.stt_engine === engine
+                    ? 'bg-emerald-600 border-emerald-500 text-white'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'
+                )}
+              >
+                {engine === 'deepgram' ? '⚡ Deepgram' : '🤗 HuggingFace'}
+              </button>
+            ))}
+          </div>
+        </div>
         {/* 발화 피드백 표시 */}
         <div className="flex items-center justify-between">
           <div>
@@ -1365,6 +1388,7 @@ export default function StudentPage() {
 
   const { isSupported, isListening, startListening, stopListening, lastProcessedBlobUrl } = useWebSpeech({
     onInterimResult: handleInterim,
+    sttEngine: settings.stt_engine ?? 'deepgram',
     onFinalResult: handleFinalResult,
     onFallback: handleFallback,
     onError: handleError,

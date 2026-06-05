@@ -16,6 +16,7 @@ interface DeepgramOptions {
   processingConfig?: AudioProcessingConfig
   // 오늘 배우는 target 단어들 — Deepgram keyword boosting(문맥 힌트)에 사용
   keywords?: string[]
+  sttEngine?: 'deepgram' | 'huggingface'
 }
 
 export function useWebSpeech({
@@ -27,6 +28,7 @@ export function useWebSpeech({
   confidenceThreshold = CONFIDENCE_THRESHOLD,
   processingConfig = DEFAULT_AUDIO_CONFIG,
   keywords = [],
+  sttEngine = 'deepgram' as 'deepgram' | 'huggingface',
 }: DeepgramOptions) {
   const mrRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
