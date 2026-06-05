@@ -332,7 +332,7 @@ export function useWebSpeech({
 
       const params = new URLSearchParams({
         language: 'multi',
-        model: 'nova-2',
+        model: 'nova-3',
         smart_format: 'true',
         punctuate: 'true',
         utterances: 'true',
