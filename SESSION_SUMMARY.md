@@ -18,104 +18,93 @@
 - 기술스택: Next.js 15, TypeScript, Tailwind, Supabase, Deepgram nova-2, GPT-4o-mini, ElevenLabs
 - AI 선생님: Coty (코티) - CLAUDE.md 기준
 - 대상: 오프라인 영어 학원 최대 8명
+- 현재 버전: v2026-06-05.15
 
 ---
 
-## 오늘 세션(2026-06-03) 완료한 작업
+## 오늘 세션(2026-06-05) 완료한 작업
 
-### 시나리오 시스템
-- Insight Builder 1 Unit 1~3 시나리오 JSON 설계 완료
-- lesson_scenarios 테이블 신규 생성 (기존 동명 테이블은 lesson_sessions로 rename)
-- lesson_progress 테이블 신규 생성
-- Unit 1 School, Unit 2 Family, Unit 3 Birthdays DB INSERT 완료
+### feedback 시스템 개선
+- /api/feedback 완전 제거 (chat 응답에 통합)
+- GPT 응답에 feedback 필드 포함 (grammar, overall, retry_reason, pronunciation)
+- 발음 교정 피드백 추가: student_said → target, tip_kr
+- 발음 교정 지침 강화: 정확한 혀/입술/성대 위치 설명
+- FeedbackCard UI: grammar + overall + retry_reason + pronunciation 표시
 
-### 힌트 시스템 개선 (v2026-06-03.9~11)
-- generateChoices(GPT 즉석 생성) 제거 → 시나리오 hint_line + accept_variants 직접 사용
-- HintBox UI 단계적 표시: 힌트 보기 → hint_line → 가능한 답변 보기 → accept_variants
-- hint step 기준 수정: 완료 턴은 다음 step, 오답 턴은 현재 step 기준
+### 학생 발음 듣기 기능
+- 학생 말풍선에 "내 발음 듣기" 버튼 추가
+- Blob URL을 onFinalResult 콜백으로 직접 전달
+- pendingBlobUrlRef로 타이밍 문제 해결
+- 브라우저 메모리에 저장 (페이지 새로고침 전까지 유지)
 
-### system-prompt.ts 개선 (v2026-06-03.12)
-- 공통 규칙을 코드로 통합, DB gpt_rules.flow는 수업별 특이사항만 관리
-- ai_line 강제 사용 규칙 추가
-- 질문으로 끝맺음 강제
-- 오답 시 이유 설명 후 재시도 유도
-- step_completed 판정 유연화: 축약형 인정, target_word 포함 시 인정
-- 시나리오 인스펙터 모달에 공통 지침 섹션 추가
+### UI 개선
+- 영문 보기 시 한국어 보기/숨기기 버튼 통합 (EnglishBox 안으로)
+- 오답 시 AI 말풍선 비는 문제 수정 (needsAction 제거)
+- 로그아웃 시 대화 히스토리 초기화 (handleExit에 reset() 추가)
 
-### feedback 시스템 개선 (v2026-06-03.13)
-- /api/feedback(GPT 별도 호출) 제거 → chat 응답에 통합
-- GPT 호출 1회 절감 + 문맥 기반 정확한 분석
-- feedback 구조: grammar, overall, retry_reason (오답 시 한국어로 이유 설명)
-- DB: conversation_logs.correction → retry_reason 컬럼명 변경, tip 컬럼 제거
-- FeedbackCard UI: fluency/vocabulary 제거, grammar + overall + retry_reason만 표시
+### system-prompt.ts 개선
+- 전면 재작성: 규칙 단순화, 현재 step 데이터 직접 주입
+- alreadyCompleted 파라미터 추가: 모든 step 완료 시 closing 강제
+- 마지막 step 완료 후 자연스러운 마무리 인사 처리
+- 판정 기준 명확화: [정답/오답/힌트] 세 가지로 단순화
 
 ---
 
-## 확정된 설계 결정사항
+## 현재 system-prompt.ts 구조
 
-### 지침 관리 방식
-- system-prompt.ts: 모든 수업 공통 규칙 (코드로 관리)
-- DB gpt_rules.flow: 수업별 특이사항만 (예: phase 3 역할 전환)
-- DB gpt_rules.counting_rules: 진도 카운트 기준
+buildSystemPrompt(scenario, persona, nickname, currentStep, alreadyCompleted)
 
-### 시나리오 관리
-- 원본: JSON 파일 (설계/검토용)
-- 운영: Supabase DB (앱이 로드)
-- GPT 참조: DB에서 로드한 데이터를 system prompt에 주입
+- alreadyCompleted = true이면: 바로 closing 마무리 인사
+- 현재 step의 curAiLine, nextAiLine을 프롬프트에 직접 삽입
+- [정답] → curReaction + nextAiLine
+- [오답] → 이유 설명 + curAiLine으로 끝맺음
+- [힌트] → curHintLine + curAiLine
 
-### 힌트 시스템
-- 힌트 버튼 클릭 1: hint_line 표시 (학생이 생각할 수 있는 클루)
-- 힌트 버튼 클릭 2: accept_variants 표시 (가능한 답변, 말로만)
-- GPT가 직접 생성하던 choices 완전 제거
+---
 
-### feedback 시스템
-- chat/route.ts에서 GPT 응답에 feedback 포함
-- /api/feedback 라우트 제거
-- retry_reason: 오답 시에만 한국어로 틀린 이유 설명
+## DB 현황
+
+- lesson_scenarios: Unit 1~3 데이터 포함 (INSERT 완료)
+- lesson_progress: 학생별 수업 진행 기록
+- lesson_sessions: 기존 테이블 (건드리지 말 것)
+- conversation_logs: retry_reason 컬럼, tip 컬럼 제거됨
+
+---
+
+## 남아있는 알려진 문제
+
+- book→box 처럼 비슷한 발음 단어를 발음 문제로 인식 못하는 경우 있음
+  → system-prompt.ts pronunciation 판정 기준 강화 필요
+- AI가 가끔 시나리오 ai_line을 무시하고 임의 질문하는 경우 있음
+  → system-prompt.ts 추가 튜닝 필요
 
 ---
 
 ## Claude Code 상황
 
 - 상태: API usage limit 도달로 사용 불가
-- 원인: claude-opus-4-8 모델로 토큰 1억+ 사용
-- 초기화: 2026-07-01 00:00 UTC (한국시간 7월 1일 오전 9시)
+- 초기화: 2026-07-01 00:00 UTC
 - 재시작 시: Sonnet 모델로 변경 필수
 - settings.json: { "model": "claude-sonnet-4-5-20251001" }
 
 ---
 
-## 현재 작업 방식
-
-- GitHub 저장소 public 공개 (Claude가 직접 읽을 수 있음)
-- Claude가 코드 설계/작성 → 사용자가 터미널에서 수정+커밋+푸시
-- 버전 관리: frontend/lib/version.ts에서 APP_VERSION 수동 갱신
-- CHANGELOG.md: sed 명령으로 업데이트
-
----
-
 ## 다음 할 일 (우선순위)
 
-1순위: 실제 테스트 및 버그 수정
-   - 수업 진행 시 ai_line 준수 여부 확인
-   - step 완료 판정 정확도 확인
-   - retry_reason이 자연스럽게 말로 나오는지 확인
+1순위: 테스트 및 버그 수정
+   - book→box 발음 피드백 개선
+   - AI가 시나리오를 더 잘 따르도록 system-prompt 튜닝
+   - 내 발음 듣기 버튼 정상 동작 확인
 
-2순위: usage_logs 테이블 + 비용 대시보드
-   - DB 테이블 설계
+2순위: CHANGELOG.md + SESSION_SUMMARY.md 업데이트
+   - 오늘 작업 내용 반영
+
+3순위: usage_logs 테이블 + 비용 대시보드
    - Deepgram/GPT/ElevenLabs 사용량 추적
    - 학생별/세션별 비용 집계
-   - 교사 대시보드에 탭 추가
 
-3순위: 에이전트 시스템 (논의 중)
-   - Student Agent: 학생처럼 대화 (테스트/시뮬레이션용)
-   - Analysis Agent: 대화 품질 분석
-   - 각 에이전트별 system prompt 필요
-
-4순위: 학생 목소리 추가
-   - ElevenLabs Voice Library에서 어린이 목소리 선택
-   - frontend/config/voices.ts 생성
-   - TTS route에서 화자별 voice_id 분기
+4순위: 에이전트 시스템 (논의 중)
+   - Student Agent, Analysis Agent
 
 5순위: Insight Builder 2 이상 시나리오 작성
 
@@ -123,29 +112,10 @@
 
 ## 주요 파일 경로
 
-- frontend/prompts/system-prompt.ts   - GPT 지침 빌더 (공통 규칙 포함)
-- frontend/lib/lesson.ts              - progressRate, pushUnique 등 헬퍼
-- frontend/app/api/chat/route.ts      - 메인 대화 처리 + feedback 통합
-- frontend/app/api/lesson-scenario/   - 시나리오 로드/회차 생성
-- frontend/app/api/persona/           - 페르소나 조회/업데이트
+- frontend/prompts/system-prompt.ts   - GPT 지침 빌더
+- frontend/app/api/chat/route.ts      - 메인 대화 + feedback 통합
+- frontend/hooks/useConversation.ts   - 대화 상태 관리
+- frontend/hooks/useWebSpeech.ts      - STT + Blob URL 전달
 - frontend/app/(student)/page.tsx     - 학생 화면
-- frontend/app/(teacher)/teacher/     - 교사 대시보드
 - frontend/components/student/FeedbackCard.tsx - 피드백 UI
-
----
-
-## DB 테이블 현황
-
-- lesson_scenarios: 시나리오 원본 (Unit 1~3 데이터 포함)
-- lesson_progress: 학생별 수업 진행 기록
-- lesson_sessions: 기존 lesson_scenarios에서 rename (건드리지 말 것)
-- conversation_logs: retry_reason 컬럼, tip 컬럼 제거됨
-- student_personas: 학생 페르소나 정보
-
----
-
-## 오늘 세션 특이사항
-
-- Claude Code 없이 Claude(claude.ai)와 직접 작업하는 방식으로 진행
-- GitHub public으로 공개되어 Claude가 직접 코드 읽을 수 있음
-- /api/feedback 라우트는 코드에서 제거했지만 파일 자체는 남아있음 (나중에 삭제 가능)
+- frontend/lib/version.ts             - 버전 관리
