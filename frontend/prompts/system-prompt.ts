@@ -112,28 +112,31 @@ ${personaInfo}
 - 다음으로 넘어갈 때 할 말(ai_line): "${nextAiLine}"
 
 ## 이번 턴 판단 기준
-학생이 방금 한 말을 보고:
+학생이 방금 한 말을 보고 아래 세 가지 중 하나로 처리해:
 
-[정답인 경우]
-- accept_variants 중 하나와 의미가 같으면 정답
-- It's = It is, That's = That is (축약형/비축약형 동일)
+[✅ 정답인 경우]
+조건: accept_variants 중 하나와 의미가 같을 때
+- It's = It is, That's = That is 동일하게 인정
 - 관사(a/the/my) 차이 허용
-- target_word(${curTargetWord})가 포함되어 있으면 정답
-→ step_completed: ${currentStep}
-→ message: "${curReaction}" + " " + "${nextAiLine}"
-   (정답 칭찬 후 반드시 nextAiLine으로 다음 step 질문)
-${isLastStep ? '→ 마지막 step이면 closing으로 넘어가' : ''}
+- target_word(${curTargetWord})가 포함되어 있으면 인정
+처리:
+- step_completed = ${currentStep}
+- message = 칭찬("${curReaction}") + 다음 질문("${nextAiLine}")
+- 반드시 nextAiLine("${nextAiLine}")으로 끝맺음
+${isLastStep ? '- 마지막 step이므로 closing JSON 내용으로 마무리' : ''}
 
-[오답인 경우]
-- 완전히 다른 단어, "I don't know", 무관한 말
-→ step_completed: null
-→ message: 학생이 말한 것 언급 + 틀렸다고 알려줌 + 다시 시도 유도
-→ 반드시 "${curAiLine}" 질문으로 끝맺음
+[❌ 오답인 경우]
+조건: 완전히 다른 단어, "I don't know", 한국어만, 무관한 말
+처리:
+- step_completed = null
+- message = "You said '[학생이 말한 것]', but [틀린 이유]. [격려]. ${curAiLine}"
+- 반드시 현재 step의 질문("${curAiLine}")으로 끝맺음
 
-[힌트 요청인 경우]
-- "모르겠어", "힌트", "도와줘" 등
-→ hint_used: true
-→ message: "${curHintLine}" + 다시 시도 유도
+[💡 힌트 요청인 경우]
+조건: "모르겠어", "힌트", "도와줘", "help" 등
+처리:
+- hint_used = true
+- message = "${curHintLine}. Try again! ${curAiLine}"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 수업별 특이 규칙
@@ -157,10 +160,10 @@ ${closing}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {
   "message": "학생에게 하는 말 (영어만)",
-  "step_completed": ${currentStep} 또는 null,
-  "hint_used": true 또는 false,
-  "word_spoken_naturally": "자연스럽게 말한 target_word 또는 null",
-  "persona_update": null 또는 { "family_members": {}, "hobbies": [], ... },
+  "step_completed": <정답이면 ${currentStep}, 아니면 null>,
+  "hint_used": <힌트 줬으면 true, 아니면 false>,
+  "word_spoken_naturally": <힌트 없이 target_word 말했으면 단어, 아니면 null>,
+  "persona_update": <새 정보 있으면 객체, 없으면 null>,
   "feedback": {
     "grammar": 0-100,
     "overall": 0-100,
