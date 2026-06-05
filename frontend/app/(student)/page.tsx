@@ -1088,12 +1088,13 @@ export default function StudentPage() {
 
   // 종료 — 진도·로그·리포트는 DB에 누적 보존, 화면/세션만 정리하고 로그아웃
   const handleExit = useCallback(async () => {
-    clearMessages()
+    reset()              // 대화 히스토리 초기화
+    clearMessages()      // 메시지 UI 초기화
     sessionStorage.clear()
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
-  }, [clearMessages, supabase, router])
+  }, [clearMessages, reset, supabase, router])
 
   // 수업 완료 후 Coty의 마무리 인사가 끝나면 → 복습/종료 선택 카드로 복귀
   useEffect(() => {
