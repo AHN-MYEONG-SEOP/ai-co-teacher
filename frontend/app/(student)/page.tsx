@@ -1541,18 +1541,7 @@ export default function StudentPage() {
                   <div className="mt-2 max-w-[85%] w-full space-y-2">
                     <div className="flex gap-2 flex-wrap">
 
-                      <button
-                        onClick={() => sendToGPT('__RETRY__', {})}
-                        className="text-xs bg-amber-800/60 hover:bg-amber-700/60 border border-amber-600/40 text-amber-200 px-3 py-1.5 rounded-full transition-colors"
-                      >
-                        🔄 다시 피드백
-                      </button>
-                      <button
-                        onClick={() => sendToGPT('__CONTINUE__', {})}
-                        className="text-xs bg-emerald-800/60 hover:bg-emerald-700/60 border border-emerald-600/40 text-emerald-200 px-3 py-1.5 rounded-full transition-colors"
-                      >
-                        ▶️ 계속 진행
-                      </button>
+
                     </div>
                     {hasPronunciation && (
                       <div className="bg-violet-900/30 border border-violet-700/30 rounded-xl p-2 space-y-1">
