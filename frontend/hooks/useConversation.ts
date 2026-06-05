@@ -16,6 +16,7 @@ interface ConversationMeta {
   confidence?: number
   latencyMs?: number
   hintUsed?: boolean
+  blobUrl?: string
 }
 
 // ── 수업 시나리오 (lesson_scenarios 공용 템플릿, 지시서 스키마) ──
@@ -343,7 +344,7 @@ export function useConversation({
     const studentMsgId = Date.now().toString()
     // 내부 명령어는 말풍선에 표시하지 않음
     if (!isInternalCommand) {
-      addMessage({ id: studentMsgId, role: 'student', content: studentText, createdAt: new Date().toISOString(), words })
+      addMessage({ id: studentMsgId, role: 'student', content: studentText, createdAt: new Date().toISOString(), words, blobUrl: meta?.blobUrl || undefined })
     }
     historyRef.current.push({ role: 'user', content: studentText })
 

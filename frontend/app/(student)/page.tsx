@@ -1263,7 +1263,7 @@ export default function StudentPage() {
     if (words) setFinalWords(words)
     discardBlob()
     addLog(`Path A: "${punctuated}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
-    sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current }, words)
+    sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current, blobUrl: lastProcessedBlobUrl || undefined }, words)
     // 답변 후 힌트 상태 초기화
     setSeenHints(new Set())
   }, [discardBlob, setSpeechResult, setLatency, setInterimText, setInterimWords, setFinalWords, addLog, sendToGPT])
@@ -1529,6 +1529,20 @@ export default function StudentPage() {
                     alreadySeen={seenHints.has(msg.id)}
                   />
                 )}
+              {/* 학생 발화 재생 버튼 */}
+              {msg.role === 'student' && msg.blobUrl && (
+                <div className="mt-1 flex justify-end">
+                  <button
+                    onClick={() => {
+                      const audio = new Audio(msg.blobUrl)
+                      audio.play().catch(() => {})
+                    }}
+                    className="text-xs text-emerald-400/60 hover:text-emerald-300 border border-emerald-700/40 hover:border-emerald-500 rounded-full px-3 py-1 transition-colors"
+                  >
+                    🎤 내 발음 듣기
+                  </button>
+                </div>
+              )}
               {msg.role === 'student' && msg.feedback && settings.show_feedback && (
                 <div className="mt-1.5 max-w-[85%] w-full bg-slate-800/60 border border-slate-700/40 rounded-xl px-3 py-2 space-y-1.5">
                   {/* 점수 한 줄 요약 */}
