@@ -339,8 +339,12 @@ export function useConversation({
     const logIdPromise = new Promise<string | null>((resolve) => { resolveLogId = resolve })
 
     // 학생 메시지 UI 추가
+    const isInternalCommand = studentText.startsWith('__') && studentText.endsWith('__')
     const studentMsgId = Date.now().toString()
-    addMessage({ id: studentMsgId, role: 'student', content: studentText, createdAt: new Date().toISOString(), words })
+    // 내부 명령어는 말풍선에 표시하지 않음
+    if (!isInternalCommand) {
+      addMessage({ id: studentMsgId, role: 'student', content: studentText, createdAt: new Date().toISOString(), words })
+    }
     historyRef.current.push({ role: 'user', content: studentText })
 
     // 피드백 요청 (학생 발화마다)
