@@ -7,7 +7,7 @@ import type { WordResult } from '@/types'
 
 interface DeepgramOptions {
   onInterimResult?: (text: string, words?: WordResult[]) => void
-  onFinalResult?: (text: string, confidence: number, words?: WordResult[], blobUrl?: string) => void
+  onFinalResult?: (text: string, confidence: number, words?: WordResult[], blobUrl?: string, ipa?: string) => void
   onFallback?: (confidence: number, partialText?: string) => void
   onError?: (error: string) => void
   onLog?: (msg: string) => void
@@ -58,6 +58,8 @@ export function useWebSpeech({
   const confidenceThresholdRef = useRef(confidenceThreshold)
   const processingConfigRef = useRef(processingConfig)
   const keywordsRef = useRef(keywords)
+  const sttEngineRef = useRef(sttEngine)
+  useEffect(() => { sttEngineRef.current = sttEngine }, [sttEngine])
 
   // ref 동기화
   useEffect(() => { onFinalResultRef.current = onFinalResult }, [onFinalResult])
@@ -306,8 +308,6 @@ export function useWebSpeech({
     const mimeType = mrRef.current?.mimeType || 'audio/webm'
     const blob = new Blob(chunks, { type: mimeType })
     chunksRef.current = []
-    // Deepgram에 전송하는 "가공본"을 재생용으로 보관 (원본과 청취 비교 진단용)
-    saveProcessedBlob(blob)
     console.log(`⑤ Blob 생성: ${(blob.size/1024).toFixed(1)}KB, type=${blob.type}`)
     console.log(`⑥ Deepgram 전송 시작... (+${(performance.now()-t1).toFixed(0)}ms)`)
     onLogRef.current?.(`Deepgram 전송 중... (${(blob.size / 1024).toFixed(1)}KB)`)

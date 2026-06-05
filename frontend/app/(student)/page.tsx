@@ -1276,7 +1276,7 @@ export default function StudentPage() {
     if (words) setInterimWords(words)
   }, [setInterimText, setInterimWords])
 
-  const handleFinalResult = useCallback((text: string, confidence: number, words?: WordResult[], blobUrl?: string) => {
+  const handleFinalResult = useCallback((text: string, confidence: number, words?: WordResult[], blobUrl?: string, ipa?: string) => {
     if (sentRef.current) return
     sentRef.current = true
 
@@ -1294,7 +1294,7 @@ export default function StudentPage() {
     pendingBlobUrlRef.current = null
     discardBlob()
     addLog(`Path A: "${punctuated}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
-    sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current, blobUrl: currentBlobUrl }, words)
+    sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current, blobUrl: currentBlobUrl, ipa: ipa }, words)
     // 답변 후 힌트 상태 초기화
     setSeenHints(new Set())
   }, [discardBlob, setSpeechResult, setLatency, setInterimText, setInterimWords, setFinalWords, addLog, sendToGPT])
@@ -1561,6 +1561,14 @@ export default function StudentPage() {
                     alreadySeen={seenHints.has(msg.id)}
                   />
                 )}
+              {/* IPA 발음기호 표시 (HuggingFace STT 사용 시) */}
+              {msg.role === 'student' && msg.ipa && (
+                <div className="mt-1 flex justify-end">
+                  <span className="text-xs text-violet-300/70 font-mono bg-violet-900/20 border border-violet-700/30 rounded-full px-3 py-1">
+                    /{msg.ipa}/
+                  </span>
+                </div>
+              )}
               {/* 학생 발화 재생 버튼 */}
               {msg.role === 'student' && msg.blobUrl && (
                 <div className="mt-1 flex justify-end">

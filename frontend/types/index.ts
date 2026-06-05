@@ -57,6 +57,7 @@ export interface ConversationMessage {
   sceneStep?: number        // 해당 상황 설명이 속한 step 번호 (step별 구분 표시용)
   needsAction?: boolean     // 오답 시 버튼 선택 대기 상태
   blobUrl?: string          // 학생 발화 원본 음성 URL (브라우저 메모리)
+  ipa?: string              // HuggingFace IPA 발음기호
 }
 // Supabase 테이블 타입
 export interface Profile {
