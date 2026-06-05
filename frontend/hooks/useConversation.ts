@@ -344,71 +344,24 @@ export function useConversation({
     historyRef.current.push({ role: 'user', content: studentText })
 
     // 피드백 요청 (학생 발화마다)
-    fetch('/api/feedback', {
+    // 로그 저장 (feedback은 chat 응답에서 처리)
+    if (meta?.hintUsed) hintUsedCountRef.current++
+    totalTurnsRef.current++
+    fetch('/api/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: studentText, conversationHistory: historyRef.current.slice(-6) }),
-    }).then(async (res) => {
-      if (!res.ok) {
-        console.error(`❌ 피드백 요청 실패: ${res.status}`)
-        resolveLogId(null)
-        return
-      }
-      const feedbackData = await res.json()
-      setFeedback(feedbackData)
-      updateMessageFeedback(studentMsgId, feedbackData)
-
-      if (feedbackData.grammar) grammarScoresRef.current.push(feedbackData.grammar)
-      if (feedbackData.fluency) fluencyScoresRef.current.push(feedbackData.fluency)
-      if (feedbackData.vocabulary) vocabScoresRef.current.push(feedbackData.vocabulary)
-      if (feedbackData.overall) overallScoresRef.current.push(feedbackData.overall)
-      if (feedbackData.correction) correctionsRef.current.push(feedbackData.correction)
-      if (meta?.hintUsed) hintUsedCountRef.current++
-
-      if (feedbackData.overall >= 70) correctTurnsRef.current++
-      totalTurnsRef.current++
-
-      const avg = (arr: number[]) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : undefined
-
-      if (reportIdRef.current) {
-        fetch('/api/lesson-report', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'update',
-            report_id: reportIdRef.current,
-            total_turns: totalTurnsRef.current,
-            correct_turns: correctTurnsRef.current,
-            hint_used_count: hintUsedCountRef.current,
-            avg_grammar: avg(grammarScoresRef.current),
-            avg_fluency: avg(fluencyScoresRef.current),
-            avg_vocabulary: avg(vocabScoresRef.current),
-            avg_overall: avg(overallScoresRef.current),
-          }),
-        })
-      }
-      const logRes = await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: sessionId || null,
-          student_id: studentId || null,
-          student_text: studentText,
-          stt_path: meta?.sttPath,
-          confidence: meta?.confidence,
-          latency_ms: meta?.latencyMs,
-          hint_used: meta?.hintUsed ?? false,
-          grammar: feedbackData.grammar,
-          fluency: feedbackData.fluency,
-          vocabulary: feedbackData.vocabulary,
-          overall: feedbackData.overall,
-          correction: feedbackData.correction,
-          tip: feedbackData.tip,
-        }),
-      })
-      const logData = await logRes.json()
-      resolveLogId(logData.log_id || null)
-    }).catch((err) => { console.error('❌ 피드백 처리 오류:', err); resolveLogId(null) })
+      body: JSON.stringify({
+        session_id: sessionId || null,
+        student_id: studentId || null,
+        student_text: studentText,
+        stt_path: meta?.sttPath,
+        confidence: meta?.confidence,
+        latency_ms: meta?.latencyMs,
+        hint_used: meta?.hintUsed ?? false,
+      }),
+    }).then(r => r.json()).then(d => {
+      resolveLogId(d.log_id || null)
+    }).catch((err) => { console.error('❌ 로그 저장 오류:', err); resolveLogId(null) })
 
     setAIResponding(true)
     setAvatarStatus('processing')
