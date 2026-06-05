@@ -1253,7 +1253,7 @@ export default function StudentPage() {
     if (words) setInterimWords(words)
   }, [setInterimText, setInterimWords])
 
-  const handleFinalResult = useCallback((text: string, confidence: number, words?: WordResult[]) => {
+  const handleFinalResult = useCallback((text: string, confidence: number, words?: WordResult[], blobUrl?: string) => {
     if (sentRef.current) return
     sentRef.current = true
 
@@ -1267,8 +1267,8 @@ export default function StudentPage() {
     setInterimText('')
     setInterimWords([])
     if (words) setFinalWords(words)
-    const currentBlobUrl = pendingBlobUrlRef.current || lastBlobUrlRef.current || undefined
-    pendingBlobUrlRef.current = null  // 사용 후 초기화
+    const currentBlobUrl = blobUrl || pendingBlobUrlRef.current || lastBlobUrlRef.current || undefined
+    pendingBlobUrlRef.current = null
     discardBlob()
     addLog(`Path A: "${punctuated}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
     sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current, blobUrl: currentBlobUrl }, words)

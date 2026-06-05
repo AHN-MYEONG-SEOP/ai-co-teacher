@@ -7,7 +7,7 @@ import type { WordResult } from '@/types'
 
 interface DeepgramOptions {
   onInterimResult?: (text: string, words?: WordResult[]) => void
-  onFinalResult?: (text: string, confidence: number, words?: WordResult[]) => void
+  onFinalResult?: (text: string, confidence: number, words?: WordResult[], blobUrl?: string) => void
   onFallback?: (confidence: number, partialText?: string) => void
   onError?: (error: string) => void
   onLog?: (msg: string) => void
@@ -44,6 +44,7 @@ export function useWebSpeech({
   const [isReady, setIsReady] = useState(false)
   // Deepgram에 실제로 전송한 "가공본" 재생용 URL (원본과 비교 진단용)
   const [lastProcessedBlobUrl, setLastProcessedBlobUrl] = useState<string | null>(null)
+  const lastProcessedBlobUrlRef = useRef<string | null>(null)
   const isSupported = true
 
   // 콜백 ref
@@ -71,7 +72,9 @@ export function useWebSpeech({
     setLastProcessedBlobUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev)
       try {
-        return URL.createObjectURL(blob)
+        const newUrl = URL.createObjectURL(blob)
+        lastProcessedBlobUrlRef.current = newUrl
+        return newUrl
       } catch {
         return null
       }
@@ -424,7 +427,7 @@ export function useWebSpeech({
       console.log(`✅ GPT로 전송: "${transcript}"`)
       console.groupEnd()
       onLogRef.current?.(`✅ 전송: "${transcript}" (conf: ${confidence.toFixed(2)})`)
-      onFinalResultRef.current?.(transcript, confidence, words)
+      onFinalResultRef.current?.(transcript, confidence, words, lastProcessedBlobUrlRef.current || undefined)
 
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
