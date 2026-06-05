@@ -1261,9 +1261,10 @@ export default function StudentPage() {
     setInterimText('')
     setInterimWords([])
     if (words) setFinalWords(words)
+    const currentBlobUrl = lastBlobUrl || undefined
     discardBlob()
     addLog(`Path A: "${punctuated}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
-    sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current, blobUrl: lastProcessedBlobUrl || undefined }, words)
+    sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current, blobUrl: currentBlobUrl }, words)
     // 답변 후 힌트 상태 초기화
     setSeenHints(new Set())
   }, [discardBlob, setSpeechResult, setLatency, setInterimText, setInterimWords, setFinalWords, addLog, sendToGPT])
