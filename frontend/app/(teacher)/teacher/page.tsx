@@ -131,7 +131,7 @@ export default function TeacherDashboard() {
   const [personas, setPersonas] = useState<PersonaRow[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students' | 'scenarios' | 'classes' | 'teachers'>('realtime')
+  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students' | 'scenarios' | 'classes' | 'teachers' | 'classroom'>('realtime')
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([])
   const [allStudents, setAllStudents] = useState<RosterStudent[]>([])
   const [newStudent, setNewStudent] = useState<NewStudent>({ name: '', nickname: '', email: '', password: '', class_id: '' })
@@ -352,12 +352,12 @@ export default function TeacherDashboard() {
 
         {/* 탭 */}
         <div className="flex gap-2 flex-wrap">
-          {(['realtime', 'history', 'reports', 'personas', 'students', 'classes', 'teachers', 'scenarios'] as const).map(tab => (
+          {(['realtime', 'history', 'reports', 'personas', 'students', 'classes', 'teachers', 'scenarios', 'classroom'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={cn('px-4 py-2 rounded-xl text-sm transition-colors',
                 activeTab === tab ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
               )}>
-              {tab === 'realtime' ? '🔴 실시간' : tab === 'history' ? '📋 대화기록' : tab === 'reports' ? '📊 학습이력' : tab === 'personas' ? '👤 페르소나' : tab === 'students' ? '👨‍🎓 학생관리' : tab === 'classes' ? '🏫 반 관리' : tab === 'teachers' ? '👩‍🏫 교사관리' : '🎬 시나리오'}
+              {tab === 'realtime' ? '🔴 실시간' : tab === 'history' ? '📋 대화기록' : tab === 'reports' ? '📊 학습이력' : tab === 'personas' ? '👤 페르소나' : tab === 'students' ? '👨‍🎓 학생관리' : tab === 'classes' ? '🏫 반 관리' : tab === 'teachers' ? '👩‍🏫 교사관리' : tab === 'scenarios' ? '🎬 시나리오' : '🏫 교실 수업'}
             </button>
           ))}
           <button onClick={() => { fetchLogs(); fetchReports(selectedStudentId || undefined); const ids = students.map(s => s.id); fetchScenarios(ids); fetchPersonas(ids) }} className="ml-auto px-4 py-2 rounded-xl text-sm bg-slate-800 text-slate-400 hover:text-white transition-colors">
@@ -692,6 +692,32 @@ export default function TeacherDashboard() {
 
         {/* 시나리오 편집 */}
         {activeTab === 'scenarios' && <ScenarioEditor />}
+
+        {/* 교실 수업 */}
+        {activeTab === 'classroom' && (
+          <div className="space-y-6">
+            <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6">
+              <h2 className="text-lg font-bold text-white mb-2">🏫 교실 수업 시작</h2>
+              <p className="text-sm text-slate-400 mb-6">반을 선택하고 수업을 시작하세요. 학생들이 스마트폰으로 접속하면 자동으로 수업 화면이 나타납니다.</p>
+              <div className="grid grid-cols-1 gap-4">
+                {teacherClasses.map((cls) => (
+                  <div key={cls.id} className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-white">{cls.name}</p>
+                      <p className="text-xs text-slate-400 mt-1">반 수업</p>
+                    </div>
+                    <button
+                      onClick={() => alert('교실 수업 기능 준비 중입니다.')}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+                    >
+                      수업 시작 →
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )
