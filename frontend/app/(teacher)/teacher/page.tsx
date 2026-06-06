@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import ScenarioEditor from '@/components/teacher/ScenarioEditor'
+import { ClassroomStartModal } from '@/components/teacher/ClassroomStartModal'
 import ClassManager from '@/components/teacher/ClassManager'
 import TeacherManager from '@/components/teacher/TeacherManager'
 
@@ -133,6 +134,7 @@ export default function TeacherDashboard() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students' | 'scenarios' | 'classes' | 'teachers' | 'classroom'>('realtime')
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([])
+  const [classroomModal, setClassroomModal] = useState<{ classId: string; className: string } | null>(null)
   const [allStudents, setAllStudents] = useState<RosterStudent[]>([])
   const [newStudent, setNewStudent] = useState<NewStudent>({ name: '', nickname: '', email: '', password: '', class_id: '' })
   const [createLoading, setCreateLoading] = useState(false)
@@ -707,7 +709,7 @@ export default function TeacherDashboard() {
                       <p className="text-xs text-slate-400 mt-1">반 수업</p>
                     </div>
                     <button
-                      onClick={() => alert('교실 수업 기능 준비 중입니다.')}
+                      onClick={() => setClassroomModal({ classId: cls.id, className: cls.name })}
                       className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
                     >
                       수업 시작 →
@@ -719,6 +721,19 @@ export default function TeacherDashboard() {
           </div>
         )}
       </div>
+      {/* 교실 수업 시작 모달 */}
+      {classroomModal && teacherId && (
+        <ClassroomStartModal
+          classId={classroomModal.classId}
+          className={classroomModal.className}
+          teacherId={teacherId}
+          onClose={() => setClassroomModal(null)}
+          onStart={(sessionId) => {
+            setClassroomModal(null)
+            window.location.href = '/teacher/classroom?session=' + sessionId
+          }}
+        />
+      )}
     </main>
   )
 }
