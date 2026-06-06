@@ -59,7 +59,8 @@ export function ClassroomStartModal({
         .single()
 
       if (insertError || !data) {
-        setError('세션 생성에 실패했습니다.')
+        setError('세션 생성 실패: ' + (insertError?.message || '알 수 없는 오류'))
+        console.error('세션 생성 오류:', JSON.stringify(insertError))
         setLoading(false)
         return
       }
