@@ -1038,7 +1038,7 @@ export default function StudentPage() {
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage, clearMessages } = useUIStore()
   const [isDevLogOpen, setIsDevLogOpen] = useState(true)
-  const { studentId, sessionId, studentNickname, ready, settings, persona, updateSettings } = useStudentSession()
+  const { studentId, classId, sessionId, studentNickname, ready, settings, persona, updateSettings } = useStudentSession()
 
   const router = useRouter()
   const supabase = createClient()
@@ -1048,6 +1048,7 @@ export default function StudentPage() {
   // 수업 완료 후 Coty의 마무리 인사가 끝나면(sessionEnded) 다시 confirm 카드로 복귀
   type LessonState = 'loading' | 'confirm' | 'picking' | 'active'
   const [lessonState, setLessonState] = useState<LessonState>('loading')
+  const [classroomInvite, setClassroomInvite] = useState<{ sessionId: string } | null>(null)
   const [activeBook, setActiveBook] = useState<string>(settings.current_book)
   const [activeUnit, setActiveUnit] = useState<number>(settings.current_unit)
   const [activeScenario, setActiveScenario] = useState<LessonScenario | null>(null)
@@ -1176,6 +1177,37 @@ export default function StudentPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (sessionEnded) setLessonState('confirm')
   }, [sessionEnded])
+
+  // 교실 수업 세션 감지 (로그인 시 + Realtime)
+  useEffect(() => {
+    if (!ready || !classId) return
+    // 최초 접속 시 active 세션 조회
+    const checkSession = async () => {
+      const { data } = await supabase
+        .from('classroom_sessions')
+        .select('id')
+        .eq('class_id', classId)
+        .eq('status', 'active')
+        .single()
+      if (data) setClassroomInvite({ sessionId: data.id })
+    }
+    checkSession()
+    // Realtime 구독 (이미 접속 중일 때 선생님이 수업 시작하면 팝업)
+    const channel = supabase
+      .channel(`classroom_invite:${classId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'classroom_sessions',
+        filter: `class_id=eq.${classId}`,
+      }, (payload) => {
+        if (payload.new.status === 'active') {
+          setClassroomInvite({ sessionId: payload.new.id })
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [ready, classId])
 
   // Book·Unit 선택 완료 → 프로필에 저장하고 새 회차 시작
   const handlePickUnit = useCallback((book: string, unit: number) => {
@@ -1908,6 +1940,38 @@ export default function StudentPage() {
           )}
         </div>
       </div>
+
+      {/* 교실 수업 초대 팝업 */}
+      {classroomInvite && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div className="relative w-full max-w-sm mx-4 bg-slate-900 border border-emerald-700/50 rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="text-center">
+              <div className="text-4xl mb-3">🏫</div>
+              <h2 className="text-white font-bold text-lg">수업이 시작됐어요!</h2>
+              <p className="text-slate-400 text-sm mt-1">선생님이 교실 수업을 시작했어요.</p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setClassroomInvite(null)}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-3 text-sm font-medium transition-colors"
+              >
+                나중에
+              </button>
+              <button
+                onClick={() => {
+                  const sid = classroomInvite.sessionId
+                  setClassroomInvite(null)
+                  window.location.href = '/student/classroom?session=' + sid
+                }}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3 text-sm font-medium transition-colors"
+              >
+                수업 참여 →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 설정 모달 */}
       {showSettings && (

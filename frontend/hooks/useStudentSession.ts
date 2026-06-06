@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS: StudentSettings = {
 
 interface StudentSession {
   studentId: string | undefined
+  classId: string | null
   sessionId: string | null
   studentName: string | null
   studentNickname: string | null
@@ -37,6 +38,7 @@ export function useStudentSession(): StudentSession {
   const supabase = createClient()
   const router = useRouter()
   const [studentId, setStudentId] = useState<string | null>(null)
+  const [classId, setClassId] = useState<string | null>(null)
   const [studentName, setStudentName] = useState<string | null>(null)
   const [studentNickname, setStudentNickname] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -57,13 +59,14 @@ export function useStudentSession(): StudentSession {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('name, nickname, tts_speed, show_feedback, current_book, current_unit, stt_engine, silence_threshold')
+        .select('name, nickname, tts_speed, show_feedback, current_book, current_unit, stt_engine, silence_threshold, class_id')
         .eq('id', user.id)
         .single()
 
       if (profile) {
         setStudentName(profile.name)
         setStudentNickname(profile.nickname || profile.name)
+        setClassId(profile.class_id || null)
         setSettings({
           tts_speed: profile.tts_speed || 'normal',
           show_feedback: profile.show_feedback ?? true,
@@ -124,5 +127,5 @@ export function useStudentSession(): StudentSession {
       .eq('id', studentId)
   }
 
-  return { studentId: studentId ?? undefined, sessionId, studentName, studentNickname, isLoggedIn, ready, settings, persona, updateSettings }
+  return { studentId: studentId ?? undefined, classId, sessionId, studentName, studentNickname, isLoggedIn, ready, settings, persona, updateSettings }
 }
