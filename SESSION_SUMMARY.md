@@ -18,11 +18,29 @@
 - 기술스택: Next.js 15, TypeScript, Tailwind, Supabase, Deepgram nova-2, GPT-4o-mini, ElevenLabs
 - AI 선생님: Coty (코티) - CLAUDE.md 기준
 - 대상: 오프라인 영어 학원 최대 8명
-- 현재 버전: v2026-06-05.15
+- 현재 버전: v2026-06-06.10
 
 ---
 
-## 오늘 세션(2026-06-05) 완료한 작업
+## 오늘 세션(2026-06-06) 완료한 작업
+
+### Dev Log 패널 (v2026-06-06.1~2)
+- DevLogPanel.tsx 생성 (탭 필터, 통계 바, 자동 스크롤)
+- 데스크탑 오른쪽 패널, NEXT_PUBLIC_DEV_LOG=false로 숨김
+- LogEntry에 file, fn 필드 추가 → 파일명/함수명 표시
+
+### 학생 발음 듣기 버튼 정상화 (v2026-06-06.3~5)
+- saveProcessedBlob 복구, Blob URL revoke 제거
+- 첫 발화부터 버튼 표시, 재생 정상화
+
+### TTS 속도 매우 느림 추가 (v2026-06-06.6)
+- very_slow(0.6x) 옵션 추가
+
+### 이해했어요 버튼 + VAD 자동 전송 (v2026-06-06.7~10)
+- AI 말 끝나면 이해했어요/종료 버튼 표시
+- VAD: 침묵 감지 카운트다운 3→2→1→자동 전송
+- 침묵 임계값 설정 슬라이더 (기본 40, 범위 5~80)
+- profiles.silence_threshold 컬럼 추가
 
 ### feedback 시스템 개선
 - /api/feedback 완전 제거 (chat 응답에 통합)
@@ -68,6 +86,7 @@ buildSystemPrompt(scenario, persona, nickname, currentStep, alreadyCompleted)
 - lesson_progress: 학생별 수업 진행 기록
 - lesson_sessions: 기존 테이블 (건드리지 말 것)
 - conversation_logs: retry_reason 컬럼, tip 컬럼 제거됨
+- profiles: stt_engine, silence_threshold 컬럼 추가됨
 
 ---
 
