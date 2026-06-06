@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 export interface StudentSettings {
-  tts_speed: 'slow' | 'normal' | 'fast'
+  tts_speed: 'very_slow' | 'slow' | 'normal' | 'fast'
   show_feedback: boolean
   current_book: string
   current_unit: number

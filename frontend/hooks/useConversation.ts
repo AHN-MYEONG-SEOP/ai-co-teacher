@@ -75,7 +75,7 @@ interface UseConversationProps {
   sessionId?: string | null
   studentId?: string
   studentNickname?: string | null
-  ttsSpeed?: 'slow' | 'normal' | 'fast'
+  ttsSpeed?: 'very_slow' | 'slow' | 'normal' | 'fast'
   currentBook?: string
   currentUnit?: number
   persona?: Record<string, unknown> | null
@@ -93,7 +93,7 @@ export interface StartLessonArgs {
   unit: number
 }
 
-const TTS_SPEED_MAP = { slow: 0.75, normal: 1.0, fast: 1.25 }
+const TTS_SPEED_MAP = { very_slow: 0.6, slow: 0.75, normal: 1.0, fast: 1.25 }
 
 export function useConversation({
   sessionId, studentId, studentNickname,

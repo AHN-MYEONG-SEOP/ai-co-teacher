@@ -112,9 +112,10 @@ function SettingsModal({
           <p className="text-sm font-medium text-slate-300">🔊 AI 말하기 속도</p>
           <div className="space-y-2">
             {([
-              { value: 'slow',   label: '느림',  desc: '천천히 또렷하게' },
-              { value: 'normal', label: '보통',  desc: '일반적인 속도' },
-              { value: 'fast',   label: '빠름',  desc: '원어민 속도에 가깝게' },
+              { value: 'very_slow', label: '매우 느림', desc: '아주 천천히 (0.6x)' },
+              { value: 'slow',      label: '느림',      desc: '천천히 또렷하게 (0.75x)' },
+              { value: 'normal',    label: '보통',      desc: '일반적인 속도 (1.0x)' },
+              { value: 'fast',      label: '빠름',      desc: '원어민 속도에 가깝게 (1.25x)' },
             ] as const).map((opt) => (
               <label key={opt.value} className="flex items-center gap-3 cursor-pointer group">
                 <div className={cn(
@@ -1418,7 +1419,7 @@ export default function StudentPage() {
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
-      const speedMap = { slow: 0.75, normal: 1.0, fast: 1.25 }
+      const speedMap = { very_slow: 0.6, slow: 0.75, normal: 1.0, fast: 1.25 }
       audio.playbackRate = speedMap[settings.tts_speed] ?? 1.0
       audio.onended = () => URL.revokeObjectURL(url)
       audio.play().catch(() => {})
