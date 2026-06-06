@@ -187,6 +187,17 @@ function ClassroomContent() {
       .eq('id', sessionId)
   }
 
+  // 브라우저 닫거나 페이지 벗어날 때 세션 자동 종료
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (sessionId) {
+        navigator.sendBeacon('/api/classroom/end-session', JSON.stringify({ sessionId }))
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [sessionId])
+
   const endSession = async () => {
     if (!confirm('수업을 종료하시겠어요?')) return
     await supabase
@@ -194,6 +205,16 @@ function ClassroomContent() {
       .update({ status: 'ended', updated_at: new Date().toISOString() })
       .eq('id', sessionId)
     router.push('/teacher')
+  }
+
+  const handleLogout = async () => {
+    if (!confirm('로그아웃하면 수업이 종료됩니다. 계속할까요?')) return
+    await supabase
+      .from('classroom_sessions')
+      .update({ status: 'ended', updated_at: new Date().toISOString() })
+      .eq('id', sessionId)
+    await supabase.auth.signOut()
+    router.push('/login')
   }
 
   const getStudentAnswer = (studentId: string) => {
@@ -246,6 +267,12 @@ function ClassroomContent() {
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/60 hover:bg-red-700 text-red-300 hover:text-white transition-colors"
           >
             수업 종료
+          </button>
+          <button
+            onClick={handleLogout}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"
+          >
+            로그아웃
           </button>
         </div>
       </header>
