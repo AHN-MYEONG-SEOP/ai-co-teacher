@@ -1318,6 +1318,7 @@ export default function StudentPage() {
   const handleFinalResult = useCallback((text: string, confidence: number, words?: WordResult[], blobUrl?: string, ipa?: string) => {
     if (sentRef.current) return
     sentRef.current = true
+    setSilenceCountdown(null)
 
     const normalized = text.trim()
     const capitalized = normalized.charAt(0).toUpperCase() + normalized.slice(1)
