@@ -74,7 +74,8 @@ export function useWebSpeech({
   // 가공본 blob을 재생용 URL로 저장 (이전 URL은 즉시 revoke — 1개만 유지, 누수 방지)
   const saveProcessedBlob = useCallback((blob: Blob) => {
     setLastProcessedBlobUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev)
+      // revoke하지 않음 — 말풍선 재생 버튼에서 사용 중일 수 있음
+      void prev
       try {
         const newUrl = URL.createObjectURL(blob)
         lastProcessedBlobUrlRef.current = newUrl
