@@ -1813,8 +1813,8 @@ export default function StudentPage() {
               </div>
             </div>
           )}
-          {/* AI 말 끝난 후 학생 응답 대기 버튼 */}
-          {waitingForStudent && !isHolding && !isSpeaking && (
+          {/* AI 말 끝난 후 학생 응답 대기 버튼 — 임시 비활성화 (코드 보존) */}
+          {false && waitingForStudent && !isHolding && !isSpeaking && (
             <div className="flex gap-3 px-4">
               <button
                 onClick={() => {
@@ -1838,8 +1838,8 @@ export default function StudentPage() {
           )}
           {/* 마이크 버튼 + 재생 버튼 (원본 / 가공본 비교) */}
           <div className="flex items-center justify-center gap-6">
-            {/* 원본 녹음 재생 — 필터 거치지 않은 raw 마이크 */}
-            <PlaybackButton key={lastBlobUrl ?? 'raw'} url={lastBlobUrl} label="원본" />
+            {/* 원본 녹음 재생 — 임시 비활성화 (코드 보존) */}
+            {/* <PlaybackButton key={lastBlobUrl ?? 'raw'} url={lastBlobUrl} label="원본" /> */}
 
             {/* 메인 마이크 버튼 — 크게 */}
             <button
@@ -1887,8 +1887,8 @@ export default function StudentPage() {
               {sessionEnded ? '👋' : isHolding ? '🎙️' : '🎤'}
             </button>
 
-            {/* 가공본 재생 — Deepgram에 실제로 전송된 음성 */}
-            <PlaybackButton key={lastProcessedBlobUrl ?? 'proc'} url={lastProcessedBlobUrl} label="가공본" accent="bg-violet-600 hover:bg-violet-700" />
+            {/* 가공본 재생 — 임시 비활성화 (코드 보존) */}
+            {/* <PlaybackButton key={lastProcessedBlobUrl ?? 'proc'} url={lastProcessedBlobUrl} label="가공본" accent="bg-violet-600 hover:bg-violet-700" /> */}
           </div>
 
           <p className={cn('text-xs text-center', sessionEnded ? 'text-emerald-400 font-medium' : 'text-slate-500')}>
