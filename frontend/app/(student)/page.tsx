@@ -1214,6 +1214,14 @@ export default function StudentPage() {
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [isHolding, setIsHolding] = useState(false)
+  const [waitingForStudent, setWaitingForStudent] = useState(false)  // AI 말 끝난 후 학생 응답 대기
+  const prevIsSpeakingRef = useRef(false)
+  useEffect(() => {
+    if (prevIsSpeakingRef.current && !isSpeaking && lessonState === 'active' && !sessionEnded) {
+      setWaitingForStudent(true)
+    }
+    prevIsSpeakingRef.current = isSpeaking
+  }, [isSpeaking, lessonState, sessionEnded])
   const [seenHints, setSeenHints] = useState<Set<string>>(new Set())
   const [pronunciationVisible, setPronunciationVisible] = useState<Record<string, boolean>>({})
   const hintUsedRef = useRef(false)  // 현재 발화에서 힌트 봤는지
@@ -1446,6 +1454,7 @@ export default function StudentPage() {
     console.log('⑤ startListening() 호출 →')
     console.groupEnd()
     addLog('Push-to-Talk 활성화', 'info', 'page.tsx', 'handleMicStart (녹음시작)')
+    setWaitingForStudent(false)
     startListening()
   }, [isSupported, sessionEnded, lessonState, isHolding, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog, seenHints])
 
@@ -1743,6 +1752,29 @@ export default function StudentPage() {
             </div>
           )}
 
+          {/* AI 말 끝난 후 학생 응답 대기 버튼 */}
+          {waitingForStudent && !isHolding && !isSpeaking && (
+            <div className="flex gap-3 px-4">
+              <button
+                onClick={() => {
+                  setWaitingForStudent(false)
+                  handleMicStart()
+                }}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-3 px-4 rounded-2xl transition-colors shadow-lg"
+              >
+                🙋 이해했어요. 말할게요.
+              </button>
+              <button
+                onClick={() => {
+                  setWaitingForStudent(false)
+                  handleExit()
+                }}
+                className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm py-3 px-4 rounded-2xl transition-colors"
+              >
+                종료
+              </button>
+            </div>
+          )}
           {/* 마이크 버튼 + 재생 버튼 (원본 / 가공본 비교) */}
           <div className="flex items-center justify-center gap-6">
             {/* 원본 녹음 재생 — 필터 거치지 않은 raw 마이크 */}
@@ -1787,7 +1819,7 @@ export default function StudentPage() {
                 'transition-all duration-150 shadow-2xl select-none',
                 'disabled:opacity-40 disabled:cursor-not-allowed',
                 isHolding
-                  ? 'bg-gradient-to-br from-emerald-400 to-teal-500 scale-110 shadow-emerald-500/60 ring-4 ring-emerald-400/40'
+                  ? 'bg-gradient-to-br from-blue-400 to-blue-600 scale-110 shadow-blue-500/60 ring-4 ring-blue-400/40'
                   : 'bg-gradient-to-br from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600'
               )}
             >
