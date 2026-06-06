@@ -63,9 +63,9 @@ export function CotyAvatar({ state }: CotyAvatarProps) {
   }, [state])
 
   return (
-    <div className="hidden lg:flex flex-col items-center justify-center w-[280px] shrink-0 border-r border-slate-800 bg-slate-950 px-4 py-6 gap-3">
+    <div className="hidden lg:flex flex-col items-center justify-center w-[420px] shrink-0 border-r border-slate-800 bg-slate-950 px-4 py-6 gap-3">
       <div className="text-xs text-pink-400 font-medium tracking-wide">✨ Coty 선생님</div>
-      <div className="relative w-full max-w-[220px]">
+      <div className="relative w-full max-w-[360px]">
         <video
           ref={videoRef}
           src="/avatars/coty/coty-idle.mp4"
@@ -76,7 +76,7 @@ export function CotyAvatar({ state }: CotyAvatarProps) {
           className="w-full rounded-2xl shadow-2xl"
           style={{
             aspectRatio: '3/4',
-            maxHeight: '320px',
+            maxHeight: '480px',
             objectFit: 'cover',
             transition: 'opacity 0.2s ease-in-out',
           }}
