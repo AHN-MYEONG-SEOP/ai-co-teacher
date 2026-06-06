@@ -60,6 +60,12 @@ export function useWebSpeech({
   const keywordsRef = useRef(keywords)
   const sttEngineRef = useRef(sttEngine)
   useEffect(() => { sttEngineRef.current = sttEngine }, [sttEngine])
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const silenceAnalyserRef = useRef<AnalyserNode | null>(null)
+  const silenceRafRef = useRef<number | null>(null)
+  const stopListeningRef = useRef<(() => Promise<void>) | null>(null)
+  const SILENCE_THRESHOLD = 10    // 음량 임계값 (0~255)
+  const SILENCE_DELAY_MS = 3000   // 3초 침묵 시 자동 전송
 
   // ref 동기화
   useEffect(() => { onFinalResultRef.current = onFinalResult }, [onFinalResult])
@@ -245,6 +251,47 @@ export function useWebSpeech({
       console.log(`✅ 녹음 시작! (+${(performance.now()-t0).toFixed(0)}ms — 예열 상태면 즉시)`)
       console.groupEnd()
       onLogRef.current?.('녹음 시작 — 말씀하세요')
+
+      // ── VAD: 3초 침묵 시 자동 전송 ──────────────────────
+      try {
+        const actx = audioCtxRef.current
+        if (actx) {
+          const analyser = actx.createAnalyser()
+          analyser.fftSize = 512
+          const source = actx.createMediaStreamSource(processedStream)
+          source.connect(analyser)
+          silenceAnalyserRef.current = analyser
+          const dataArr = new Uint8Array(analyser.frequencyBinCount)
+
+          const checkSilence = () => {
+            if (!mrRef.current || mrRef.current.state !== 'recording') return
+            analyser.getByteFrequencyData(dataArr)
+            const avg = dataArr.reduce((a, b) => a + b, 0) / dataArr.length
+
+            if (avg < SILENCE_THRESHOLD) {
+              // 침묵 감지 — 타이머 없으면 시작
+              if (!silenceTimerRef.current) {
+                silenceTimerRef.current = setTimeout(async () => {
+                  onLogRef.current?.('🔇 3초 침묵 감지 — 자동 전송')
+                  if (silenceRafRef.current) cancelAnimationFrame(silenceRafRef.current)
+                  silenceTimerRef.current = null
+                  await stopListeningRef.current?.()
+                }, SILENCE_DELAY_MS)
+              }
+            } else {
+              // 소리 감지 — 타이머 초기화
+              if (silenceTimerRef.current) {
+                clearTimeout(silenceTimerRef.current)
+                silenceTimerRef.current = null
+              }
+            }
+            silenceRafRef.current = requestAnimationFrame(checkSilence)
+          }
+          silenceRafRef.current = requestAnimationFrame(checkSilence)
+        }
+      } catch (vadErr) {
+        console.warn('VAD 초기화 실패:', vadErr)
+      }
     } catch (err) {
       console.groupEnd()
       onLogRef.current?.(`❌ 녹음 시작 실패: ${err}`)
@@ -256,6 +303,10 @@ export function useWebSpeech({
   }, [prepare])
 
   const stopListening = useCallback(async () => {
+    // VAD 정리
+    if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null }
+    if (silenceRafRef.current) { cancelAnimationFrame(silenceRafRef.current); silenceRafRef.current = null }
+    silenceAnalyserRef.current = null
     const t1 = performance.now()
     console.group('🛑 [MIC] stopListening')
     console.log('① MediaRecorder 정지 요청')
@@ -446,6 +497,8 @@ export function useWebSpeech({
       onFallbackRef.current?.(0)
     }
   }, [])
+
+  useEffect(() => { stopListeningRef.current = stopListening }, [stopListening])
 
   return { isSupported, isListening, isReady, startListening, stopListening, lastProcessedBlobUrl }
 }
