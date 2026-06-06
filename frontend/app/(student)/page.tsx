@@ -1188,8 +1188,9 @@ export default function StudentPage() {
         .select('id')
         .eq('class_id', classId)
         .eq('status', 'active')
-        .single()
-      if (data) setClassroomInvite({ sessionId: data.id })
+        .order('created_at', { ascending: false })
+        .limit(1)
+      if (data && data.length > 0) setClassroomInvite({ sessionId: data[0].id })
     }
     checkSession()
     // Realtime 구독 (이미 접속 중일 때 선생님이 수업 시작하면 팝업)
