@@ -65,7 +65,7 @@ export function CotyAvatar({ state }: CotyAvatarProps) {
   return (
     <div className="hidden lg:flex flex-col items-center justify-center w-[420px] shrink-0 border-r border-slate-800 bg-slate-950 px-4 py-6 gap-3">
       <div className="text-xs text-pink-400 font-medium tracking-wide">✨ Coty 선생님</div>
-      <div className="relative w-full max-w-[360px]">
+      <div className="relative w-full max-w-[180px] lg:max-w-[360px]">
         <video
           ref={videoRef}
           src="/avatars/coty/coty-idle.mp4"
