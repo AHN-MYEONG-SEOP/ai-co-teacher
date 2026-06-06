@@ -309,6 +309,8 @@ export function useWebSpeech({
     const mimeType = mrRef.current?.mimeType || 'audio/webm'
     const blob = new Blob(chunks, { type: mimeType })
     chunksRef.current = []
+    // Blob URL 생성 — onFinalResult 콜백으로 전달됨
+    saveProcessedBlob(blob)
     console.log(`⑤ Blob 생성: ${(blob.size/1024).toFixed(1)}KB, type=${blob.type}`)
     console.log(`⑥ Deepgram 전송 시작... (+${(performance.now()-t1).toFixed(0)}ms)`)
     onLogRef.current?.(`Deepgram 전송 중... (${(blob.size / 1024).toFixed(1)}KB)`)
