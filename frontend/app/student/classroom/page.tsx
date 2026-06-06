@@ -46,7 +46,19 @@ function StudentClassroomContent() {
       .select('name, nickname')
       .eq('id', user.id)
       .single()
-    setStudentName(profile?.nickname || profile?.name || '학생')
+    const name = profile?.nickname || profile?.name || '학생'
+    setStudentName(name)
+
+    // 교실 참여 등록
+    await supabase
+      .from('classroom_participants')
+      .upsert({
+        session_id: sessionId,
+        student_id: user.id,
+        student_name: name,
+        joined_at: new Date().toISOString(),
+        is_online: true,
+      }, { onConflict: 'session_id,student_id' })
 
     const { data: sess } = await supabase
       .from('classroom_sessions')

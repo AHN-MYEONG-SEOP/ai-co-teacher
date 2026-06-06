@@ -30,6 +30,14 @@ interface StudentAnswer {
   created_at: string
 }
 
+interface Participant {
+  id: string
+  student_id: string
+  student_name: string
+  joined_at: string
+  is_online: boolean
+}
+
 interface ClassStudent {
   id: string
   name: string
@@ -47,6 +55,7 @@ function ClassroomContent() {
   const [cotyState, setCotyState] = useState<CotyState>('idle')
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [participants, setParticipants] = useState<Participant[]>([])
 
   const supabase = createClient()
 
@@ -73,6 +82,14 @@ function ClassroomContent() {
     setStudents(members || [])
 
     await loadAnswers(sess.id, sess.current_step)
+
+    // 참여 학생 로드
+    const { data: parts } = await supabase
+      .from('classroom_participants')
+      .select('*')
+      .eq('session_id', sess.id)
+      .eq('is_online', true)
+    setParticipants(parts || [])
     setLoading(false)
   }
 
@@ -100,6 +117,18 @@ function ClassroomContent() {
           const exists = prev.find(a => a.id === payload.new.id)
           if (exists) return prev
           return [...prev, payload.new as StudentAnswer]
+        })
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'classroom_participants',
+        filter: `session_id=eq.${sessionId}`,
+      }, (payload) => {
+        setParticipants(prev => {
+          const exists = prev.find(p => p.student_id === payload.new.student_id)
+          if (exists) return prev
+          return [...prev, payload.new as Participant]
         })
       })
       .on('postgres_changes', {
@@ -194,6 +223,7 @@ function ClassroomContent() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <span className="text-xs text-blue-400">🟢 접속: {participants.length}명</span>
           <span className="text-xs text-emerald-400">✅ {correctCount}명</span>
           <span className="text-xs text-red-400">❌ {incorrectCount}명</span>
           <span className="text-xs text-slate-400">⬜ {waitingCount}명</span>
@@ -257,20 +287,25 @@ function ClassroomContent() {
                 : answer.is_correct ? 'correct'
                 : 'incorrect'
 
+              const isOnline = participants.some(p => p.student_id === student.id)
               return (
                 <div key={student.id} className={cn(
                   'bg-slate-900 border-2 rounded-2xl p-3 flex flex-col gap-2 transition-all',
                   status === 'correct' ? 'border-emerald-500/60' :
                   status === 'incorrect' ? 'border-red-500/60' :
+                  isOnline ? 'border-blue-500/40' :
                   'border-slate-700'
                 )}>
                   {/* 학생 이름 */}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-white">
-                      {student.nickname || student.name}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn('w-2 h-2 rounded-full', isOnline ? 'bg-blue-400 animate-pulse' : 'bg-slate-600')} />
+                      <span className="text-sm font-medium text-white">
+                        {student.nickname || student.name}
+                      </span>
+                    </div>
                     <span className="text-lg">
-                      {status === 'correct' ? '✅' : status === 'incorrect' ? '❌' : '⬜'}
+                      {status === 'correct' ? '✅' : status === 'incorrect' ? '❌' : isOnline ? '🟢' : '⬜'}
                     </span>
                   </div>
 
