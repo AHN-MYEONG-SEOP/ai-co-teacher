@@ -166,6 +166,29 @@ function SettingsModal({
             ))}
           </div>
         </div>
+        {/* 침묵 감지 임계값 */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-300">🔇 침묵 감지 민감도</p>
+              <p className="text-xs text-slate-500 mt-0.5">값이 낮을수록 민감 (조용한 환경), 높을수록 둔감 (시끄러운 환경)</p>
+            </div>
+            <span className="text-sm font-mono text-emerald-400">{local.silence_threshold ?? 40}</span>
+          </div>
+          <input
+            type="range"
+            min={5}
+            max={80}
+            step={5}
+            value={local.silence_threshold ?? 40}
+            onChange={(e) => setLocal(p => ({ ...p, silence_threshold: Number(e.target.value) }))}
+            className="w-full accent-emerald-400"
+          />
+          <div className="flex justify-between text-xs text-slate-600">
+            <span>민감 (조용한 방)</span>
+            <span>둔감 (시끄러운 환경)</span>
+          </div>
+        </div>
         {/* 발화 피드백 표시 */}
         <div className="flex items-center justify-between">
           <div>
@@ -1214,7 +1237,8 @@ export default function StudentPage() {
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [isHolding, setIsHolding] = useState(false)
-  const [waitingForStudent, setWaitingForStudent] = useState(false)  // AI 말 끝난 후 학생 응답 대기
+  const [waitingForStudent, setWaitingForStudent] = useState(false)
+  const [silenceCountdown, setSilenceCountdown] = useState<number | null>(null)  // AI 말 끝난 후 학생 응답 대기
   const prevIsSpeakingRef = useRef(false)
   useEffect(() => {
     if (prevIsSpeakingRef.current && !isSpeaking && lessonState === 'active' && !sessionEnded) {
@@ -1404,6 +1428,8 @@ export default function StudentPage() {
   const { isSupported, isListening, startListening, stopListening, lastProcessedBlobUrl } = useWebSpeech({
     onInterimResult: handleInterim,
     sttEngine: settings.stt_engine ?? 'deepgram',
+    silenceThreshold: settings.silence_threshold ?? 40,
+    onSilenceCountdown: setSilenceCountdown,
     onFinalResult: handleFinalResult,
     onFallback: handleFallback,
     onError: handleError,
@@ -1455,6 +1481,7 @@ export default function StudentPage() {
     console.groupEnd()
     addLog('Push-to-Talk 활성화', 'info', 'page.tsx', 'handleMicStart (녹음시작)')
     setWaitingForStudent(false)
+    setSilenceCountdown(null)
     startListening()
   }, [isSupported, sessionEnded, lessonState, isHolding, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog, seenHints])
 
@@ -1752,6 +1779,22 @@ export default function StudentPage() {
             </div>
           )}
 
+          {/* 침묵 카운트다운 */}
+          {silenceCountdown !== null && silenceCountdown > 0 && (
+            <div className="flex justify-center">
+              <div className="bg-amber-900/40 border border-amber-700/40 rounded-2xl px-6 py-2 flex items-center gap-3">
+                <span className="text-amber-300 text-sm">🔇 침묵 감지</span>
+                <span className="text-amber-400 font-bold font-mono text-2xl">{silenceCountdown}</span>
+              </div>
+            </div>
+          )}
+          {silenceCountdown === 0 && (
+            <div className="flex justify-center">
+              <div className="bg-emerald-900/40 border border-emerald-700/40 rounded-2xl px-6 py-2">
+                <span className="text-emerald-300 text-sm">✅ 전송 중...</span>
+              </div>
+            </div>
+          )}
           {/* AI 말 끝난 후 학생 응답 대기 버튼 */}
           {waitingForStudent && !isHolding && !isSpeaking && (
             <div className="flex gap-3 px-4">

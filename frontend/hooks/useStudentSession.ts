@@ -9,6 +9,7 @@ export interface StudentSettings {
   current_book: string
   current_unit: number
   stt_engine: 'deepgram' | 'huggingface'
+  silence_threshold: number
 }
 
 const DEFAULT_SETTINGS: StudentSettings = {
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: StudentSettings = {
   current_book: 'STARLAND Phonics 1 Single Letters',
   current_unit: 1,
   stt_engine: 'deepgram',
+  silence_threshold: 40,
 }
 
 interface StudentSession {
@@ -55,7 +57,7 @@ export function useStudentSession(): StudentSession {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('name, nickname, tts_speed, show_feedback, current_book, current_unit, stt_engine')
+        .select('name, nickname, tts_speed, show_feedback, current_book, current_unit, stt_engine, silence_threshold')
         .eq('id', user.id)
         .single()
 
@@ -68,6 +70,7 @@ export function useStudentSession(): StudentSession {
           current_book: profile.current_book || DEFAULT_SETTINGS.current_book,
           current_unit: profile.current_unit || DEFAULT_SETTINGS.current_unit,
           stt_engine: profile.stt_engine || 'deepgram',
+          silence_threshold: profile.silence_threshold ?? 40,
         })
       }
       // 프로필 로드 완료 → page에서 시나리오/회차 로드를 시작할 수 있음
@@ -116,6 +119,7 @@ export function useStudentSession(): StudentSession {
         current_book: updated.current_book,
         current_unit: updated.current_unit,
         stt_engine: updated.stt_engine,
+        silence_threshold: updated.silence_threshold,
       })
       .eq('id', studentId)
   }

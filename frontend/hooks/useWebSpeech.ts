@@ -17,6 +17,8 @@ interface DeepgramOptions {
   // 오늘 배우는 target 단어들 — Deepgram keyword boosting(문맥 힌트)에 사용
   keywords?: string[]
   sttEngine?: 'deepgram' | 'huggingface'
+  silenceThreshold?: number
+  onSilenceCountdown?: (count: number | null) => void
 }
 
 export function useWebSpeech({
@@ -29,6 +31,8 @@ export function useWebSpeech({
   processingConfig = DEFAULT_AUDIO_CONFIG,
   keywords = [],
   sttEngine = 'deepgram' as 'deepgram' | 'huggingface',
+  silenceThreshold = 40,
+  onSilenceCountdown,
 }: DeepgramOptions) {
   const mrRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -64,8 +68,10 @@ export function useWebSpeech({
   const silenceAnalyserRef = useRef<AnalyserNode | null>(null)
   const silenceRafRef = useRef<number | null>(null)
   const stopListeningRef = useRef<(() => Promise<void>) | null>(null)
-  const SILENCE_THRESHOLD = 10    // 음량 임계값 (0~255)
-  const SILENCE_DELAY_MS = 3000   // 3초 침묵 시 자동 전송
+  const silenceThresholdRef = useRef(silenceThreshold)
+  const onSilenceCountdownRef = useRef(onSilenceCountdown)
+  useEffect(() => { silenceThresholdRef.current = silenceThreshold }, [silenceThreshold])
+  useEffect(() => { onSilenceCountdownRef.current = onSilenceCountdown }, [onSilenceCountdown])
 
   // ref 동기화
   useEffect(() => { onFinalResultRef.current = onFinalResult }, [onFinalResult])
@@ -268,21 +274,32 @@ export function useWebSpeech({
             analyser.getByteFrequencyData(dataArr)
             const avg = dataArr.reduce((a, b) => a + b, 0) / dataArr.length
 
-            if (avg < SILENCE_THRESHOLD) {
-              // 침묵 감지 — 타이머 없으면 시작
+            if (avg < silenceThresholdRef.current) {
+              // 침묵 감지 — 카운트다운 시작
               if (!silenceTimerRef.current) {
-                silenceTimerRef.current = setTimeout(async () => {
-                  onLogRef.current?.('🔇 3초 침묵 감지 — 자동 전송')
-                  if (silenceRafRef.current) cancelAnimationFrame(silenceRafRef.current)
-                  silenceTimerRef.current = null
-                  await stopListeningRef.current?.()
-                }, SILENCE_DELAY_MS)
+                let count = 3
+                onSilenceCountdownRef.current?.(count)
+                const tick = () => {
+                  count--
+                  if (count > 0) {
+                    onSilenceCountdownRef.current?.(count)
+                    silenceTimerRef.current = setTimeout(tick, 1000)
+                  } else {
+                    onSilenceCountdownRef.current?.(0)
+                    silenceTimerRef.current = null
+                    if (silenceRafRef.current) cancelAnimationFrame(silenceRafRef.current)
+                    onLogRef.current?.('🔇 침묵 3초 — 자동 전송')
+                    stopListeningRef.current?.()
+                  }
+                }
+                silenceTimerRef.current = setTimeout(tick, 1000)
               }
             } else {
-              // 소리 감지 — 타이머 초기화
+              // 소리 감지 — 카운트다운 취소
               if (silenceTimerRef.current) {
                 clearTimeout(silenceTimerRef.current)
                 silenceTimerRef.current = null
+                onSilenceCountdownRef.current?.(null)
               }
             }
             silenceRafRef.current = requestAnimationFrame(checkSilence)
