@@ -1239,8 +1239,7 @@ export default function StudentPage() {
 
   // Path B: Blob → Whisper 서버
   const handleBlobReady = useCallback(async (blob: Blob) => {
-    // Blob URL을 미리 생성해서 ref에 저장
-    if (pendingBlobUrlRef.current) URL.revokeObjectURL(pendingBlobUrlRef.current)
+    // Blob URL 생성 — revoke하지 않음 (말풍선 재생 버튼에서 사용)
     pendingBlobUrlRef.current = URL.createObjectURL(blob)
     addLog(`Path B: Whisper 전송 중... (${(blob.size / 1024).toFixed(1)}KB)`, 'warning')
     setAvatarStatus('processing')
@@ -1297,8 +1296,8 @@ export default function StudentPage() {
     setInterimText('')
     setInterimWords([])
     if (words) setFinalWords(words)
-    const currentBlobUrl = blobUrl || pendingBlobUrlRef.current || lastBlobUrlRef.current || undefined
-    pendingBlobUrlRef.current = null
+    const currentBlobUrl = pendingBlobUrlRef.current || blobUrl || lastBlobUrlRef.current || undefined
+    // pendingBlobUrlRef는 null로 초기화하지 않음 — 말풍선 재생 버튼에서 사용
     discardBlob()
     addLog(`transcript: "${punctuated}" | confidence: ${(confidence * 100).toFixed(0)}% | latency: ${latency}ms`, 'success', 'useWebSpeech.ts', 'onSTTResult (STT완료)')
     sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current, blobUrl: currentBlobUrl, ipa: ipa }, words)
