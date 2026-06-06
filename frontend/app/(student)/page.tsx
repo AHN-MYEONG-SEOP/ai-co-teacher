@@ -1796,24 +1796,7 @@ export default function StudentPage() {
               </div>
             </div>
           )}
-
-          {/* 침묵 카운트다운 */}
-          {silenceCountdown !== null && silenceCountdown > 0 && (
-            <div className="flex justify-center">
-              <div className="bg-amber-900/40 border border-amber-700/40 rounded-2xl px-6 py-2 flex items-center gap-3">
-                <span className="text-amber-300 text-sm">🔇 침묵 감지</span>
-                <span className="text-amber-400 font-bold font-mono text-2xl">{silenceCountdown}</span>
-              </div>
-            </div>
-          )}
-          {silenceCountdown === 0 && (
-            <div className="flex justify-center">
-              <div className="bg-emerald-900/40 border border-emerald-700/40 rounded-2xl px-6 py-2">
-                <span className="text-emerald-300 text-sm">✅ 전송 중...</span>
-              </div>
-            </div>
-          )}
-          {/* AI 말 끝난 후 학생 응답 대기 버튼 — 임시 비활성화 (코드 보존) */}
+          {/* 침묵 카운트다운 — 비활성화 (코드 보존) */}
           {false && waitingForStudent && !isHolding && !isSpeaking && (
             <div className="flex gap-3 px-4">
               <button
