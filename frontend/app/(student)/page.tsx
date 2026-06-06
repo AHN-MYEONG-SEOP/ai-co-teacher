@@ -1,4 +1,6 @@
 'use client'
+// DEV_LOG 환경변수로 패널 ON/OFF
+const DEV_LOG_ENABLED = process.env.NEXT_PUBLIC_DEV_LOG !== 'false'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -13,6 +15,7 @@ import { useAudioStore } from '@/store/audioStore'
 import { useUIStore } from '@/store/uiStore'
 import { useAudioConfigStore, type AudioProcessingConfig } from '@/store/audioConfigStore'
 import { cn } from '@/lib/utils'
+import { DevLogPanel } from '@/components/DevLogPanel'
 import type { WordResult } from '@/types'
 
 // ── 설정 모달 ──────────────────────────────────────────
@@ -1452,7 +1455,9 @@ export default function StudentPage() {
   }, [isHolding, stopListening, setAvatarStatus, setInterimText, setInterimWords])
 
   return (
-    <main className="h-[100dvh] bg-slate-950 text-white flex flex-col overflow-hidden">
+    <div className="flex h-[100dvh] bg-slate-950 text-white overflow-hidden">
+    {/* 왼쪽: 앱 화면 */}
+    <main className="h-[100dvh] bg-slate-950 text-white flex flex-col overflow-hidden flex-shrink-0 w-full lg:w-[420px]">
       <NavBar logCount={logs.length} onLogClick={() => setLogDrawerOpen(!isLogDrawerOpen)} onSettingsClick={() => setShowSettings(true)} />
 
       {/* 배경 그라디언트 */}
@@ -1919,5 +1924,15 @@ export default function StudentPage() {
         </div>
       </div>
     </main>
+    {/* 오른쪽: Dev Log 패널 (데스크탑 전용) */}
+    {DEV_LOG_ENABLED && (
+      <div className="hidden lg:flex flex-col flex-1 border-l border-slate-800 min-w-[300px] max-w-[500px]">
+        <DevLogPanel
+          logs={logs}
+          onClear={() => setLogs([])}
+        />
+      </div>
+    )}
+    </div>
   )
 }
