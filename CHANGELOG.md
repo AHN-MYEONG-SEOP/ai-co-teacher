@@ -195,6 +195,9 @@
 
 ## 변경 이력
 
+### 2026-06-06
+- **feat: Coty 아바타 + 음파 애니메이션 추가 (v2026-06-06.11)** — 데스크탑 화면 왼쪽에 Coty 선생님 아바타 패널 추가. 상태(idle/speaking/listening/processing/correct/encourage/think)에 따라 이미지 자동 전환. TTS 재생 중 음파(SoundWave) 애니메이션 표시. `components/student/CotyAvatar.tsx` 신규 생성.
+
 ### 2026-06
 - **keyword boosting 핵심어 확대** (v2026-06-01.11): 기존 Unit target 단어에 더해 ① 시나리오 stage 타깃 ② **AI가 방금 던진 질문 속 핵심어**까지 Deepgram `keywords`에 포함. 학생이 다음에 말할 가능성이 높은 단어를 그 턴마다 동적으로 부스트 → 답변 인식 정확도↑. 흔한 기능어(the/you/what 등)는 stopword로 제외, 3글자 이상 알파벳 토큰만 추출
 - **Deepgram `nova-2`로 복귀 + keyword boosting(문맥 힌트) 도입** (v2026-06-01.10): conversational 변형 모델은 인식 품질이 오히려 떨어져 기본 `nova-2`로 되돌림. 대신 **연음/구어체 인식 보완**을 위해 오늘 Unit의 target 단어를 Deepgram `keywords` 파라미터(keyword boosting, `word:2`)로 전달 → 발음이 다소 뭉개져도 해당 단어로 인식될 확률↑. `useWebSpeech`에 `keywords` 옵션 추가, 학생 화면이 `useCurriculum.getUnitData`로 현재 Unit 단어를 추출해 주입 (최대 80개, `,`/`/` 분리·중복 제거)

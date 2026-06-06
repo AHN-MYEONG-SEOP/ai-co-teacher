@@ -16,6 +16,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useAudioConfigStore, type AudioProcessingConfig } from '@/store/audioConfigStore'
 import { cn } from '@/lib/utils'
 import { DevLogPanel } from '@/components/DevLogPanel'
+import { CotyAvatar, type CotyState } from '@/components/student/CotyAvatar'
 import type { WordResult } from '@/types'
 
 // ── 설정 모달 ──────────────────────────────────────────
@@ -1495,9 +1496,24 @@ export default function StudentPage() {
     await stopListening()
   }, [isHolding, stopListening, setAvatarStatus, setInterimText, setInterimWords])
 
+  // avatarStatus → CotyState 매핑
+  const cotyState: CotyState = (() => {
+    if (avatarStatus === 'speaking') return 'speaking'
+    if (avatarStatus === 'listening') return 'listening'
+    if (avatarStatus === 'processing') return 'processing'
+    // 마지막 메시지 기반으로 correct/encourage 판단
+    const lastAiMsg = [...messages].reverse().find(m => m.role === 'ai')
+    const lastStudentMsg = [...messages].reverse().find(m => m.role === 'student')
+    if (lastStudentMsg?.feedback?.overall !== undefined && lastStudentMsg.feedback.overall >= 80) return 'correct'
+    if (lastStudentMsg?.feedback?.overall !== undefined && lastStudentMsg.feedback.overall < 70) return 'encourage'
+    return 'idle'
+  })()
+
   return (
     <div className="flex h-[100dvh] bg-slate-950 text-white overflow-hidden">
-    {/* 왼쪽: 앱 화면 */}
+    {/* 왼쪽: Coty 아바타 (데스크탑 전용) */}
+    <CotyAvatar state={cotyState} />
+    {/* 중앙: 앱 화면 */}
     <main className="h-[100dvh] bg-slate-950 text-white flex flex-col overflow-hidden flex-shrink-0 w-full lg:w-[420px]">
       <NavBar logCount={logs.length} onLogClick={() => setLogDrawerOpen(!isLogDrawerOpen)} onSettingsClick={() => setShowSettings(true)} />
 
