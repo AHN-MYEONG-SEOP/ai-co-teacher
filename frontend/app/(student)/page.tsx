@@ -830,6 +830,8 @@ interface LogEntry {
   time: string
   message: string
   type: 'info' | 'success' | 'warning' | 'error'
+  file?: string
+  fn?: string
 }
 
 // ── 수업 시작 확인 카드 (로그인 직후) ──────────────────
@@ -1226,11 +1228,14 @@ export default function StudentPage() {
     return () => clearTimeout(timer)
   }, [messages, isHolding, interimText, isSpeaking])
 
-  const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
+  const addLog = useCallback((message: string, type: LogEntry['type'] = 'info', file?: string, fn?: string) => {
     const now = new Date()
     const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`
-    setLogs((prev) => [{ id: logIdRef.current++, time, message, type }, ...prev].slice(0, 50))
+    setLogs((prev) => [{ id: logIdRef.current++, time, message, type, file, fn }, ...prev].slice(0, 200))
   }, [])
+
+  // Blob URL ref — handleBlobReady보다 먼저 선언해야 함
+  const pendingBlobUrlRef = useRef<string | null>(null)
 
   // Path B: Blob → Whisper 서버
   const handleBlobReady = useCallback(async (blob: Blob) => {
@@ -1272,7 +1277,6 @@ export default function StudentPage() {
   })
   const lastBlobUrlRef = useRef<string | null>(null)
   useEffect(() => { lastBlobUrlRef.current = lastBlobUrl }, [lastBlobUrl])
-  const pendingBlobUrlRef = useRef<string | null>(null)
 
   const handleInterim = useCallback((text: string, words?: WordResult[]) => {
     setInterimText(text)
@@ -1296,7 +1300,7 @@ export default function StudentPage() {
     const currentBlobUrl = blobUrl || pendingBlobUrlRef.current || lastBlobUrlRef.current || undefined
     pendingBlobUrlRef.current = null
     discardBlob()
-    addLog(`Path A: "${punctuated}" (confidence: ${(confidence * 100).toFixed(0)}%, ${latency}ms)`, 'success')
+    addLog(`transcript: "${punctuated}" | confidence: ${(confidence * 100).toFixed(0)}% | latency: ${latency}ms`, 'success', 'useWebSpeech.ts', 'onSTTResult (STT완료)')
     sendToGPT(punctuated, { sttPath: 'A', confidence, latencyMs: latency, hintUsed: hintUsedRef.current, blobUrl: currentBlobUrl, ipa: ipa }, words)
     // 답변 후 힌트 상태 초기화
     setSeenHints(new Set())
@@ -1306,7 +1310,7 @@ export default function StudentPage() {
     if (sentRef.current) return
     sentRef.current = true
 
-    addLog(`인식 불명확: confidence ${(confidence * 100).toFixed(0)}% — 재시도 요청`, 'warning')
+    addLog(`confidence: ${(confidence * 100).toFixed(0)}% — 재시도 요청`, 'warning', 'useWebSpeech.ts', 'onFallback (인식불명확)')
     discardBlob()
     setInterimText('')
     setInterimWords([])
@@ -1379,7 +1383,7 @@ export default function StudentPage() {
   }, [discardBlob, addLog, addMessage, setAvatarStatus, setInterimText, setInterimWords])
 
   const handleError = useCallback((error: string) => {
-    addLog(`STT 오류: ${error}`, 'error')
+    addLog(`${error}`, 'error', 'useWebSpeech.ts', 'onError (STT오류)')
     setAvatarStatus('idle')
     discardBlob()
   }, [addLog, setAvatarStatus, discardBlob])
@@ -1395,7 +1399,7 @@ export default function StudentPage() {
     onFinalResult: handleFinalResult,
     onFallback: handleFallback,
     onError: handleError,
-    onLog: (msg) => addLog(msg, 'info'),
+    onLog: (msg) => addLog(msg, 'info', 'useWebSpeech.ts', 'onLog'),
     onStreamReady: handleStreamReady,
     processingConfig: audioConfig,
     keywords: sttKeywords,
@@ -1441,7 +1445,7 @@ export default function StudentPage() {
     console.log('④ avatarStatus = listening, interimText 설정')
     console.log('⑤ startListening() 호출 →')
     console.groupEnd()
-    addLog('마이크 시작', 'info')
+    addLog('Push-to-Talk 활성화', 'info', 'page.tsx', 'handleMicStart (녹음시작)')
     startListening()
   }, [isSupported, sessionEnded, lessonState, isHolding, startListening, setAvatarStatus, setInterimText, setInterimWords, addLog, seenHints])
 

@@ -7,6 +7,8 @@ interface LogEntry {
   time: string
   message: string
   type: 'info' | 'success' | 'warning' | 'error'
+  file?: string
+  fn?: string
 }
 
 type TabFilter = '전체' | 'STT' | 'GPT' | 'TTS' | '오류'
@@ -104,9 +106,11 @@ export function DevLogPanel({ logs, onClear }: {
               log.type === 'info'    && 'border-[#22d3ee]',
             )}
           >
-            <span className="text-[10px] text-slate-600 mr-2 font-mono">{log.time}</span>
+            <span className="text-[10px] text-slate-600 mr-2 font-mono shrink-0">{log.time}</span>
+            {log.file && <span className="text-[#38bdf8] mr-1 font-mono text-[10px] shrink-0">{log.file}</span>}
+            {log.fn && <span className="text-[#fbbf24] mr-2 font-mono text-[10px] shrink-0">→ {log.fn}</span>}
             <span className={cn(
-              'font-mono',
+              'font-mono text-[11px]',
               log.type === 'success' && 'text-emerald-400',
               log.type === 'warning' && 'text-amber-400',
               log.type === 'error'   && 'text-red-400',
