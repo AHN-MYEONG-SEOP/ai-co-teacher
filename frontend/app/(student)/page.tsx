@@ -1037,6 +1037,7 @@ export default function StudentPage() {
     setInterimWords, setFinalWords,
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage, clearMessages } = useUIStore()
+  const [isDevLogOpen, setIsDevLogOpen] = useState(true)
   const { studentId, sessionId, studentNickname, ready, settings, persona, updateSettings } = useStudentSession()
 
   const router = useRouter()
@@ -2020,13 +2021,29 @@ export default function StudentPage() {
         </div>
       </div>
     </main>
-    {/* 오른쪽: Dev Log 패널 (데스크탑 전용) */}
+    {/* 오른쪽: Dev Log 패널 토글 버튼 + 패널 (데스크탑 전용) */}
     {DEV_LOG_ENABLED && (
-      <div className="hidden lg:flex flex-col flex-1 border-l border-slate-800 min-w-[300px] max-w-[500px]">
-        <DevLogPanel
-          logs={logs}
-          onClear={() => setLogs([])}
-        />
+      <div className="hidden lg:flex">
+        {/* 토글 버튼 */}
+        <button
+          onClick={() => setIsDevLogOpen(v => !v)}
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-50 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs px-1 py-3 rounded-l-lg transition-all shadow-lg"
+          title={isDevLogOpen ? 'Dev Log 닫기' : 'Dev Log 열기'}
+          style={{ right: isDevLogOpen ? 'calc(min(500px, 33vw))' : '0px', transition: 'right 0.3s ease' }}
+        >
+          {isDevLogOpen ? '▶' : '◀'}
+          <span className="block mt-1 [writing-mode:vertical-rl] text-[10px] tracking-widest opacity-70">LOG</span>
+        </button>
+        {/* 패널 */}
+        <div
+          className="flex flex-col border-l border-slate-800 min-w-[300px] max-w-[500px] transition-all duration-300 overflow-hidden"
+          style={{ width: isDevLogOpen ? 'min(500px, 33vw)' : '0px', minWidth: isDevLogOpen ? '300px' : '0px', opacity: isDevLogOpen ? 1 : 0 }}
+        >
+          <DevLogPanel
+            logs={logs}
+            onClear={() => setLogs([])}
+          />
+        </div>
       </div>
     )}
     </div>
