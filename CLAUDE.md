@@ -61,6 +61,7 @@ Claude Code는 매 작업 완료 시 아래 규칙을 **자동으로** 따라야
 | 상태관리 | Zustand | `frontend/store/` |
 | BaaS | Supabase (Auth, DB, Realtime) | |
 | STT | Deepgram nova-2 (HTTP Blob) | 현재 구현 |
+| STT IPA | HuggingFace wav2vec2-lv-60-espeak-cv-ft | 발음기호 분석용 |
 | STT Fallback | FastAPI + Whisper | Mac Mini M4 타겟 |
 | TTS | ElevenLabs | TTS_PROVIDER=elevenlabs |
 | LLM | OpenAI GPT-4o-mini | |
@@ -198,9 +199,12 @@ transcript + confidence + words 반환
 ```sql
 profiles (
   id uuid PK, role text, name text, nickname text, class_id uuid,
-  tts_speed text, show_feedback boolean,
+  tts_speed text,              -- 'very_slow' | 'slow' | 'normal' | 'fast'
+  show_feedback boolean,
   current_book text, current_unit integer,
-  mode text  -- 'study' | 'chat'
+  stt_engine text,             -- 'deepgram' | 'huggingface' (DEFAULT 'deepgram')
+  silence_threshold integer,   -- VAD 침묵 감지 임계값 (DEFAULT 40, 범위 5~80)
+  mode text                    -- 'study' | 'chat'
 )
 
 conversation_logs (
@@ -299,9 +303,11 @@ lesson_progress (
 
 | 설정 | 옵션 | DB 컬럼 |
 |------|------|---------|
-| AI 말하기 속도 | 느림/보통/빠름 | profiles.tts_speed |
+| AI 말하기 속도 | 매우느림(0.6x)/느림(0.75x)/보통(1.0x)/빠름(1.25x) | profiles.tts_speed |
 | 발화 피드백 표시 | ON/OFF | profiles.show_feedback |
 | 학습 교재 | Book/Unit | profiles.current_book/unit |
+| STT 엔진 | Deepgram(빠름) / HuggingFace(IPA 발음기호) | profiles.stt_engine |
+| 침묵 감지 임계값 | 5~80 슬라이더 (기본 40) | profiles.silence_threshold |
 
 ---
 
@@ -359,6 +365,8 @@ ELEVENLABS_API_KEY=...
 ELEVENLABS_VOICE_ID=dSBPNBQ40EIx8MT5ZFf6
 TTS_PROVIDER=elevenlabs
 NEXT_PUBLIC_WHISPER_SERVER_URL=http://localhost:8000
+HUGGINGFACE_API_KEY=...
+NEXT_PUBLIC_DEV_LOG=true  # false로 설정 시 Dev Log 패널 숨김
 
 # Backend (.env)
 OPENAI_API_KEY=...
@@ -396,5 +404,5 @@ npx turbo dev
 
 ---
 
-**문서 버전**: v2.1
-**최종 수정**: 2026년 6월
+**문서 버전**: v2.2
+**최종 수정**: 2026년 6월 6일
