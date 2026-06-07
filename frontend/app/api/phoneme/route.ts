@@ -5,7 +5,7 @@ export async function POST(req: NextRequest) {
     const blob = await req.blob()
 
     const response = await fetch(
-      'https://api-inference.huggingface.co/models/facebook/wav2vec2-lv-60-espeak-cv-ft',
+      'https://api-inference.huggingface.co/models/facebook/wav2vec2-base-960h',
       {
         method: 'POST',
         headers: {
