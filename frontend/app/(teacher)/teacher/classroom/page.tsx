@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { CotyAvatar } from '@/components/student/CotyAvatar'
 import type { CotyState } from '@/components/student/CotyAvatar'
 import { cn } from '@/lib/utils'
+import { APP_VERSION } from '@/lib/version'
 
 interface ClassroomSession {
   id: string
@@ -241,6 +242,7 @@ function ClassroomContent() {
           <div>
             <h1 className="font-bold text-white text-sm">교실 수업</h1>
             <p className="text-xs text-slate-400">Step {session?.current_step}</p>
+          <p className="text-xs text-slate-600">{APP_VERSION}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

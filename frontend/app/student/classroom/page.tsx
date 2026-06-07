@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
 import { cn } from '@/lib/utils'
+import { APP_VERSION } from '@/lib/version'
 
 interface ClassroomSession {
   id: string
@@ -176,6 +177,7 @@ function StudentClassroomContent() {
         <div>
           <p className="text-xs text-slate-400">교실 수업 중</p>
           <p className="text-sm font-medium text-white">Step {session?.current_step}</p>
+          <p className="text-xs text-slate-600">{APP_VERSION}</p>
         </div>
         <button
           onClick={() => router.push('/student')}
