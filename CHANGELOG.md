@@ -193,7 +193,40 @@
 
 ---
 
+
 ## 변경 이력
+
+### 2026-06-06 (v2026-06-06.11 ~ v2026-06-06.29)
+
+**Coty 아바타**
+- CotyAvatar.tsx 생성 - 상태별 MP4 영상 자동 전환 (idle/speaking/correct/encourage/think)
+- 태블릿 세로(768px)부터 표시, 데스크탑 420px
+- 1회 재생 상태(correct/encourage) 후 idle 복귀
+
+**UI 정리**
+- Dev Log 패널 토글 버튼 추가
+- 원본/가공본/이해버튼/침묵카운트다운 비활성화
+- 종료버튼 마이크 왼쪽으로 이동
+
+**문서**
+- FILE_MAP.md 생성 (파일 지도)
+- CLAUDE.md에 FILE_MAP 업데이트 규칙 추가
+
+**신규 컴포넌트**
+- LessonCell.tsx - 학생 1명 칸 컴포넌트
+- ClassroomStartModal.tsx - 수업 시작 모달
+
+**교실 화면**
+- /teacher/classroom - 선생님 교실 화면
+- /student/classroom - 학생 교실 화면
+- 학생 접속 초대 팝업 (Realtime)
+- classroom_participants 실시간 접속 표시
+
+**DB 추가**
+- classroom_sessions, classroom_questions
+- classroom_answers, classroom_participants
+- classes 테이블: grid_cols, grid_rows, max_students
+
 
 ### 2026-06-06
 - **feat: Coty 아바타 + 음파 애니메이션 추가 (v2026-06-06.11)** — 데스크탑 화면 왼쪽에 Coty 선생님 아바타 패널 추가. 상태(idle/speaking/listening/processing/correct/encourage/think)에 따라 이미지 자동 전환. TTS 재생 중 음파(SoundWave) 애니메이션 표시. `components/student/CotyAvatar.tsx` 신규 생성.

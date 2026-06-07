@@ -3,6 +3,11 @@
 
 ---
 
+## 작업 방식
+→ WORKING_GUIDE.md 참고
+
+---
+
 ## 읽어야 할 파일 순서
 
 1. 이 파일 (SESSION_SUMMARY.md)
@@ -18,7 +23,7 @@
 - 기술스택: Next.js 15, TypeScript, Tailwind, Supabase, Deepgram nova-2, GPT-4o-mini, ElevenLabs
 - AI 선생님: Coty (코티) - CLAUDE.md 기준
 - 대상: 오프라인 영어 학원 최대 8명
-- 현재 버전: v2026-06-06.10
+- 현재 버전: v2026-06-06.29
 
 ---
 
@@ -138,3 +143,66 @@ buildSystemPrompt(scenario, persona, nickname, currentStep, alreadyCompleted)
 - frontend/app/(student)/page.tsx     - 학생 화면
 - frontend/components/student/FeedbackCard.tsx - 피드백 UI
 - frontend/lib/version.ts             - 버전 관리
+
+---
+## 오늘 세션(2026-06-07) 완료한 작업
+### 현재 버전: v2026-06-06.29
+
+### Coty 아바타 (v2026-06-06.11~14)
+- CotyAvatar.tsx 생성 - 상태별 MP4 영상 자동 전환
+- 영상 5개 추가: coty-idle/speaking/correct/encourage/think.mp4
+- 데스크탑(lg:) + 태블릿 세로(md:) 에서 표시
+- 너비 420px, 1회 재생 상태(correct/encourage) → idle 복귀
+
+### UI 정리 (v2026-06-06.16~18)
+- Dev Log 패널 토글 버튼 추가 (열기/닫기)
+- 원본/가공본/이해버튼 비활성화 (코드 보존)
+- 종료버튼 마이크 왼쪽으로 이동
+- 침묵 카운트다운 UI 비활성화
+- 태블릿 세로(768px)부터 Coty 영상 표시
+
+### 문서 (v2026-06-06.19)
+- FILE_MAP.md 생성 - 파일 지도 문서
+- CLAUDE.md에 FILE_MAP.md 자동 업데이트 규칙 추가
+
+### LessonCell 컴포넌트 (v2026-06-06.19)
+- frontend/components/student/LessonCell.tsx 생성
+- 학생 1명 칸 컴포넌트 (이미지+질문+답변+마이크)
+- 그리드 크기에 따라 UI 자동 조정
+
+### 교사 대시보드 교실 수업 탭 (v2026-06-06.20~22)
+- 교사 대시보드에 🏫 교실 수업 탭 추가
+- ClassroomStartModal.tsx 생성 - 교재/Unit/그리드 선택
+- 수업 시작 시 classroom_sessions 생성
+
+### 교실 화면 구현 (v2026-06-06.23~29)
+- /teacher/classroom 선생님 교실 화면 생성
+  - 학생 그리드 실시간 표시
+  - 접속 학생 🟢 표시 (classroom_participants)
+  - 다음 스텝 / 힌트 / 수업 종료 / 로그아웃 버튼
+  - 브라우저 닫을 때 세션 자동 종료 (sendBeacon)
+- /student/classroom 학생 교실 화면 생성
+  - Coty 질문 텍스트 표시 (음성 없음)
+  - 마이크로 답변 → classroom_answers 저장
+  - Realtime으로 Step 동기화
+- 학생 화면 교실 수업 초대 팝업 추가
+  - 로그인 시 active 세션 자동 감지
+  - Realtime으로 수업 시작 즉시 팝업
+  - [나중에] / [수업 참여 →] 선택
+
+### DB 추가 (Supabase)
+- classroom_sessions - 교실 세션 관리
+- classroom_questions - 질문 관리 (전체/개별)
+- classroom_answers - 학생 답변 저장
+- classroom_participants - 학생 접속 현황
+- classes 테이블에 grid_cols, grid_rows, max_students 컬럼 추가
+
+### 남은 문제
+- 학생 교실 화면에서 GPT 채점 연동 미완성
+- Coty가 교실에서 질문 생성 기능 미구현
+- 선생님 화면 학생 목록 조회 방식 개선 필요
+
+### 다음 우선순위
+1. 선생님 교실 화면에서 Coty 질문 생성 + TTS 재생
+2. 학생 답변 GPT 채점 연동
+3. 통합 수업 화면 (/lesson) - LessonGrid 구현
