@@ -18,8 +18,12 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const error = await response.text()
-      console.error('HuggingFace API 오류:', error)
-      return NextResponse.json({ error }, { status: response.status })
+      console.error('HuggingFace API 오류:', response.status, error)
+      return NextResponse.json({ 
+        error, 
+        status: response.status,
+        hint: response.status === 503 ? '모델 로딩 중 (30초 후 재시도)' : '오류 발생'
+      }, { status: response.status })
     }
 
     const result = await response.json()
