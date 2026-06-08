@@ -117,3 +117,78 @@ npm run build 2>&1 | grep "error\|Error\|Type" | head -10
 grep -n "찾을내용" 파일경로
 sed -n '{줄번호},{줄번호}p' 파일경로
 ```
+
+---
+
+## 실전에서 배운 팁
+
+### 코드 수정 시 주의사항
+
+**heredoc (<<'EOF') 방식은 따옴표/특수문자가 잘릴 수 있음**
+- 긴 파일 생성 시 python3 << 'PYEOF' 방식 사용
+- 단순 텍스트 파일은 heredoc도 OK
+- TypeScript/JSX 코드는 반드시 python3으로
+
+**python3 -c 방식은 ! 문자 오류 발생**
+- bash에서 !는 히스토리 확장 문자
+- python3 << 'PYEOF' 방식 사용 권장
+
+**str.replace() 찾지 못할 때**
+- 실제 파일 내용과 공백/줄바꿈 차이 확인
+- grep -n "찾을내용" 파일경로 로 정확한 위치 확인
+- sed -n '{줄번호}p' 파일경로 로 실제 내용 확인
+
+---
+
+### Next.js 라우팅 주의사항
+
+**(teacher), (student) 폴더 그룹은 URL에 포함 안 됨**
+- (teacher)/classroom/page.tsx -> /classroom (의도와 다름)
+- (teacher)/teacher/classroom/page.tsx -> /teacher/classroom (정상)
+- student/classroom/page.tsx -> /student/classroom (정상)
+
+**빌드 결과에서 라우팅 확인 필수**
+- npm run build 후 출력에서 경로 확인
+
+---
+
+### Supabase Realtime 주의사항
+
+**새 테이블 만들면 Realtime 활성화 필수**
+- ALTER PUBLICATION supabase_realtime ADD TABLE 테이블명;
+- SELECT tablename FROM pg_publication_tables WHERE pubname = 'supabase_realtime';
+
+**RLS 정책 없으면 INSERT 실패**
+- ALTER TABLE 테이블명 ENABLE ROW LEVEL SECURITY;
+- CREATE POLICY "authenticated can all" ON 테이블명 FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+**.single() 대신 .limit(1) 사용**
+- 결과가 여러 개일 때 .single()은 오류 발생
+- .order('created_at', {ascending: false}).limit(1) 사용
+
+---
+
+### 네트워크 제한
+
+**Codespaces에서 접근 불가 도메인**
+- api-inference.huggingface.co -> 차단됨
+- Mac Mini M4 로컬 서버로 대안
+
+**Vercel 배포 환경변수**
+- .env.local -> Vercel에 자동 반영 안 됨
+- Vercel 대시보드 -> Settings -> Environment Variables 에서 직접 추가
+
+---
+
+### 새 세션 시작 시 Claude에게 전달할 파일
+
+필수:
+- SESSION_SUMMARY.md
+- CLAUDE.md
+- CHANGELOG.md
+- FILE_MAP.md
+- WORKING_GUIDE.md
+
+선택 (관련 작업 시):
+- classroom-v7-spec.md
+- GitHub URL: https://github.com/AHN-MYEONG-SEOP/ai-co-teacher
