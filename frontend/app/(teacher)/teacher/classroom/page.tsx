@@ -126,10 +126,29 @@ function ClassroomContent() {
         table: 'classroom_participants',
         filter: `session_id=eq.${sessionId}`,
       }, (payload) => {
+        const incoming = payload.new as Participant
         setParticipants(prev => {
-          const exists = prev.find(p => p.student_id === payload.new.student_id)
+          const exists = prev.find(p => p.student_id === incoming.student_id)
           if (exists) return prev
-          return [...prev, payload.new as Participant]
+          return [...prev, incoming]
+        })
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'classroom_participants',
+        filter: `session_id=eq.${sessionId}`,
+      }, (payload) => {
+        const incoming = payload.new as Participant
+        setParticipants(prev => {
+          const exists = prev.find(p => p.student_id === incoming.student_id)
+          if (exists) {
+            // is_online 상태 업데이트
+            return prev.map(p => p.student_id === incoming.student_id ? incoming : p)
+          }
+          // UPDATE인데 목록에 없으면 추가 (초기 로드 타이밍 문제 대비)
+          if (incoming.is_online) return [...prev, incoming]
+          return prev
         })
       })
       .on('postgres_changes', {

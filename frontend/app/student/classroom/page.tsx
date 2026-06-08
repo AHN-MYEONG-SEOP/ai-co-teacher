@@ -50,6 +50,8 @@ function StudentClassroomContent() {
   const [micEnabled, setMicEnabled] = useState(false)
   const [micDisabledReason, setMicDisabledReason] = useState<string>('선생님이 마이크를 활성화하면 말할 수 있어요')
   const [reaskRequested, setReaskRequested] = useState(false)  // 재발화 요청 상태
+  const [welcomePlaying, setWelcomePlaying] = useState(false)
+  const [welcomeText, setWelcomeText] = useState<string | null>(null)
 
   // 타이머
   const [stepTimeLeft, setStepTimeLeft] = useState<number | null>(null)   // 현재 스텝 남은 초
@@ -155,6 +157,10 @@ function StudentClassroomContent() {
     applyMicPolicy(sess.mic_target ?? 'none', user.id)
     startTimer(sess)
     setLoading(false)
+    // 입장 직후 환영 인사 (수업 waiting/active 상태일 때만)
+    if (sess.status === 'active' || sess.status === 'waiting') {
+      playWelcome(name, user.id, sessionId as string)
+    }
   }
 
   // ── Realtime: 세션 업데이트 ───────────────────────────
@@ -237,6 +243,54 @@ function StudentClassroomContent() {
       })
     } catch (e) {
       console.error('채점 오류:', e)
+    }
+  }
+
+  // ── 환영 인사 ───────────────────────────────────────────
+  const playWelcome = async (name: string, uid: string, sid: string) => {
+    try {
+      setWelcomePlaying(true)
+      // 1) 환영 인사 텍스트 생성
+      const chatRes = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: '[SYSTEM: Student just joined the classroom. Give a warm, short welcome greeting using their name. 1-2 sentences only. English only.]',
+          sessionId: 'classroom-welcome',
+          classroomMode: true,
+          studentName: name,
+        }),
+      })
+      const chatData = chatRes.ok ? await chatRes.json() : null
+      const greeting = chatData?.content || `Hi ${name}! Welcome to class! Are you ready?`
+      setWelcomeText(greeting)
+
+      // 2) TTS 음성 생성 및 재생
+      const ttsRes = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: greeting, speed: 'normal' }),
+      })
+      if (ttsRes.ok) {
+        const blob = await ttsRes.blob()
+        const url = URL.createObjectURL(blob)
+        const audio = new Audio(url)
+        audio.onended = async () => {
+          URL.revokeObjectURL(url)
+          setWelcomePlaying(false)
+          // 3) 인사 후 해당 학생 마이크 활성화
+          await supabase
+            .from('classroom_sessions')
+            .update({ mic_target: uid })
+            .eq('id', sid)
+        }
+        audio.play().catch(() => setWelcomePlaying(false))
+      } else {
+        setWelcomePlaying(false)
+      }
+    } catch (e) {
+      console.error('환영 인사 오류:', e)
+      setWelcomePlaying(false)
     }
   }
 
@@ -345,6 +399,14 @@ function StudentClassroomContent() {
         )}
 
         {/* Coty 메시지 */}
+        {/* 환영 인사 말풍선 */}
+        {(welcomeText !== null || welcomePlaying) && (
+          <div className="bg-violet-900/30 border border-violet-700/30 rounded-2xl px-4 py-3">
+            <p className="text-xs text-violet-400 mb-1">💬 Coty {welcomePlaying ? '🔊' : ''}</p>
+            <p className="text-base text-violet-200 font-medium">{welcomeText ?? '...'}</p>
+          </div>
+        )}
+
         {session?.coty_message && (
           <div className="bg-violet-900/30 border border-violet-700/30 rounded-2xl px-4 py-3">
             <p className="text-xs text-violet-400 mb-1">💬 Coty</p>
