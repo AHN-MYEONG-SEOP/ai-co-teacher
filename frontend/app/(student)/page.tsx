@@ -1183,16 +1183,34 @@ export default function StudentPage() {
     if (!ready || !classId) return
     // 최초 접속 시 active 세션 조회
     const checkSession = async () => {
+      // active 세션 조회 후 좀비 세션 자동 종료
+      // updated_at 기준 10분 이상 갱신 없으면 죽은 세션으로 간주
       const { data } = await supabase
         .from('classroom_sessions')
-        .select('id')
+        .select('id, updated_at')
         .eq('class_id', classId)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(1)
+
       if (data && data.length > 0) {
-        window.location.href = '/student/classroom?session=' + data[0].id
-        return
+        const sess = data[0]
+        const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000)
+        const lastUpdate = new Date(sess.updated_at)
+
+        if (lastUpdate < tenMinsAgo) {
+          // 10분 이상 갱신 없음 → 좀비 세션 강제 종료
+          await supabase
+            .from('classroom_sessions')
+            .update({ status: 'ended' })
+            .eq('id', sess.id)
+          console.log('[classroom] 좀비 세션 자동 종료:', sess.id)
+          // 자습 화면으로 그냥 진행 (return 없이 아래 흐름 계속)
+        } else {
+          // 살아있는 세션 → 수업 참여
+          window.location.href = '/student/classroom?session=' + sess.id
+          return
+        }
       }
     }
     checkSession()
