@@ -192,3 +192,28 @@ sed -n '{줄번호},{줄번호}p' 파일경로
 선택 (관련 작업 시):
 - classroom-v7-spec.md
 - GitHub URL: https://github.com/AHN-MYEONG-SEOP/ai-co-teacher
+
+---
+
+## 새 세션 시작 프롬프트
+
+새 창에서 아래 내용을 그대로 붙여넣으면 이전 작업을 이어갈 수 있습니다:
+아래 파일들을 읽고 프로젝트 현황을 파악해줘:
+https://raw.githubusercontent.com/AHN-MYEONG-SEOP/ai-co-teacher/main/SESSION_SUMMARY.md
+https://raw.githubusercontent.com/AHN-MYEONG-SEOP/ai-co-teacher/main/CLAUDE.md
+https://raw.githubusercontent.com/AHN-MYEONG-SEOP/ai-co-teacher/main/CHANGELOG.md
+https://raw.githubusercontent.com/AHN-MYEONG-SEOP/ai-co-teacher/main/MODULE_MAP.md
+https://raw.githubusercontent.com/AHN-MYEONG-SEOP/ai-co-teacher/main/WORKING_GUIDE.md
+
+GitHub: https://github.com/AHN-MYEONG-SEOP/ai-co-teacher
+Codespaces 경로: /workspaces/ai-co-teacher/
+현재 버전: v2026-06-06.34
+
+작업 방식:
+- 코드 수정은 터미널 python3 스크립트로 직접 수정
+- 수정 전 MODULE_MAP.md 반드시 참조
+- 수정 후 cd frontend && npm run build 로 빌드 확인
+- 빌드 성공하면 git add, commit, push
+- 커밋 메시지에 버전 번호 포함
+- frontend/lib/version.ts의 APP_VERSION도 함께 업데이트
+- 파일을 다운로드해서 넣으라고 하지 말고 터미널 명령어로 직접 수정
