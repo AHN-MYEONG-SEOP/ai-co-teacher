@@ -264,6 +264,11 @@ function StudentClassroomContent() {
       const chatData = chatRes.ok ? await chatRes.json() : null
       const greeting = chatData?.content || `Hi ${name}! Welcome to class! Are you ready?`
       setWelcomeText(greeting)
+      // classroom_sessions.coty_message 업데이트 -> 선생님 화면 Realtime 반영
+      await supabase
+        .from('classroom_sessions')
+        .update({ coty_message: greeting, updated_at: new Date().toISOString() })
+        .eq('id', sid)
 
       // 2) TTS 음성 생성 및 재생
       const ttsRes = await fetch('/api/tts', {

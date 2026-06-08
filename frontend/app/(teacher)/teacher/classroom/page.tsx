@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { CotyAvatar } from '@/components/student/CotyAvatar'
@@ -51,6 +51,7 @@ function ClassroomContent() {
   const sessionId = searchParams.get('session')
 
   const [session, setSession] = useState<ClassroomSession | null>(null)
+  const sessionRef = useRef<ClassroomSession | null>(null)
   const [students, setStudents] = useState<ClassStudent[]>([])
   const [answers, setAnswers] = useState<StudentAnswer[]>([])
   const [cotyState, setCotyState] = useState<CotyState>('idle')
@@ -73,6 +74,7 @@ function ClassroomContent() {
       .eq('id', sessionId)
       .single()
     if (!sess) { router.push('/teacher'); return }
+    sessionRef.current = sess
     setSession(sess)
 
     const { data: members } = await supabase
@@ -157,7 +159,14 @@ function ClassroomContent() {
         table: 'classroom_sessions',
         filter: `id=eq.${sessionId}`,
       }, (payload) => {
-        setSession(payload.new as ClassroomSession)
+        const updated = payload.new as ClassroomSession
+        const prev = sessionRef.current
+        sessionRef.current = updated
+        setSession(updated)
+        // coty_message 바뀌면 선생님 화면에서도 자동 TTS 재생
+        if (updated.coty_message && updated.coty_message !== prev?.coty_message) {
+          playCoty(updated.coty_message)
+        }
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -357,6 +366,10 @@ function ClassroomContent() {
                     </span>
                   </div>
 
+                  {/* 현재 Coty 메시지 */}
+                  {session?.coty_message && status === 'waiting' && isOnline && (
+                    <p className="text-[10px] text-violet-300/70 italic truncate">{session.coty_message}</p>
+                  )}
                   {/* 답변 내용 */}
                   {answer ? (
                     <div className="space-y-1">
