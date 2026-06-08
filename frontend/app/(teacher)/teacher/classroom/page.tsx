@@ -12,6 +12,7 @@ interface ClassroomSession {
   id: string
   class_id: string
   current_step: number
+  current_step_type: string | null
   status: string
   coty_message: string | null
   coty_scene_kr: string | null
@@ -171,6 +172,43 @@ function ClassroomContent() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [sessionId])
+
+  // 특정 학생에게 Coty 메시지 전송 → conversation_logs INSERT + TTS 재생
+  const sendCotyMessage = async (studentId: string, studentName: string, customText?: string) => {
+    if (!sessionId || !session) return
+    try {
+      // GPT로 메시지 생성
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: customText || '[SYSTEM: Give a warm welcome greeting to the student. 1-2 sentences only. English only.]',
+          sessionId: 'classroom-coty',
+          classroomMode: true,
+          studentName,
+        }),
+      })
+      const data = res.ok ? await res.json() : null
+      const text = data?.content || `Hi ${studentName}! Welcome to class!`
+
+      // conversation_logs INSERT
+      await supabase.from('conversation_logs').insert({
+        session_id: sessionId,
+        student_id: studentId,
+        target_student_id: studentId,
+        classroom_session_id: sessionId,
+        session_type: 'classroom',
+        role: 'ai',
+        ai_text: text,
+        step_type: session.current_step_type || null,
+      })
+
+      // 선생님 화면 TTS 재생
+      playCoty(text)
+    } catch (e) {
+      console.error('sendCotyMessage 오류:', e)
+    }
+  }
 
   const playCoty = useCallback(async (text: string) => {
     if (isSpeaking) return
@@ -366,9 +404,14 @@ function ClassroomContent() {
                     </span>
                   </div>
 
-                  {/* 현재 Coty 메시지 */}
-                  {session?.coty_message && status === 'waiting' && isOnline && (
-                    <p className="text-[10px] text-violet-300/70 italic truncate">{session.coty_message}</p>
+                  {/* Coty 말 걸기 버튼 */}
+                  {isOnline && (
+                    <button
+                      onClick={() => sendCotyMessage(student.id, student.nickname || student.name)}
+                      className="w-full py-1.5 rounded-xl text-xs bg-violet-900/40 hover:bg-violet-700/60 text-violet-300 border border-violet-700/30 transition-colors"
+                    >
+                      💬 Coty 인사
+                    </button>
                   )}
                   {/* 답변 내용 */}
                   {answer ? (

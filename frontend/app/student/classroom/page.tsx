@@ -52,6 +52,9 @@ function StudentClassroomContent() {
   const [reaskRequested, setReaskRequested] = useState(false)  // 재발화 요청 상태
   const [welcomePlaying, setWelcomePlaying] = useState(false)
   const [welcomeText, setWelcomeText] = useState<string | null>(null)
+  // 교실 대화 메시지 목록
+  interface ClassroomMessage { id: string; role: string; text: string; createdAt: string }
+  const [classroomMessages, setClassroomMessages] = useState<ClassroomMessage[]>([])
 
   // 타이머
   const [stepTimeLeft, setStepTimeLeft] = useState<number | null>(null)   // 현재 스텝 남은 초
@@ -198,7 +201,41 @@ function StudentClassroomContent() {
         }
       })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    // conversation_logs Realtime 구독 (ai 메시지 수신)
+    const logChannel = supabase
+      .channel(`classroom_logs:${sessionId}:${studentIdRef.current}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'conversation_logs',
+        filter: `classroom_session_id=eq.${sessionId}`,
+      }, (payload) => {
+        const log = payload.new
+        // 내게 온 AI 메시지만 표시
+        if (log.role === 'ai' && (log.target_student_id === studentIdRef.current || log.target_student_id === null)) {
+          setClassroomMessages(prev => [...prev, {
+            id: log.id,
+            role: 'ai',
+            text: log.ai_text || '',
+            createdAt: log.created_at,
+          }])
+        }
+        // 내 발화 확인
+        if (log.role === 'student' && log.student_id === studentIdRef.current) {
+          setClassroomMessages(prev => [...prev, {
+            id: log.id,
+            role: 'student',
+            text: log.student_text || '',
+            createdAt: log.created_at,
+          }])
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+      supabase.removeChannel(logChannel)
+    }
   }, [sessionId, applyMicPolicy, startTimer])
 
   // ── STT 결과 처리 ─────────────────────────────────────
@@ -457,6 +494,23 @@ function StudentClassroomContent() {
             </div>
           )}
         </div>
+
+        {/* 교실 대화 메시지 목록 */}
+        {classroomMessages.length > 0 && (
+          <div className="w-full space-y-2 max-h-48 overflow-y-auto">
+            {classroomMessages.map((msg) => (
+              <div key={msg.id} className={cn(
+                'rounded-2xl px-4 py-2 text-sm',
+                msg.role === 'ai'
+                  ? 'bg-violet-900/30 border border-violet-700/30 text-violet-200 mr-8'
+                  : 'bg-emerald-900/30 border border-emerald-700/30 text-emerald-200 ml-8 text-right'
+              )}>
+                <p className="text-xs opacity-50 mb-0.5">{msg.role === 'ai' ? '💬 Coty' : '🧑 나'}</p>
+                <p>{msg.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 마이크 버튼 + 재발화 요청 */}
         <div className="flex flex-col items-center gap-3 mb-4">
