@@ -86,12 +86,26 @@ export function useStudentSession(): StudentSession {
         .catch(() => {})
 
       try {
-        const { data, error } = await supabase
+        // 기존 개인 세션 찾기 (student_id = 자기id, class_id = null)
+        const { data: existing } = await supabase
           .from('sessions')
-          .insert({ class_id: null, started_at: new Date().toISOString() })
           .select('id')
+          .eq('student_id', user.id)
+          .is('class_id', null)
+          .order('started_at', { ascending: false })
+          .limit(1)
           .single()
-        if (!error && data) setSessionId(data.id)
+        if (existing) {
+          setSessionId(existing.id)
+        } else {
+          // 없으면 새로 생성
+          const { data, error } = await supabase
+            .from('sessions')
+            .insert({ class_id: null, student_id: user.id, started_at: new Date().toISOString(), status: 'off' })
+            .select('id')
+            .single()
+          if (!error && data) setSessionId(data.id)
+        }
       } catch { }
     }
 
