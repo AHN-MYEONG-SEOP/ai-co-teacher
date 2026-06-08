@@ -1,5 +1,16 @@
 # 🤖 AI Co-Teacher — Claude Code Development Guidelines
 
+## 새 세션 시작 시 필독 파일 목록
+이 프로젝트를 함께 개발하려면 아래 파일들을 모두 읽고 시작하라:
+- CLAUDE.md (현재 파일) → AI 행동 지침 + 코딩 규칙
+- SESSION_SUMMARY.md → 현재 프로젝트 상태 + 다음 우선순위
+- CHANGELOG.md → 버전별 변경 이력
+- MODULE_MAP.md → 함수/파일 위치 지도
+- WORKING_GUIDE.md → 협업 방식 + 실전 팁
+
+---
+
+
 **This document is the absolute source of truth for the AI Co-Teacher project.**
 Claude는 코드를 작성하거나 리팩토링하기 전에 반드시 이 지침을 전체 정독하고, 모든 규칙을 철저히 준수해야 합니다.
 ## md파일 업데이트 규칙
