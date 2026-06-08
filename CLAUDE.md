@@ -2,6 +2,19 @@
 
 **This document is the absolute source of truth for the AI Co-Teacher project.**
 Claude는 코드를 작성하거나 리팩토링하기 전에 반드시 이 지침을 전체 정독하고, 모든 규칙을 철저히 준수해야 합니다.
+## md파일 업데이트 규칙
+
+"지금까지 내용을 md에 반영해줘" 라고 하면
+Claude가 아래 규칙대로 각 파일을 자동 업데이트하고 커밋/푸시한다.
+
+- MODULE_MAP.md: 새 함수 추가/위치 변경/파일 추가삭제 반영
+- CHANGELOG.md: 오늘 작업한 기능 변경 이력 + 버전 번호 추가
+- SESSION_SUMMARY.md: 오늘 완료 작업 요약 + 버전 + 다음 우선순위
+- WORKING_GUIDE.md: 새로운 실전 팁/주의사항 발견되면 추가
+- CLAUDE.md: 새 DB/API/규칙 변경됐으면 반영
+
+---
+
 
 ---
 
