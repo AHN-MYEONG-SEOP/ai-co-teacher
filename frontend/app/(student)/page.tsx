@@ -1190,7 +1190,10 @@ export default function StudentPage() {
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(1)
-      if (data && data.length > 0) setClassroomInvite({ sessionId: data[0].id })
+      if (data && data.length > 0) {
+        window.location.href = '/student/classroom?session=' + data[0].id
+        return
+      }
     }
     checkSession()
     // Realtime 구독 (이미 접속 중일 때 선생님이 수업 시작하면 팝업)
@@ -1203,7 +1206,9 @@ export default function StudentPage() {
         filter: `class_id=eq.${classId}`,
       }, (payload) => {
         if (payload.new.status === 'active') {
-          setClassroomInvite({ sessionId: payload.new.id })
+          setTimeout(() => {
+            window.location.href = '/student/classroom?session=' + payload.new.id
+          }, 1500)
         }
       })
       .subscribe()
@@ -1574,7 +1579,35 @@ export default function StudentPage() {
               </p>
             </div>
           )}
-          {messages.map((msg) => (
+          {messages.map((msg) => {
+            const divider = (msg as any).classroomDivider as 'start' | 'end' | undefined
+            if (divider) {
+              const dateStr = (msg as any).sessionDate ?? ''
+              return (
+                <div key={msg.id} className="py-3">
+                  {divider === 'start' && (
+                    <div className="space-y-2 text-center">
+                      <p className="text-xs text-amber-400/80 bg-amber-900/20 border border-amber-700/30 rounded-xl px-3 py-1.5 inline-block">
+                        수업이 시작되어 자습을 중단합니다
+                      </p>
+                      <div className="flex items-center gap-2 px-2">
+                        <div className="flex-1 h-px bg-slate-700" />
+                        <span className="text-xs text-slate-500">{dateStr} 수업 시작</span>
+                        <div className="flex-1 h-px bg-slate-700" />
+                      </div>
+                    </div>
+                  )}
+                  {divider === 'end' && (
+                    <div className="flex items-center gap-2 px-2">
+                      <div className="flex-1 h-px bg-slate-700" />
+                      <span className="text-xs text-slate-500">{dateStr} 수업 종료</span>
+                      <div className="flex-1 h-px bg-slate-700" />
+                    </div>
+                  )}
+                </div>
+              )
+            }
+            return (
             <div key={msg.id} className={cn(
               'flex flex-col',
               msg.role === 'student' ? 'items-end' : 'items-start'
@@ -1726,7 +1759,8 @@ export default function StudentPage() {
                 )
               })()}
             </div>
-          ))}
+          )
+          })}
 
           {/* 상황 안내 — Coty가 말하기 직전 보여주는 한국어 상황 설명 (새 step 진입 시) */}
           {currentScene && (
@@ -1943,36 +1977,7 @@ export default function StudentPage() {
       </div>
 
       {/* 교실 수업 초대 팝업 */}
-      {classroomInvite && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-          <div className="relative w-full max-w-sm mx-4 bg-slate-900 border border-emerald-700/50 rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="text-center">
-              <div className="text-4xl mb-3">🏫</div>
-              <h2 className="text-white font-bold text-lg">수업이 시작됐어요!</h2>
-              <p className="text-slate-400 text-sm mt-1">선생님이 교실 수업을 시작했어요.</p>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setClassroomInvite(null)}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-3 text-sm font-medium transition-colors"
-              >
-                나중에
-              </button>
-              <button
-                onClick={() => {
-                  const sid = classroomInvite.sessionId
-                  setClassroomInvite(null)
-                  window.location.href = '/student/classroom?session=' + sid
-                }}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-3 text-sm font-medium transition-colors"
-              >
-                수업 참여 →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* classroomInvite: 자동 참여로 전환됨 */}
 
       {/* 설정 모달 */}
       {showSettings && (
