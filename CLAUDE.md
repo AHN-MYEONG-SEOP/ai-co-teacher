@@ -260,8 +260,29 @@ conversation_logs (
   student_text, ai_text,
   stt_path text, confidence float, latency_ms int,
   grammar int, fluency int, vocabulary int, overall int,
-  correction text, tip text,
-  hint_used boolean
+  correction text, tip text, hint_used boolean,
+  -- 교실 수업 관련 (v8 추가)
+  session_type text,
+  classroom_session_id uuid, classroom_question_id uuid, target_student_id uuid,
+  audio_url text, kr_sentence text, expected_en text,
+  hint text, accept_variants jsonb, step_type text,
+  is_correct boolean, score integer, feedback_kr text, mic_activated boolean
+)
+
+-- classroom_sessions 추가 컬럼 (v8): total_steps int, lesson_duration_minutes int, step_durations jsonb, mic_target text
+-- classroom_answers 추가 컬럼 (v8): audio_url text, no_response_count int
+-- lesson_scenarios 추가 컬럼 (v8): source text, generated_at timestamptz, generation_instructions text
+
+-- 교실 수업 지침 (v8 신규)
+scenario_instructions (
+  id uuid PK, scenario_id uuid, teacher_id uuid,
+  instruction text, created_at timestamptz
+)
+
+-- 숙제 로그 (v8 신규)
+homework_logs (
+  id uuid PK, student_id uuid, classroom_session_id uuid,
+  reviewed_at timestamptz, review_score integer, completed boolean
 )
 
 study_logs (

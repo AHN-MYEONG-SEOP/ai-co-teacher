@@ -190,7 +190,7 @@ sed -n '{줄번호},{줄번호}p' 파일경로
 - WORKING_GUIDE.md
 
 선택 (관련 작업 시):
-- classroom-v7-spec.md
+- classroom-v8-spec.md
 - GitHub URL: https://github.com/AHN-MYEONG-SEOP/ai-co-teacher
 
 ---
@@ -207,7 +207,7 @@ https://raw.githubusercontent.com/AHN-MYEONG-SEOP/ai-co-teacher/main/WORKING_GUI
 
 GitHub: https://github.com/AHN-MYEONG-SEOP/ai-co-teacher
 Codespaces 경로: /workspaces/ai-co-teacher/
-현재 버전: v2026-06-06.34
+현재 버전: v2026-06-08.3
 
 작업 방식:
 - 코드 수정은 터미널 python3 스크립트로 직접 수정

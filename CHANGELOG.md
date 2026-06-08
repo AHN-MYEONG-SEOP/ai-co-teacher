@@ -196,6 +196,15 @@
 
 ## 변경 이력
 
+### 2026-06-08 (v2026-06-08.3)
+
+- **feat: DB 마이그레이션 v8** — conversation_logs 교실 관련 14개 컬럼 추가. classroom_sessions/answers/scenarios 컬럼 추가. scenario_instructions, homework_logs 테이블 신규 생성.
+- **feat: 학생 교실 화면 v8 전면 재작성** — mic_target 정책, 타이머, 재발화 버튼, step_type 라벨, kr_sentence 표시.
+- **feat: 학생 자습 교실 자동 참여** — active 세션 감지 즉시 이동, 팝업 제거, 구분선 추가.
+- **fix: 좀비 세션 자동 종료** — updated_at 10분 이상 무갱신 세션 자동 ended 처리.
+- **fix: 선생님 화면 학생 접속 상태 미반영** — classroom_participants UPDATE 구독 추가.
+- **feat: 입장 시 Coty 환영 인사 TTS** — GPT 인사 생성 후 TTS 재생, 완료 후 마이크 활성화.
+
 ### 2026-06-07 (v2026-06-06.31 ~ v2026-06-06.34)
 
 **기획서**

@@ -400,10 +400,15 @@ public/
 
 ### 교실 수업 세션 관련
 ```
-1. components/teacher/ClassroomStartModal.tsx → handleStart()
-2. app/(teacher)/teacher/classroom/page.tsx   → 선생님 교실 화면
-3. app/student/classroom/page.tsx             → 학생 교실 화면
-4. app/api/classroom/end-session/route.ts     → 세션 종료 API
+1. components/teacher/ClassroomStartModal.tsx   → handleStart()
+2. app/(teacher)/teacher/classroom/page.tsx     → 선생님 교실 화면
+3. app/student/classroom/page.tsx               → 학생 교실 화면 (v8 전면 재작성)
+   - applyMicPolicy()     : mic_target 정책 적용 (none/all/student_id)
+   - startTimer()         : 스텝/전체 타이머
+   - playWelcome()        : 입장 환영 인사 TTS
+   - handleReaskRequest() : 재발화 요청 기록
+   - handleFinalResult()  : STT 채점 + classroom_answers 저장
+4. app/api/classroom/end-session/route.ts       → 세션 종료 API
 ```
 
 ### 새 학생 설정 항목 추가
@@ -421,3 +426,4 @@ public/
 | 날짜 | 버전 | 변경 내용 |
 |------|------|---------|
 | 2026-06-07 | v2026-06-06.34 | 최초 작성 |
+| 2026-06-08 | v2026-06-08.3  | 학생 교실 화면 v8 전면 재작성, 마이크 정책/타이머/환영인사/재발화 추가 |
