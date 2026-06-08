@@ -207,7 +207,7 @@ https://raw.githubusercontent.com/AHN-MYEONG-SEOP/ai-co-teacher/main/WORKING_GUI
 
 GitHub: https://github.com/AHN-MYEONG-SEOP/ai-co-teacher
 Codespaces 경로: /workspaces/ai-co-teacher/
-현재 버전: v2026-06-08.3
+현재 버전: v2026-06-08.10
 
 작업 방식:
 - 코드 수정은 터미널 python3 스크립트로 직접 수정

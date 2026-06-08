@@ -196,6 +196,16 @@
 
 ## 변경 이력
 
+### 2026-06-08 (v2026-06-08.10) — 세션/연동 설계 개선
+
+- **refactor: sessions 테이블 설계 개선** — student_id, status 컬럼 추가. class_id=null이면 개인 자습 세션, 반UUID면 교실 수업 세션.
+- **refactor: 개인 세션 재사용** — useStudentSession.ts에서 로그인 시 기존 세션 찾아 재사용. 없으면 새로 생성.
+- **fix: conversation_logs 외래키 재설정** — session_id FK를 sessions 테이블로 올바르게 참조.
+- **fix: classroom_sessions RLS 추가** — new row violates row-level security 오류 해결.
+- **feat: sendCotyMessage 개선** — /api/chat __GREETING__ 형식 사용, 전체/개별 학생 대상 분리.
+- **feat: conversation_logs 기반 교실 연동** — 선생님 화면 [Coty 인사]/[전체 인사] 버튼, 학생 화면 Realtime 메시지 수신.
+- **refactor: 학생 교실 화면 TTS 제거** — AI 음성은 선생님 화면에서만, 학생 화면은 텍스트만 표시.
+
 ### 2026-06-08 (v2026-06-08.3)
 
 - **feat: DB 마이그레이션 v8** — conversation_logs 교실 관련 14개 컬럼 추가. classroom_sessions/answers/scenarios 컬럼 추가. scenario_instructions, homework_logs 테이블 신규 생성.
