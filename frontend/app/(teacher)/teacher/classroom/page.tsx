@@ -173,10 +173,11 @@ function ClassroomContent() {
     return () => { supabase.removeChannel(channel) }
   }, [sessionId])
 
-  // 특정 학생에게 Coty 메시지 전송 → conversation_logs INSERT + TTS 재생
-  const sendCotyMessage = async (studentId: string, studentName: string, customText?: string) => {
+  // 특정 학생(또는 전체)에게 Coty 메시지 전송 → /api/log INSERT + TTS 재생
+  const sendCotyMessage = async (targetStudents: {id: string, name: string}[], customText?: string) => {
     if (!sessionId || !session) return
     try {
+      const firstName = targetStudents[0]?.name || '학생'
       // GPT로 메시지 생성
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -185,23 +186,28 @@ function ClassroomContent() {
           message: customText || '[SYSTEM: Give a warm welcome greeting to the student. 1-2 sentences only. English only.]',
           sessionId: 'classroom-coty',
           classroomMode: true,
-          studentName,
+          studentName: firstName,
         }),
       })
       const data = res.ok ? await res.json() : null
-      const text = data?.content || `Hi ${studentName}! Welcome to class!`
+      const text = data?.content || `Hi ${firstName}! Welcome to class!`
 
-      // conversation_logs INSERT
-      await supabase.from('conversation_logs').insert({
-        session_id: sessionId,
-        student_id: studentId,
-        target_student_id: studentId,
-        classroom_session_id: sessionId,
-        session_type: 'classroom',
-        role: 'ai',
-        ai_text: text,
-        step_type: session.current_step_type || null,
-      })
+      // 각 학생별로 conversation_logs INSERT (/api/log 사용)
+      await Promise.all(targetStudents.map(student =>
+        fetch('/api/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: sessionId,
+            student_id: student.id,
+            target_student_id: student.id,
+            classroom_session_id: sessionId,
+            session_type: 'classroom',
+            ai_text: text,
+            step_type: session.current_step_type || null,
+          }),
+        })
+      ))
 
       // 선생님 화면 TTS 재생
       playCoty(text)
@@ -317,6 +323,13 @@ function ClassroomContent() {
           <span className="text-xs text-red-400">❌ {incorrectCount}명</span>
           <span className="text-xs text-slate-400">⬜ {waitingCount}명</span>
           <button
+            onClick={() => sendCotyMessage(students.map(s => ({id: s.id, name: s.nickname || s.name})))}
+            disabled={isSpeaking || students.length === 0}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-40 transition-colors"
+          >
+            💬 전체 인사
+          </button>
+          <button
             onClick={toggleHint}
             className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
               session?.hint_visible ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -407,7 +420,7 @@ function ClassroomContent() {
                   {/* Coty 말 걸기 버튼 */}
                   {isOnline && (
                     <button
-                      onClick={() => sendCotyMessage(student.id, student.nickname || student.name)}
+                      onClick={() => sendCotyMessage([{id: student.id, name: student.nickname || student.name}])}
                       className="w-full py-1.5 rounded-xl text-xs bg-violet-900/40 hover:bg-violet-700/60 text-violet-300 border border-violet-700/30 transition-colors"
                     >
                       💬 Coty 인사

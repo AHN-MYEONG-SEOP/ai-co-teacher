@@ -15,8 +15,9 @@ export async function POST(req: NextRequest) {
       student_text, ai_text,
       stt_path, confidence, latency_ms,
       grammar, overall, retry_reason,
-      hint_used,
-      log_id,
+      hint_used, log_id,
+      session_type, classroom_session_id, target_student_id,
+      step_type, is_correct, score, feedback_kr,
     } = await req.json()
 
     if (log_id) {
@@ -46,6 +47,13 @@ export async function POST(req: NextRequest) {
           overall: overall || null,
           retry_reason: retry_reason || null,
           hint_used: hint_used ?? false,
+          session_type: session_type || null,
+          classroom_session_id: classroom_session_id || null,
+          target_student_id: target_student_id || null,
+          step_type: step_type || null,
+          is_correct: is_correct ?? null,
+          score: score ?? null,
+          feedback_kr: feedback_kr || null,
         })
         .select('id')
         .single()
