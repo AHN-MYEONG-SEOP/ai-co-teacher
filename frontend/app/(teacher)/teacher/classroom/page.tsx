@@ -13,6 +13,7 @@ interface ClassroomSession {
   class_id: string
   current_step: number
   current_step_type: string | null
+  scenario_id: string | null
   status: string
   coty_message: string | null
   coty_scene_kr: string | null
@@ -183,14 +184,14 @@ function ClassroomContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: customText || '[SYSTEM: Give a warm welcome greeting to the student. 1-2 sentences only. English only.]',
-          sessionId: 'classroom-coty',
-          classroomMode: true,
-          studentName: firstName,
+          studentText: customText || `__GREETING__:${firstName}`,
+          studentId: targetStudents[0]?.id || null,
+          nickname: firstName,
+          currentBook: 'Insight Builder 1',
         }),
       })
       const data = res.ok ? await res.json() : null
-      const text = data?.content || `Hi ${firstName}! Welcome to class!`
+      const text = data?.message || data?.text || data?.content || `Hi ${firstName}! Welcome to class!`
 
       // 각 학생별로 conversation_logs INSERT (/api/log 사용)
       await Promise.all(targetStudents.map(student =>
