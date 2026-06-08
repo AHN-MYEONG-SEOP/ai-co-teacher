@@ -23,7 +23,7 @@
 - 기술스택: Next.js 15, TypeScript, Tailwind, Supabase, Deepgram nova-2, GPT-4o-mini, ElevenLabs
 - AI 선생님: Coty (코티) - CLAUDE.md 기준
 - 대상: 오프라인 영어 학원 최대 8명
-- 현재 버전: v2026-06-06.29
+- 현재 버전: v2026-06-06.34
 
 ---
 
@@ -206,3 +206,43 @@ buildSystemPrompt(scenario, persona, nickname, currentStep, alreadyCompleted)
 1. 선생님 교실 화면에서 Coty 질문 생성 + TTS 재생
 2. 학생 답변 GPT 채점 연동
 3. 통합 수업 화면 (/lesson) - LessonGrid 구현
+
+---
+## 오늘 세션 추가 작업 (2026-06-07 후반)
+### 현재 버전: v2026-06-06.34
+
+### 기획서 완성
+- classroom-v7-spec.md 생성 (교실 수업 통합 기획서 최종)
+  - 수업 엔진 통일 (스텝/프리토킹 → 시나리오 기반 통일)
+  - 자습/수업 화면 통합 확정
+  - 마이크 활성화 정책 확정
+  - 프리토킹 스텝 유형 5가지 확정
+    (word_listen_repeat → word_k2e → 
+     sentence_listen_repeat → sentence_k2e → free_talk)
+  - K2E 기능 설계
+  - 시나리오 자동 생성 + 미리보기/수정 흐름
+  - 학생 무응답 처리 (2회 경고, 3회 선생님 알림)
+  - 음성 저장 정책
+  - 복습/숙제 기능 설계
+  - conversation_logs 통합 설계
+
+### phoneme API (HuggingFace)
+- /api/phoneme 엔드포인트 생성
+- HuggingFace wav2vec2 모델 연동 시도
+- Codespaces/Vercel 네트워크 제한으로 보류
+  (api-inference.huggingface.co 도메인 차단)
+- Mac Mini M4 구축 후 로컬 운영으로 재시도 예정
+
+### 향후 논의 완료 사항
+- 학생 발화 피드백: 현재 GPT 텍스트 기반
+- 음성 저장: Supabase Storage → AWS S3/Cloudflare R2 검토
+- 학부모 공유: 차후 논의
+- 토큰 관리: 차후 논의
+- 복습/숙제: 차후 구현
+
+### 다음 우선순위
+1. 자습/수업 화면 통합 (로그인 시 자동 수업 참여)
+2. 마이크 버튼 활성화 정책 구현
+3. 시나리오 자동 생성 API (/api/classroom/generate-scenario)
+4. 선생님 화면 스텝 패널 (반복/건너뜀/수정)
+5. conversation_logs 교실 수업 필드 추가
