@@ -217,3 +217,18 @@ Codespaces 경로: /workspaces/ai-co-teacher/
 - 커밋 메시지에 버전 번호 포함
 - frontend/lib/version.ts의 APP_VERSION도 함께 업데이트
 - 파일을 다운로드해서 넣으라고 하지 말고 터미널 명령어로 직접 수정
+
+---
+
+## md파일 일괄 업데이트 방법
+
+세션 종료 전 아래 한 마디만 하면 됩니다:
+
+    "지금까지 수정된 내용을 md파일에 반영해줘"
+
+Claude가 자동으로:
+- MODULE_MAP.md 줄 번호/함수명 업데이트
+- CHANGELOG.md 변경 이력 추가
+- SESSION_SUMMARY.md 오늘 작업 요약
+- docs/ 설계 변경 사항 표시
+- git add -A && commit && push
