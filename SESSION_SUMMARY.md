@@ -47,7 +47,8 @@
 - 학생 교실 진입 시 conversation_logs INSERT (session_type='START')
 - AI 환영 인사 → ai_text UPDATE
 - AI 질문 시 전체 학생 수만큼 conversation_logs INSERT
-- 학생 답변 → student_text UPDATE
+- 학생 답변 → student_text UPDATE (환영 인사 답변도 START row에 넣음)
+- 한 row = 한 번의 AI-학생 대화 쌍 (ai_text + student_text)
 - 선생님 화면 각 학생 창 = 해당 학생 conversation_logs 표시
 
 ### 3. 학생 수업 화면 = 자습 화면 통합
