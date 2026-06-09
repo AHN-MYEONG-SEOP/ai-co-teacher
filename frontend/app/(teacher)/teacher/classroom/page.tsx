@@ -65,6 +65,8 @@ function ClassroomContent() {
   const [scenario, setScenario] = useState<any>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [pendingAnswers, setPendingAnswers] = useState<Set<string>>(new Set())
+  // 학생별 lesson_progress id 관리
+  const [studentProgressIds, setStudentProgressIds] = useState<Record<string, string>>({})
   const currentStepRef = useRef(1)
   currentStepRef.current = currentStep
 
@@ -179,6 +181,36 @@ function ClassroomContent() {
           setJoinedStudents(prev => new Set(prev).add(log.student_id))
           const student = students.find(s => s.id === log.student_id)
           const studentName = student?.nickname || student?.name || '학생'
+          // lesson_progress INSERT (새 회차 생성)
+          if (scenario) {
+            const today = new Date().toISOString().split('T')[0]
+            const { data: progRows } = await supabase
+              .from('lesson_progress')
+              .select('attempt')
+              .eq('student_id', log.student_id)
+              .eq('scenario_id', scenario.id)
+              .order('attempt', { ascending: false })
+              .limit(1)
+            const nextAttempt = (progRows?.[0]?.attempt ?? 0) + 1
+            const { data: newProg } = await supabase
+              .from('lesson_progress')
+              .insert({
+                student_id: log.student_id,
+                scenario_id: scenario.id,
+                session_date: today,
+                attempt: nextAttempt,
+                current_step: 1,
+                completed_steps: [],
+                natural_steps: [],
+                hint_used_steps: [],
+                completed: false,
+              })
+              .select('id')
+              .single()
+            if (newProg) {
+              setStudentProgressIds(prev => ({ ...prev, [log.student_id]: newProg.id }))
+            }
+          }
           await sendCotyMessage([{ id: log.student_id, name: studentName }], undefined, log.id)
         }
         // AI 메시지 업데이트 (INSERT)
@@ -260,6 +292,7 @@ function ClassroomContent() {
                 studentText: log.student_text,
                 studentId: log.student_id,
                 scenarioId: scenario.id,
+                progressId: studentProgressIds[log.student_id] || null,
                 nickname: students.find((s: any) => s.id === log.student_id)?.nickname
                   || students.find((s: any) => s.id === log.student_id)?.name
                   || '학생',
