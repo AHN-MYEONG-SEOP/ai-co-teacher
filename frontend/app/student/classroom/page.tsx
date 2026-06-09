@@ -158,6 +158,22 @@ function StudentClassroomContent() {
     setSession(sess)
     applyMicPolicy(sess.mic_target ?? 'none', user.id)
     startTimer(sess)
+
+    // 학생 입장 -> conversation_logs INSERT (session_type='START')
+    const { data: logData } = await supabase
+      .from('conversation_logs')
+      .insert({
+        session_id: sessionId,
+        student_id: user.id,
+        target_student_id: user.id,
+        session_type: 'START',
+      })
+      .select('id')
+      .single()
+    if (logData) {
+      sessionStorage.setItem('classroomLogId', logData.id)
+    }
+
     setLoading(false)
 
   }

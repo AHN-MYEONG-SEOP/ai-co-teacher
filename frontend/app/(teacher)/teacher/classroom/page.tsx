@@ -127,6 +127,20 @@ function ClassroomContent() {
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
+        table: 'conversation_logs',
+        filter: `session_id=eq.${sessionId}`,
+      }, async (payload) => {
+        const log = payload.new
+        // 학생 입장(START) 감지 → AI 환영 인사 생성 후 같은 row UPDATE
+        if (log.session_type === 'START' && log.student_id) {
+          const student = students.find(s => s.id === log.student_id)
+          const studentName = student?.nickname || student?.name || '학생'
+          await sendCotyMessage([{ id: log.student_id, name: studentName }], undefined, log.id)
+        }
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
         table: 'classroom_participants',
         filter: `session_id=eq.${sessionId}`,
       }, (payload) => {
@@ -175,11 +189,11 @@ function ClassroomContent() {
   }, [sessionId])
 
   // 특정 학생(또는 전체)에게 Coty 메시지 전송 → /api/log INSERT + TTS 재생
-  const sendCotyMessage = async (targetStudents: {id: string, name: string}[], customText?: string) => {
+  // logId 있으면 기존 row UPDATE, 없으면 새 row INSERT
+  const sendCotyMessage = async (targetStudents: {id: string, name: string}[], customText?: string, logId?: string) => {
     if (!sessionId || !session) return
     try {
       const firstName = targetStudents[0]?.name || '학생'
-      // GPT로 메시지 생성
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,24 +207,29 @@ function ClassroomContent() {
       const data = res.ok ? await res.json() : null
       const text = data?.message || data?.text || data?.content || `Hi ${firstName}! Welcome to class!`
 
-      // 각 학생별로 conversation_logs INSERT (/api/log 사용)
-      await Promise.all(targetStudents.map(student =>
-        fetch('/api/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            session_id: sessionId,
-            student_id: student.id,
-            target_student_id: student.id,
-            classroom_session_id: sessionId,
-            session_type: 'classroom',
-            ai_text: text,
-            step_type: session.current_step_type || null,
-          }),
-        })
-      ))
-
-      // 선생님 화면 TTS 재생
+      if (logId) {
+        // 기존 START row에 ai_text UPDATE
+        await supabase
+          .from('conversation_logs')
+          .update({ ai_text: text })
+          .eq('id', logId)
+      } else {
+        // 새 row INSERT
+        await Promise.all(targetStudents.map(student =>
+          fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              session_id: sessionId,
+              student_id: student.id,
+              target_student_id: student.id,
+              session_type: 'classroom',
+              ai_text: text,
+              step_type: session.current_step_type || null,
+            }),
+          })
+        ))
+      }
       playCoty(text)
     } catch (e) {
       console.error('sendCotyMessage 오류:', e)
