@@ -131,6 +131,7 @@ function ClassroomContent() {
         filter: `session_id=eq.${sessionId}`,
       }, async (payload) => {
         const log = payload.new
+        console.log('[Realtime] conversation_logs INSERT:', log.session_type, log.student_id)
         // 학생 입장(START) 감지 → AI 환영 인사 생성 후 같은 row UPDATE
         if (log.session_type === 'START' && log.student_id) {
           const student = students.find(s => s.id === log.student_id)
