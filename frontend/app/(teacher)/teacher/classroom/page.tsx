@@ -63,7 +63,7 @@ function ClassroomContent() {
   // conversation_logs START row로 입장한 학생 추적
   const [joinedStudents, setJoinedStudents] = useState<Set<string>>(new Set())
   // 학생별 최근 메시지
-  const [studentMessages, setStudentMessages] = useState<Record<string, {ai: string, student: string, logId: string}>>({})
+  const [studentMessages, setStudentMessages] = useState<Record<string, {role: string, text: string, id: string}[]>>({})
 
   const supabase = createClient()
 
@@ -142,12 +142,14 @@ function ClassroomContent() {
           const studentName = student?.nickname || student?.name || '학생'
           await sendCotyMessage([{ id: log.student_id, name: studentName }], undefined, log.id)
         }
-        // AI 메시지 업데이트
+        // AI 메시지 업데이트 (INSERT)
         if (log.ai_text && log.target_student_id) {
-          setStudentMessages(prev => ({
-            ...prev,
-            [log.target_student_id]: { ...prev[log.target_student_id], ai: log.ai_text, logId: log.id }
-          }))
+          setStudentMessages(prev => {
+            const arr = prev[log.target_student_id] || []
+            const exists = arr.find((m: any) => m.id === log.id)
+            if (exists) return { ...prev, [log.target_student_id]: arr.map((m: any) => m.id === log.id ? { ...m, text: log.ai_text } : m) }
+            return { ...prev, [log.target_student_id]: [...arr, { role: 'ai', text: log.ai_text, id: log.id }] }
+          })
         }
       })
       .on('postgres_changes', {
@@ -189,16 +191,20 @@ function ClassroomContent() {
       }, (payload) => {
         const log = payload.new
         if (log.ai_text && log.target_student_id) {
-          setStudentMessages(prev => ({
-            ...prev,
-            [log.target_student_id]: { ...prev[log.target_student_id], ai: log.ai_text, logId: log.id }
-          }))
+          setStudentMessages(prev => {
+            const arr = prev[log.target_student_id] || []
+            const exists = arr.find((m: any) => m.id === log.id)
+            if (exists) return { ...prev, [log.target_student_id]: arr.map((m: any) => m.id === log.id ? { ...m, text: log.ai_text } : m) }
+            return { ...prev, [log.target_student_id]: [...arr, { role: 'ai', text: log.ai_text, id: log.id }] }
+          })
         }
         if (log.student_text && log.student_id) {
-          setStudentMessages(prev => ({
-            ...prev,
-            [log.student_id]: { ...prev[log.student_id], student: log.student_text }
-          }))
+          setStudentMessages(prev => {
+            const arr = prev[log.student_id] || []
+            const exists = arr.find((m: any) => m.id === log.id + '_s')
+            if (exists) return prev
+            return { ...prev, [log.student_id]: [...arr, { role: 'student', text: log.student_text, id: log.id + '_s' }] }
+          })
           setJoinedStudents(prev => new Set(prev).add(log.student_id))
         }
       })
@@ -476,18 +482,24 @@ function ClassroomContent() {
                   </div>
 
                   {/* Coty 말 걸기 버튼 */}
-                  {/* AI 메시지 */}
-                  {studentMessages[student.id]?.ai && (
-                    <div className="bg-violet-900/20 border border-violet-700/30 rounded-xl px-3 py-2">
-                      <p className="text-[10px] text-violet-400 mb-0.5">💬 Coty</p>
-                      <p className="text-xs text-violet-200">{studentMessages[student.id].ai}</p>
-                    </div>
-                  )}
-                  {/* 학생 답변 */}
-                  {studentMessages[student.id]?.student && (
-                    <div className="bg-emerald-900/20 border border-emerald-700/30 rounded-xl px-3 py-2">
-                      <p className="text-[10px] text-emerald-400 mb-0.5">🧑 답변</p>
-                      <p className="text-xs text-emerald-200">{studentMessages[student.id].student}</p>
+                  {/* 대화 메시지 목록 */}
+                  {(studentMessages[student.id] || []).length > 0 && (
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {(studentMessages[student.id] || []).map((msg) => (
+                        <div key={msg.id} className={cn(
+                          'rounded-xl px-2 py-1.5',
+                          msg.role === 'ai'
+                            ? 'bg-violet-900/20 border border-violet-700/30'
+                            : 'bg-emerald-900/20 border border-emerald-700/30'
+                        )}>
+                          <p className={cn('text-[10px] mb-0.5', msg.role === 'ai' ? 'text-violet-400' : 'text-emerald-400')}>
+                            {msg.role === 'ai' ? '💬 Coty' : '🧑 답변'}
+                          </p>
+                          <p className={cn('text-xs', msg.role === 'ai' ? 'text-violet-200' : 'text-emerald-200')}>
+                            {msg.text}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   )}
                   {isOnline && (

@@ -64,8 +64,14 @@ function StudentClassroomContent() {
   const sessionStartRef = useRef<number | null>(null) // 수업 시작 timestamp
 
   const studentIdRef = useRef<string | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
   const sessionRef = useRef<ClassroomSession | null>(null)
   sessionRef.current = session
+
+  // 새 메시지 올 때마다 자동 스크롤
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [classroomMessages])
 
   // ── 마이크 활성화 정책 적용 (교실에서는 항상 활성화) ──
   const applyMicPolicy = useCallback((micTarget: string, sid: string | null) => {
@@ -444,7 +450,7 @@ function StudentClassroomContent() {
 
         {/* 교실 대화 메시지 목록 */}
         {classroomMessages.length > 0 && (
-          <div className="w-full space-y-2 max-h-48 overflow-y-auto">
+          <div className="w-full space-y-2 flex-1 overflow-y-auto pb-2">
             {classroomMessages.map((msg) => (
               <div key={msg.id} className={cn(
                 'rounded-2xl px-4 py-2 text-sm',
@@ -456,6 +462,7 @@ function StudentClassroomContent() {
                 <p>{msg.text}</p>
               </div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
         )}
 
