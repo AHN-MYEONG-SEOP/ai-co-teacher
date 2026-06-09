@@ -447,11 +447,40 @@ function ClassroomContent() {
   }, [currentStep])
 
   const startLesson = async () => {
-    if (!sessionId || !session || students.length === 0) return
+    if (!sessionId || !session || students.length === 0 || !scenario) return
     const allSteps = (scenario?.phases || []).flatMap((p: any) => p.steps || [])
     const stepData = allSteps[currentStep - 1]
-    const aiLine = stepData?.ai_line || stepData?.scene_kr || `Let's start step ${currentStep}!`
-    // 전체 학생 수만큼 conversation_logs INSERT
+    const aiLine = stepData?.ai_line?.replace(/{{nickname}}/g, '여러분') || `Let's start step ${currentStep}!`
+
+    // 1) lesson_progress 반 단위로 생성 (class_id 기준)
+    const today = new Date().toISOString().split('T')[0]
+    const { data: progRows } = await supabase
+      .from('lesson_progress')
+      .select('attempt')
+      .eq('class_id', session.class_id)
+      .eq('scenario_id', scenario.id)
+      .order('attempt', { ascending: false })
+      .limit(1)
+    const nextAttempt = (progRows?.[0]?.attempt ?? 0) + 1
+    const { data: newProg } = await supabase
+      .from('lesson_progress')
+      .insert({
+        student_id: null,
+        class_id: session.class_id,
+        scenario_id: scenario.id,
+        session_date: today,
+        attempt: nextAttempt,
+        current_step: currentStep,
+        completed_steps: [],
+        natural_steps: [],
+        hint_used_steps: [],
+        completed: false,
+      })
+      .select('id')
+      .single()
+    const progressId = newProg?.id || null
+
+    // 2) 전체 학생 수만큼 conversation_logs INSERT
     await Promise.all(students.map((student: any) =>
       fetch('/api/log', {
         method: 'POST',
@@ -467,6 +496,13 @@ function ClassroomContent() {
     ))
     playCoty(aiLine)
     setPendingAnswers(new Set(students.map((s: any) => s.id)))
+
+    // progressId를 state에 저장 (GPT 채점 시 사용)
+    if (progressId) {
+      const ids: Record<string, string> = {}
+      students.forEach((s: any) => { ids[s.id] = progressId })
+      setStudentProgressIds(ids)
+    }
   }
 
   const nextStep = async () => {
