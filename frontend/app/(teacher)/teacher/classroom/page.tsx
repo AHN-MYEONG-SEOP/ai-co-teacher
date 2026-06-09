@@ -376,10 +376,11 @@ function ClassroomContent() {
           <span className="text-xs text-blue-400">🟢 접속: {joinedCount}명 / {students.length}명</span>
           <button
             onClick={startLesson}
-            disabled={isSpeaking || students.length === 0 || lessonStarted}
+            disabled={isSpeaking || students.length === 0 || lessonStarted || !scenario}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40 transition-colors"
+            title={!scenario ? '시나리오 로딩 중...' : lessonStarted ? '수업 진행 중' : '학습 시작'}
           >
-            📚 학습 시작
+            {lessonStarted ? '📚 수업 중' : !scenario ? '⏳ 로딩 중' : '📚 학습 시작'}
           </button>
           <button
             onClick={endSession}
