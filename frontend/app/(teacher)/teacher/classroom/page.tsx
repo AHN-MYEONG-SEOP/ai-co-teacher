@@ -65,6 +65,28 @@ function ClassroomContent() {
   const [scenario, setScenario] = useState<any>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [pendingAnswers, setPendingAnswers] = useState<Set<string>>(new Set())
+  const currentStepRef = useRef(1)
+  currentStepRef.current = currentStep
+
+  // pendingAnswers 0 되면 자동으로 다음 스텝 진행
+  useEffect(() => {
+    if (pendingAnswers.size === 0) return
+    // 모든 학생 답변 완료
+    const checkAllDone = async () => {
+      if (pendingAnswers.size !== 0) return
+      const allSteps = (scenario?.phases || []).flatMap((p: any) => p.steps || [])
+      const nextStep = currentStepRef.current + 1
+      if (nextStep > allSteps.length) {
+        console.log('[교실] 모든 스텝 완료')
+        return
+      }
+      // 3초 후 자동으로 다음 스텝 질문
+      setTimeout(() => {
+        setCurrentStep(nextStep)
+      }, 3000)
+    }
+    checkAllDone()
+  }, [pendingAnswers, scenario])
   // 학생별 최근 메시지
   const [studentMessages, setStudentMessages] = useState<Record<string, {role: string, text: string, id: string}[]>>({})
 
@@ -364,6 +386,33 @@ function ClassroomContent() {
   }, [isSpeaking])
 
   // 시나리오 현재 스텝의 ai_line을 전체 학생에게 전송
+  // currentStep 변경 시 자동으로 다음 스텝 질문
+  useEffect(() => {
+    if (currentStep === 1) return  // 최초 진입은 [학습 시작] 버튼으로
+    if (!scenario || !sessionId || students.length === 0) return
+    const allSteps = (scenario?.phases || []).flatMap((p: any) => p.steps || [])
+    const stepData = allSteps[currentStep - 1]
+    if (!stepData) return
+    const aiLine = stepData?.ai_line || `Let's continue with step ${currentStep}!`
+    // 전체 학생에게 다음 스텝 질문 INSERT
+    Promise.all(students.map((student: any) =>
+      fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          student_id: student.id,
+          target_student_id: student.id,
+          session_type: 'classroom',
+          ai_text: aiLine,
+        }),
+      })
+    )).then(() => {
+      playCoty(aiLine)
+      setPendingAnswers(new Set(students.map((s: any) => s.id)))
+    })
+  }, [currentStep])
+
   const startLesson = async () => {
     if (!sessionId || !session || students.length === 0) return
     const allSteps = (scenario?.phases || []).flatMap((p: any) => p.steps || [])
