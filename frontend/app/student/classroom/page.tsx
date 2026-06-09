@@ -243,14 +243,23 @@ function StudentClassroomContent() {
             return [...prev, { id: log.id, role: 'ai', text: log.ai_text, createdAt: log.created_at }]
           })
         }
-        // student_text가 UPDATE되면 내 답변 표시
+        // student_text가 UPDATE되면 내 답변을 새 메시지로 추가
         if (log.student_text && log.student_id === studentIdRef.current) {
           setClassroomMessages(prev => {
-            const exists = prev.find(m => m.id === log.id)
+            // 이미 student 메시지로 표시된 게 있으면 업데이트
+            const exists = prev.find(m => m.id === log.id + '_student')
             if (exists) {
-              return prev.map(m => m.id === log.id ? { ...m, studentText: log.student_text } : m)
+              return prev.map(m => m.id === log.id + '_student'
+                ? { ...m, text: log.student_text }
+                : m)
             }
-            return prev
+            // 없으면 새로 추가
+            return [...prev, {
+              id: log.id + '_student',
+              role: 'student',
+              text: log.student_text,
+              createdAt: log.created_at,
+            }]
           })
         }
       })
