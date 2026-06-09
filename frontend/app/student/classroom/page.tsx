@@ -67,21 +67,10 @@ function StudentClassroomContent() {
   const sessionRef = useRef<ClassroomSession | null>(null)
   sessionRef.current = session
 
-  // ── 마이크 활성화 정책 적용 ─────────────────────────────
+  // ── 마이크 활성화 정책 적용 (교실에서는 항상 활성화) ──
   const applyMicPolicy = useCallback((micTarget: string, sid: string | null) => {
-    if (micTarget === 'none') {
-      setMicEnabled(false)
-      setMicDisabledReason('선생님이 마이크를 활성화하면 말할 수 있어요')
-    } else if (micTarget === 'all') {
-      setMicEnabled(true)
-      setMicDisabledReason('')
-    } else if (micTarget === sid) {
-      setMicEnabled(true)
-      setMicDisabledReason('')
-    } else {
-      setMicEnabled(false)
-      setMicDisabledReason('다른 친구의 차례예요')
-    }
+    setMicEnabled(true)
+    setMicDisabledReason('')
   }, [])
 
   // ── 타이머 시작 ────────────────────────────────────────
