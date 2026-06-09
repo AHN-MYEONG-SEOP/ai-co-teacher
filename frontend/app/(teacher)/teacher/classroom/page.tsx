@@ -62,6 +62,9 @@ function ClassroomContent() {
   const [participants, setParticipants] = useState<Participant[]>([])
   // conversation_logs START row로 입장한 학생 추적
   const [joinedStudents, setJoinedStudents] = useState<Set<string>>(new Set())
+  const [scenario, setScenario] = useState<any>(null)
+  const [currentStep, setCurrentStep] = useState(1)
+  const [pendingAnswers, setPendingAnswers] = useState<Set<string>>(new Set())
   // 학생별 최근 메시지
   const [studentMessages, setStudentMessages] = useState<Record<string, {role: string, text: string, id: string}[]>>({})
 
@@ -92,6 +95,20 @@ function ClassroomContent() {
 
     await loadAnswers(sess.id, sess.current_step)
 
+
+    // classes에서 book/unit 로드 후 시나리오 조회
+    const { data: classData } = await supabase
+      .from('classes')
+      .select('current_book, current_unit')
+      .eq('id', sess.class_id)
+      .single()
+    if (classData?.current_book && classData?.current_unit) {
+      const res = await fetch(`/api/lesson-scenario?book=${encodeURIComponent(classData.current_book)}&unit=${classData.current_unit}`)
+      if (res.ok) {
+        const scenData = await res.json()
+        setScenario(scenData?.scenario ?? null)
+      }
+    }
     // 참여 학생 로드
     const { data: parts } = await supabase
       .from('classroom_participants')
@@ -206,6 +223,12 @@ function ClassroomContent() {
             return { ...prev, [log.student_id]: [...arr, { role: 'student', text: log.student_text, id: log.id + '_s' }] }
           })
           setJoinedStudents(prev => new Set(prev).add(log.student_id))
+          // 답변 완료 체크
+          setPendingAnswers(prev => {
+            const next = new Set(prev)
+            next.delete(log.student_id)
+            return next
+          })
         }
       })
       .on('postgres_changes', {
@@ -306,6 +329,30 @@ function ClassroomContent() {
     }
   }, [isSpeaking])
 
+  // 시나리오 현재 스텝의 ai_line을 전체 학생에게 전송
+  const startLesson = async () => {
+    if (!sessionId || !session || students.length === 0) return
+    const allSteps = (scenario?.phases || []).flatMap((p: any) => p.steps || [])
+    const stepData = allSteps[currentStep - 1]
+    const aiLine = stepData?.ai_line || stepData?.scene_kr || `Let's start step ${currentStep}!`
+    // 전체 학생 수만큼 conversation_logs INSERT
+    await Promise.all(students.map((student: any) =>
+      fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          student_id: student.id,
+          target_student_id: student.id,
+          session_type: 'classroom',
+          ai_text: aiLine,
+        }),
+      })
+    ))
+    playCoty(aiLine)
+    setPendingAnswers(new Set(students.map((s: any) => s.id)))
+  }
+
   const nextStep = async () => {
     if (!session) return
     const newStep = session.current_step + 1
@@ -387,11 +434,11 @@ function ClassroomContent() {
           <span className="text-xs text-red-400">❌ {incorrectCount}명</span>
           <span className="text-xs text-slate-400">⬜ {waitingCount}명</span>
           <button
-            onClick={() => sendCotyMessage(students.map(s => ({id: s.id, name: s.nickname || s.name})))}
+            onClick={startLesson}
             disabled={isSpeaking || students.length === 0}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-700 hover:bg-violet-600 text-white disabled:opacity-40 transition-colors"
+            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40 transition-colors"
           >
-            💬 전체 인사
+            📚 학습 시작
           </button>
           <button
             onClick={toggleHint}

@@ -72,6 +72,8 @@ export function ClassroomStartModal({
         .update({
           grid_cols: gridCols,
           grid_rows: gridRows,
+          current_book: selectedBook,
+          current_unit: selectedUnit,
         })
         .eq('id', classId)
 
