@@ -270,8 +270,7 @@ function StudentClassroomContent() {
       supabase.removeChannel(logChannel)
     }
   }, [sessionId, applyMicPolicy, startTimer])
-
-  // ── STT 결과 처리 ─────────────────────────────────────
+  // ── STT 결과 처리 (자습화면과 동일한 방식) ──────────────
   const handleFinalResult = async (transcript: string) => {
     if (!transcript.trim() || !sessionId || !studentIdRef.current) return
     setIsHolding(false)
@@ -280,16 +279,50 @@ function StudentClassroomContent() {
     // 현재 열린 conversation_logs row id
     const logId = sessionStorage.getItem('classroomLogId')
     if (!logId) return
+    sessionStorage.removeItem('classroomLogId')
 
-    // student_text UPDATE
+    // 1) student_text UPDATE
     await supabase
       .from('conversation_logs')
       .update({ student_text: transcript })
       .eq('id', logId)
 
-    // 다음 AI 메시지 대기
-    sessionStorage.removeItem('classroomLogId')
+    // 2) GPT 채점
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentText: transcript,
+          studentId: studentIdRef.current,
+          sessionId,
+        }),
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      const aiText = data.message || data.text || ''
+      if (!aiText) return
+
+      // 3) 피드백 row INSERT (새 row)
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          student_id: studentIdRef.current,
+          target_student_id: studentIdRef.current,
+          session_type: 'classroom',
+          ai_text: aiText,
+          score: data.feedback?.overall ?? null,
+          is_correct: data.step_completed ?? null,
+          feedback_kr: data.feedback?.pronunciation?.tip_kr || null,
+        }),
+      })
+    } catch (e) {
+      console.error('GPT 채점 오류:', e)
+    }
   }
+
 
   // ── 재발화 요청 ───────────────────────────────────────
   const handleReaskRequest = async () => {
