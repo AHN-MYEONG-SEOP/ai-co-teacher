@@ -47,7 +47,7 @@ function StudentClassroomContent() {
   const [isHolding, setIsHolding] = useState(false)
 
   // 마이크 활성화 정책
-  const [micEnabled, setMicEnabled] = useState(false)
+  const [micEnabled, setMicEnabled] = useState(true)  // 교실에서는 항상 활성화
   const [micDisabledReason, setMicDisabledReason] = useState<string>('선생님이 마이크를 활성화하면 말할 수 있어요')
   const [reaskRequested, setReaskRequested] = useState(false)  // 재발화 요청 상태
 
@@ -213,33 +213,56 @@ function StudentClassroomContent() {
         }
       })
       .subscribe()
-    // conversation_logs Realtime 구독 (ai 메시지 수신)
+    // conversation_logs Realtime 구독
     const logChannel = supabase
       .channel(`classroom_logs:${sessionId}:${studentIdRef.current}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'conversation_logs',
-        filter: `classroom_session_id=eq.${sessionId}`,
+        filter: `session_id=eq.${sessionId}`,
       }, (payload) => {
         const log = payload.new
-        // 내게 온 AI 메시지만 표시
-        if (log.role === 'ai' && (log.target_student_id === studentIdRef.current || log.target_student_id === null)) {
+        // 내게 온 메시지만 처리
+        if (log.target_student_id !== studentIdRef.current) return
+        if (log.ai_text) {
           setClassroomMessages(prev => [...prev, {
             id: log.id,
             role: 'ai',
-            text: log.ai_text || '',
+            text: log.ai_text,
             createdAt: log.created_at,
           }])
         }
-        // 내 발화 확인
-        if (log.role === 'student' && log.student_id === studentIdRef.current) {
-          setClassroomMessages(prev => [...prev, {
-            id: log.id,
-            role: 'student',
-            text: log.student_text || '',
-            createdAt: log.created_at,
-          }])
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'conversation_logs',
+        filter: `session_id=eq.${sessionId}`,
+      }, (payload) => {
+        const log = payload.new
+        if (log.target_student_id !== studentIdRef.current) return
+        // ai_text가 UPDATE되면 메시지 추가 또는 업데이트
+        if (log.ai_text) {
+          // 현재 답변해야 할 row id 저장
+          sessionStorage.setItem('classroomLogId', log.id)
+          setClassroomMessages(prev => {
+            const exists = prev.find(m => m.id === log.id)
+            if (exists) {
+              return prev.map(m => m.id === log.id ? { ...m, text: log.ai_text } : m)
+            }
+            return [...prev, { id: log.id, role: 'ai', text: log.ai_text, createdAt: log.created_at }]
+          })
+        }
+        // student_text가 UPDATE되면 내 답변 표시
+        if (log.student_text && log.student_id === studentIdRef.current) {
+          setClassroomMessages(prev => {
+            const exists = prev.find(m => m.id === log.id)
+            if (exists) {
+              return prev.map(m => m.id === log.id ? { ...m, studentText: log.student_text } : m)
+            }
+            return prev
+          })
         }
       })
       .subscribe()
@@ -252,47 +275,22 @@ function StudentClassroomContent() {
 
   // ── STT 결과 처리 ─────────────────────────────────────
   const handleFinalResult = async (transcript: string) => {
-    if (!transcript.trim() || !sessionId || !studentIdRef.current || !sessionRef.current) return
+    if (!transcript.trim() || !sessionId || !studentIdRef.current) return
     setIsHolding(false)
     setInterimText('')
-    setMicEnabled(false)  // 발화 완료 시 마이크 비활성화
 
-    const sess = sessionRef.current
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: transcript,
-          sessionId: 'classroom',
-          classroomMode: true,
-          step: sess.current_step,
-          step_type: sess.current_step_type,
-          expected_en: sess.expected_en,
-          kr_sentence: sess.kr_sentence,
-        }),
-      })
-      const data = res.ok ? await res.json() : null
-      const isCorrect = data?.step_completed ? true : false
-      const score = data?.feedback?.overall ?? null
+    // 현재 열린 conversation_logs row id
+    const logId = sessionStorage.getItem('classroomLogId')
+    if (!logId) return
 
-      setMyAnswer({ text: transcript, isCorrect, score })
+    // student_text UPDATE
+    await supabase
+      .from('conversation_logs')
+      .update({ student_text: transcript })
+      .eq('id', logId)
 
-      await supabase.from('classroom_answers').insert({
-        session_id: sessionId,
-        student_id: studentIdRef.current,
-        student_name: studentName,
-        step: sess.current_step,
-        step_type: sess.current_step_type,
-        attempt: 1,
-        student_text: transcript,
-        is_correct: isCorrect,
-        score,
-        feedback_kr: data?.feedback?.pronunciation?.tip_kr || null,
-      })
-    } catch (e) {
-      console.error('채점 오류:', e)
-    }
+    // 다음 AI 메시지 대기
+    sessionStorage.removeItem('classroomLogId')
   }
 
   // ── 재발화 요청 ───────────────────────────────────────
