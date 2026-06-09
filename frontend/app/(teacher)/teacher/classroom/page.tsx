@@ -46,6 +46,11 @@ function ClassroomContent() {
   const [pendingAnswers, setPendingAnswers] = useState<Set<string>>(new Set())
   const [studentProgressIds, setStudentProgressIds] = useState<Record<string, string>>({})
   const [lessonStarted, setLessonStarted] = useState(false)
+  const [statusLogs, setStatusLogs] = useState<string[]>([])
+  const addLog = (msg: string) => {
+    const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    setStatusLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 20))
+  }
 
   // 학생별 메시지 (배열)
   const [studentMessages, setStudentMessages] = useState<Record<string, ChatMessage[]>>({})
@@ -85,11 +90,13 @@ function ClassroomContent() {
       .eq('id', sess.class_id)
       .maybeSingle()
     if (classData?.current_book && classData?.current_unit) {
+      addLog(`📖 교재 로드 중: ${classData.current_book} Unit ${classData.current_unit}`)
       const res = await fetch(`/api/lesson-scenario?book=${encodeURIComponent(classData.current_book)}&unit=${classData.current_unit}`)
       if (res.ok) {
         const data = await res.json()
         setScenario(data?.scenario ?? null)
         console.log('[선생님] 시나리오 로드:', data?.scenario?.title)
+        addLog(`✅ 시나리오 로드 완료: ${data?.scenario?.title || '제목없음'} (${data?.scenario?.total_steps}스텝)`)
       }
     }
     setLoading(false)
@@ -113,6 +120,7 @@ function ClassroomContent() {
           setJoinedStudents(prev => new Set(prev).add(log.student_id))
           const student = students.find(s => s.id === log.student_id)
           const studentName = student?.nickname || student?.name || '학생'
+          addLog(`🟢 ${studentName} 입장 — 환영 인사 전송 중`)
           await sendCotyMessage([{ id: log.student_id, name: studentName }], undefined, log.id)
         }
         // AI 메시지 INSERT 감지
@@ -152,6 +160,7 @@ function ClassroomContent() {
           setPendingAnswers(prev => {
             const next = new Set(prev)
             next.delete(log.student_id)
+            addLog(`💬 ${students.find(s => s.id === log.student_id)?.nickname || '학생'} 답변 수신 — GPT 채점 중 (남은: ${next.size}명)`)
             return next
           })
           // GPT 채점
@@ -286,6 +295,7 @@ function ClassroomContent() {
     const stepData = allSteps[step - 1]
     if (!stepData) return
     const aiLine = (stepData?.ai_line || `Let's try step ${step}!`).replace(/{{nickname}}/g, '여러분')
+    addLog(`📢 Step ${step} 질문 전송: "${aiLine.slice(0, 40)}..."`)
     await Promise.all(students.map(student =>
       fetch('/api/log', {
         method: 'POST',
@@ -306,9 +316,10 @@ function ClassroomContent() {
   // ── 학습 시작 ────────────────────────────────────
   const startLesson = async () => {
     if (!sessionId || !session || students.length === 0 || !scenario) {
-      console.log('[startLesson] 조건 미충족', { sessionId, session: session?.id, students: students.length, scenario: scenario?.id })
+      addLog(`❌ 학습 시작 실패 — sessionId:${!!sessionId} session:${!!session} students:${students.length}명 scenario:${!!scenario}`)
       return
     }
+    addLog(`🚀 학습 시작 — ${scenario.title} (${students.length}명 대상)`)
     const today = new Date().toISOString().split('T')[0]
     // lesson_progress 반 단위 생성
     const { data: progRows } = await supabase
@@ -409,6 +420,17 @@ function ClassroomContent() {
           )}
           {waitingCount > 0 && lessonStarted && (
             <p className="text-xs text-slate-400 text-center">답변 대기 중: {pendingAnswers.size}명</p>
+          )}
+          {/* 상태 로그 */}
+          {statusLogs.length > 0 && (
+            <div className="w-full mt-2">
+              <p className="text-[10px] text-slate-500 mb-1">📋 상태 로그</p>
+              <div className="bg-slate-900 rounded-xl p-2 max-h-40 overflow-y-auto space-y-1">
+                {statusLogs.map((log, i) => (
+                  <p key={i} className="text-[10px] text-slate-400 leading-relaxed">{log}</p>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
