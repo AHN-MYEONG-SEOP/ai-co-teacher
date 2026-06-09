@@ -60,6 +60,10 @@ function ClassroomContent() {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [loading, setLoading] = useState(true)
   const [participants, setParticipants] = useState<Participant[]>([])
+  // conversation_logs START row로 입장한 학생 추적
+  const [joinedStudents, setJoinedStudents] = useState<Set<string>>(new Set())
+  // 학생별 최근 메시지
+  const [studentMessages, setStudentMessages] = useState<Record<string, {ai: string, student: string, logId: string}>>({})
 
   const supabase = createClient()
 
@@ -131,12 +135,19 @@ function ClassroomContent() {
         filter: `session_id=eq.${sessionId}`,
       }, async (payload) => {
         const log = payload.new
-        console.log('[Realtime] conversation_logs INSERT:', log.session_type, log.student_id)
-        // 학생 입장(START) 감지 → AI 환영 인사 생성 후 같은 row UPDATE
+        // 학생 입장(START) 감지
         if (log.session_type === 'START' && log.student_id) {
+          setJoinedStudents(prev => new Set(prev).add(log.student_id))
           const student = students.find(s => s.id === log.student_id)
           const studentName = student?.nickname || student?.name || '학생'
           await sendCotyMessage([{ id: log.student_id, name: studentName }], undefined, log.id)
+        }
+        // AI 메시지 업데이트
+        if (log.ai_text && log.target_student_id) {
+          setStudentMessages(prev => ({
+            ...prev,
+            [log.target_student_id]: { ...prev[log.target_student_id], ai: log.ai_text, logId: log.id }
+          }))
         }
       })
       .on('postgres_changes', {
@@ -169,6 +180,27 @@ function ClassroomContent() {
           if (incoming.is_online) return [...prev, incoming]
           return prev
         })
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'conversation_logs',
+        filter: `session_id=eq.${sessionId}`,
+      }, (payload) => {
+        const log = payload.new
+        if (log.ai_text && log.target_student_id) {
+          setStudentMessages(prev => ({
+            ...prev,
+            [log.target_student_id]: { ...prev[log.target_student_id], ai: log.ai_text, logId: log.id }
+          }))
+        }
+        if (log.student_text && log.student_id) {
+          setStudentMessages(prev => ({
+            ...prev,
+            [log.student_id]: { ...prev[log.student_id], student: log.student_text }
+          }))
+          setJoinedStudents(prev => new Set(prev).add(log.student_id))
+        }
       })
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -421,7 +453,7 @@ function ClassroomContent() {
                 : answer.is_correct ? 'correct'
                 : 'incorrect'
 
-              const isOnline = participants.some(p => p.student_id === student.id)
+              const isOnline = joinedStudents.has(student.id)
               return (
                 <div key={student.id} className={cn(
                   'bg-slate-900 border-2 rounded-2xl p-3 flex flex-col gap-2 transition-all',
@@ -444,6 +476,20 @@ function ClassroomContent() {
                   </div>
 
                   {/* Coty 말 걸기 버튼 */}
+                  {/* AI 메시지 */}
+                  {studentMessages[student.id]?.ai && (
+                    <div className="bg-violet-900/20 border border-violet-700/30 rounded-xl px-3 py-2">
+                      <p className="text-[10px] text-violet-400 mb-0.5">💬 Coty</p>
+                      <p className="text-xs text-violet-200">{studentMessages[student.id].ai}</p>
+                    </div>
+                  )}
+                  {/* 학생 답변 */}
+                  {studentMessages[student.id]?.student && (
+                    <div className="bg-emerald-900/20 border border-emerald-700/30 rounded-xl px-3 py-2">
+                      <p className="text-[10px] text-emerald-400 mb-0.5">🧑 답변</p>
+                      <p className="text-xs text-emerald-200">{studentMessages[student.id].student}</p>
+                    </div>
+                  )}
                   {isOnline && (
                     <button
                       onClick={() => sendCotyMessage([{id: student.id, name: student.nickname || student.name}])}

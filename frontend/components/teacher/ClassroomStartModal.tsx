@@ -36,29 +36,34 @@ export function ClassroomStartModal({
     const supabase = createClient()
 
     try {
-      // 기존 수업 세션 종료 (status='off')
-      await supabase
+      // 기존 반 세션 찾기 (하나만 유지)
+      const { data: existing } = await supabase
         .from('sessions')
-        .update({ status: 'off' })
-        .eq('class_id', classId)
-        .eq('status', 'on')
-      // 새 세션 생성
-      const { data, error: insertError } = await supabase
-        .from('sessions')
-        .insert({
-          class_id: classId,
-          student_id: null,
-          status: 'on',
-          started_at: new Date().toISOString(),
-        })
         .select('id')
+        .eq('class_id', classId)
+        .is('student_id', null)
+        .order('started_at', { ascending: false })
+        .limit(1)
         .single()
 
-      if (insertError || !data) {
-        setError('세션 생성 실패: ' + (insertError?.message || '알 수 없는 오류'))
-        console.error('세션 생성 오류:', JSON.stringify(insertError))
-        setLoading(false)
-        return
+      let data: { id: string }
+      if (existing) {
+        // 기존 세션 재사용 → status='on'
+        await supabase.from('sessions').update({ status: 'on' }).eq('id', existing.id)
+        data = { id: existing.id }
+      } else {
+        // 새 세션 생성
+        const { data: newSess, error: insertError } = await supabase
+          .from('sessions')
+          .insert({ class_id: classId, student_id: null, status: 'on', started_at: new Date().toISOString() })
+          .select('id')
+          .single()
+        if (insertError || !newSess) {
+          setError('세션 생성 실패: ' + (insertError?.message || '알 수 없는 오류'))
+          setLoading(false)
+          return
+        }
+        data = { id: newSess.id }
       }
 
       // classes 테이블에 그리드 설정 + 선택한 book/unit 저장
