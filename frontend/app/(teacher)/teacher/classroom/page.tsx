@@ -229,6 +229,36 @@ function ClassroomContent() {
             next.delete(log.student_id)
             return next
           })
+          // GPT 채점 → 피드백 row INSERT
+          if (scenario) {
+            fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                studentText: log.student_text,
+                studentId: log.student_id,
+                scenarioId: scenario.id,
+              }),
+            }).then(r => r.ok ? r.json() : null).then(data => {
+              if (!data) return
+              const aiText = data.message || data.text || ''
+              if (!aiText) return
+              fetch('/api/log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  session_id: sessionId,
+                  student_id: log.student_id,
+                  target_student_id: log.student_id,
+                  session_type: 'classroom',
+                  ai_text: aiText,
+                  score: data.feedback?.overall ?? null,
+                  is_correct: data.step_completed ?? null,
+                  feedback_kr: data.feedback?.pronunciation?.tip_kr || null,
+                }),
+              })
+            }).catch(e => console.error('GPT 채점 오류:', e))
+          }
         }
       })
       .on('postgres_changes', {
