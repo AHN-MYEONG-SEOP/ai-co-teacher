@@ -238,6 +238,10 @@ function ClassroomContent() {
                 studentText: log.student_text,
                 studentId: log.student_id,
                 scenarioId: scenario.id,
+                nickname: students.find((s: any) => s.id === log.student_id)?.nickname
+                  || students.find((s: any) => s.id === log.student_id)?.name
+                  || '학생',
+                progressData: { current_step: currentStep, completed_steps: [], natural_steps: [], hint_used_steps: [] },
               }),
             }).then(r => r.ok ? r.json() : null).then(data => {
               if (!data) return
