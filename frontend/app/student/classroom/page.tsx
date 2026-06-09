@@ -319,7 +319,10 @@ function StudentClassroomContent() {
   })
 
   const handleMicStart = async () => {
-    if (isHolding || !micEnabled) return
+    if (isHolding) return
+    // AI 메시지가 있을 때만 (classroomLogId 있을 때) 마이크 활성화
+    const logId = sessionStorage.getItem('classroomLogId')
+    if (!logId) return
     setIsHolding(true)
     await startListening()
   }
