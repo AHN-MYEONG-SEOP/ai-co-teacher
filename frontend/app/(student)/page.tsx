@@ -1181,57 +1181,45 @@ export default function StudentPage() {
   // 교실 수업 세션 감지 (로그인 시 + Realtime)
   useEffect(() => {
     if (!ready || !classId) return
-    // 최초 접속 시 active 세션 조회
+    // 반 세션 status='on' 확인
     const checkSession = async () => {
-      // active 세션 조회 후 좀비 세션 자동 종료
-      // updated_at 기준 10분 이상 갱신 없으면 죽은 세션으로 간주
       const { data } = await supabase
-        .from('classroom_sessions')
-        .select('id, updated_at')
+        .from('sessions')
+        .select('id, status')
         .eq('class_id', classId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
+        .eq('status', 'on')
+        .order('started_at', { ascending: false })
         .limit(1)
-
       if (data && data.length > 0) {
-        const sess = data[0]
-        const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000)
-        const lastUpdate = new Date(sess.updated_at)
-
-        if (lastUpdate < tenMinsAgo) {
-          // 10분 이상 갱신 없음 → 좀비 세션 강제 종료
-          await supabase
-            .from('classroom_sessions')
-            .update({ status: 'ended' })
-            .eq('id', sess.id)
-          console.log('[classroom] 좀비 세션 자동 종료:', sess.id)
-          // 자습 화면으로 그냥 진행 (return 없이 아래 흐름 계속)
+        if (lessonState === 'active') {
+          setClassroomInvite({ sessionId: data[0].id })
         } else {
-          // 살아있는 세션 → 수업 참여
-          window.location.href = '/student/classroom?session=' + sess.id
-          return
+          window.location.href = '/student/classroom?session=' + data[0].id
         }
+        return
       }
     }
     checkSession()
-    // Realtime 구독 (이미 접속 중일 때 선생님이 수업 시작하면 팝업)
+    // Realtime 구독 — 선생님이 수업 시작(status='on')하면 감지
     const channel = supabase
       .channel(`classroom_invite:${classId}`)
       .on('postgres_changes', {
-        event: 'INSERT',
+        event: 'UPDATE',
         schema: 'public',
-        table: 'classroom_sessions',
+        table: 'sessions',
         filter: `class_id=eq.${classId}`,
       }, (payload) => {
-        if (payload.new.status === 'active') {
-          setTimeout(() => {
+        if (payload.new.status === 'on') {
+          if (lessonState === 'active') {
+            setClassroomInvite({ sessionId: payload.new.id })
+          } else {
             window.location.href = '/student/classroom?session=' + payload.new.id
-          }, 1500)
+          }
         }
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [ready, classId])
+  }, [ready, classId, lessonState])
 
   // Book·Unit 선택 완료 → 프로필에 저장하고 새 회차 시작
   const handlePickUnit = useCallback((book: string, unit: number) => {

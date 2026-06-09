@@ -71,7 +71,7 @@ function ClassroomContent() {
   const loadSession = async () => {
     if (!sessionId) return
     const { data: sess } = await supabase
-      .from('classroom_sessions')
+      .from('sessions')
       .select('*')
       .eq('id', sessionId)
       .single()
@@ -158,7 +158,7 @@ function ClassroomContent() {
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
-        table: 'classroom_sessions',
+        table: 'sessions',
         filter: `id=eq.${sessionId}`,
       }, (payload) => {
         const updated = payload.new as ClassroomSession
@@ -247,8 +247,8 @@ function ClassroomContent() {
     if (!session) return
     const newStep = session.current_step + 1
     await supabase
-      .from('classroom_sessions')
-      .update({ current_step: newStep, updated_at: new Date().toISOString() })
+      .from('sessions')
+      .update({ current_step: newStep })
       .eq('id', sessionId)
     setAnswers([])
   }
@@ -256,8 +256,8 @@ function ClassroomContent() {
   const toggleHint = async () => {
     if (!session) return
     await supabase
-      .from('classroom_sessions')
-      .update({ hint_visible: !session.hint_visible, updated_at: new Date().toISOString() })
+      .from('sessions')
+      .update({ hint_visible: !session.hint_visible })
       .eq('id', sessionId)
   }
 
@@ -275,8 +275,8 @@ function ClassroomContent() {
   const endSession = async () => {
     if (!confirm('수업을 종료하시겠어요?')) return
     await supabase
-      .from('classroom_sessions')
-      .update({ status: 'ended', updated_at: new Date().toISOString() })
+      .from('sessions')
+      .update({ status: 'off' })
       .eq('id', sessionId)
     router.push('/teacher')
   }
@@ -284,8 +284,8 @@ function ClassroomContent() {
   const handleLogout = async () => {
     if (!confirm('로그아웃하면 수업이 종료됩니다. 계속할까요?')) return
     await supabase
-      .from('classroom_sessions')
-      .update({ status: 'ended', updated_at: new Date().toISOString() })
+      .from('sessions')
+      .update({ status: 'off' })
       .eq('id', sessionId)
     await supabase.auth.signOut()
     router.push('/login')

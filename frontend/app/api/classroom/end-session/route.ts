@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
     )
 
     await supabase
-      .from('classroom_sessions')
-      .update({ status: 'ended', updated_at: new Date().toISOString() })
+      .from('sessions')
+      .update({ status: 'off' })
       .eq('id', sessionId)
 
     return NextResponse.json({ ok: true })

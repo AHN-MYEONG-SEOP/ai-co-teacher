@@ -150,7 +150,7 @@ function StudentClassroomContent() {
     }, { onConflict: 'session_id,student_id' })
 
     const { data: sess } = await supabase
-      .from('classroom_sessions')
+      .from('sessions')
       .select('*')
       .eq('id', sessionId)
       .single()
@@ -170,7 +170,7 @@ function StudentClassroomContent() {
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
-        table: 'classroom_sessions',
+        table: 'sessions',
         filter: `id=eq.${sessionId}`,
       }, (payload) => {
         const updated = payload.new as ClassroomSession
