@@ -125,7 +125,7 @@ function ClassroomContent() {
       .from('classes')
       .select('current_book, current_unit')
       .eq('id', sess.class_id)
-      .single()
+      .maybeSingle()
     if (classData?.current_book && classData?.current_unit) {
       const res = await fetch(`/api/lesson-scenario?book=${encodeURIComponent(classData.current_book)}&unit=${classData.current_unit}`)
       if (res.ok) {
