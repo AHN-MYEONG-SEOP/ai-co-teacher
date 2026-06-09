@@ -489,10 +489,10 @@ function ClassroomContent() {
                         <div key={msg.id} className={cn(
                           'rounded-xl px-2 py-1.5',
                           msg.role === 'ai'
-                            ? 'bg-violet-900/20 border border-violet-700/30'
-                            : 'bg-emerald-900/20 border border-emerald-700/30'
+                            ? 'bg-violet-900/20 border border-violet-700/30 mr-2'
+                            : 'bg-emerald-900/20 border border-emerald-700/30 ml-2 text-right'
                         )}>
-                          <p className={cn('text-[10px] mb-0.5', msg.role === 'ai' ? 'text-violet-400' : 'text-emerald-400')}>
+                          <p className={cn('text-[10px] mb-0.5', msg.role === 'ai' ? 'text-violet-400' : 'text-emerald-400 text-right')}>
                             {msg.role === 'ai' ? '💬 Coty' : '🧑 답변'}
                           </p>
                           <p className={cn('text-xs', msg.role === 'ai' ? 'text-violet-200' : 'text-emerald-200')}>
