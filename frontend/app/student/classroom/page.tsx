@@ -218,16 +218,10 @@ function StudentClassroomContent() {
         filter: `session_id=eq.${sessionId}`,
       }, (payload) => {
         const log = payload.new
-        // 내게 온 메시지만 처리
+        // START row INSERT는 무시 (ai_text는 UPDATE로 들어옴)
         if (log.target_student_id !== studentIdRef.current) return
-        if (log.ai_text) {
-          setClassroomMessages(prev => [...prev, {
-            id: log.id,
-            role: 'ai',
-            text: log.ai_text,
-            createdAt: log.created_at,
-          }])
-        }
+        // sessionStorage에 logId 저장 (학생 답변용)
+        sessionStorage.setItem('classroomLogId', log.id)
       })
       .on('postgres_changes', {
         event: 'UPDATE',
