@@ -192,7 +192,12 @@ function ClassroomContent() {
   // 특정 학생(또는 전체)에게 Coty 메시지 전송 → /api/log INSERT + TTS 재생
   // logId 있으면 기존 row UPDATE, 없으면 새 row INSERT
   const sendCotyMessage = async (targetStudents: {id: string, name: string}[], customText?: string, logId?: string) => {
-    if (!sessionId || !session) return
+    const currentSession = sessionRef.current
+    if (!sessionId || !currentSession) {
+      console.log('[sendCotyMessage] 세션 없음 - sessionId:', sessionId, 'session:', currentSession)
+      return
+    }
+    const session = currentSession
     try {
       const firstName = targetStudents[0]?.name || '학생'
       const res = await fetch('/api/chat', {
