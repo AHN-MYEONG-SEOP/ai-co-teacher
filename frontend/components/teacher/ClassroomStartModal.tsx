@@ -36,24 +36,20 @@ export function ClassroomStartModal({
     const supabase = createClient()
 
     try {
-      // 기존 active 세션 종료
+      // 기존 수업 세션 종료 (status='off')
       await supabase
-        .from('classroom_sessions')
-        .update({ status: 'ended', updated_at: new Date().toISOString() })
+        .from('sessions')
+        .update({ status: 'off' })
         .eq('class_id', classId)
-        .eq('status', 'active')
-
+        .eq('status', 'on')
       // 새 세션 생성
       const { data, error: insertError } = await supabase
-        .from('classroom_sessions')
+        .from('sessions')
         .insert({
           class_id: classId,
-          teacher_id: teacherId,
-          current_step: 1,
-          status: 'active',
-          coty_message: '',
-          coty_scene_kr: '',
-          hint_visible: false,
+          student_id: null,
+          status: 'on',
+          started_at: new Date().toISOString(),
         })
         .select('id')
         .single()
