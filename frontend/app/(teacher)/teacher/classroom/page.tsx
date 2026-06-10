@@ -46,6 +46,7 @@ function ClassroomContent() {
   const [pendingAnswers, setPendingAnswers] = useState<Set<string>>(new Set())
   const [studentProgressIds, setStudentProgressIds] = useState<Record<string, string>>({})
   const [lessonStarted, setLessonStarted] = useState(false)
+  const [debugOpen, setDebugOpen] = useState(true)
   const [statusLogs, setStatusLogs] = useState<string[]>([])
   const addLog = (msg: string) => {
     const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -451,30 +452,62 @@ function ClassroomContent() {
         </div>
 
         {/* 디버그 패널 */}
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-slate-700 rounded-2xl p-4 w-[600px] max-h-48 overflow-y-auto shadow-xl">
-          <p className="text-[10px] text-slate-500 mb-2 font-bold">🔍 디버그 패널</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
-            <span className="text-slate-400">sessionId</span>
-            <span className="text-white font-mono">{sessionId || 'null'}</span>
-            <span className="text-slate-400">session.id</span>
-            <span className="text-white font-mono">{session?.id || 'null'}</span>
-            <span className="text-slate-400">session.class_id</span>
-            <span className="text-white font-mono">{session?.class_id || 'null'}</span>
-            <span className="text-slate-400">session.status</span>
-            <span className="text-white font-mono">{session?.status || 'null'}</span>
-            <span className="text-slate-400">students.length</span>
-            <span className="text-white font-mono">{students.length}명</span>
-            <span className="text-slate-400">scenario</span>
-            <span className={scenario ? 'text-emerald-400 font-mono' : 'text-red-400 font-mono'}>{scenario ? `✅ ${scenario.title} (${scenario.total_steps}스텝)` : '❌ null'}</span>
-            <span className="text-slate-400">currentStep</span>
-            <span className="text-white font-mono">{currentStep}</span>
-            <span className="text-slate-400">lessonStarted</span>
-            <span className={lessonStarted ? 'text-emerald-400 font-mono' : 'text-slate-400 font-mono'}>{lessonStarted ? '✅ true' : 'false'}</span>
-            <span className="text-slate-400">joinedStudents</span>
-            <span className="text-white font-mono">{joinedStudents.size}명</span>
-            <span className="text-slate-400">pendingAnswers</span>
-            <span className="text-white font-mono">{pendingAnswers.size}명</span>
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-slate-700 rounded-2xl shadow-xl w-[620px]">
+          {/* 헤더 */}
+          <div
+            className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-slate-800 rounded-t-2xl"
+            onClick={() => setDebugOpen(prev => !prev)}
+          >
+            <p className="text-[11px] text-slate-400 font-bold">🔍 디버그 패널</p>
+            <span className="text-slate-500 text-xs">{debugOpen ? '▼ 닫기' : '▲ 열기'}</span>
           </div>
+          {/* 내용 */}
+          {debugOpen && (
+            <div className="px-4 pb-4 max-h-[420px] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+                <span className="text-slate-500 col-span-2 font-bold pt-1">── 세션 (sessions 테이블) ──</span>
+                <span className="text-slate-400">sessionId</span>
+                <span className="text-white font-mono truncate">{sessionId || 'null'}</span>
+                <span className="text-slate-400">session.id</span>
+                <span className="text-white font-mono truncate">{session?.id || 'null'}</span>
+                <span className="text-slate-400">session.class_id</span>
+                <span className="text-white font-mono truncate">{session?.class_id || 'null'}</span>
+                <span className="text-slate-400">session.status</span>
+                <span className="text-white font-mono">{session?.status || 'null'}</span>
+
+                <span className="text-slate-500 col-span-2 font-bold pt-1">── 학생 (profiles 테이블) ──</span>
+                <span className="text-slate-400">students.length</span>
+                <span className="text-white font-mono">{students.length}명</span>
+                <span className="text-slate-400">joinedStudents</span>
+                <span className="text-white font-mono">{joinedStudents.size}명 입장</span>
+                <span className="text-slate-400">pendingAnswers</span>
+                <span className="text-white font-mono">{pendingAnswers.size}명 대기</span>
+
+                <span className="text-slate-500 col-span-2 font-bold pt-1">── 시나리오 (lesson_scenarios) ──</span>
+                <span className="text-slate-400">scenario</span>
+                <span className={scenario ? 'text-emerald-400 font-mono' : 'text-red-400 font-mono'}>
+                  {scenario ? `✅ ${scenario.title}` : '❌ null'}
+                </span>
+                <span className="text-slate-400">total_steps</span>
+                <span className="text-white font-mono">{scenario?.total_steps ?? 'null'}</span>
+                <span className="text-slate-400">scenario.id</span>
+                <span className="text-white font-mono truncate">{scenario?.id ?? 'null'}</span>
+
+                <span className="text-slate-500 col-span-2 font-bold pt-1">── 수업 진행 상태 ──</span>
+                <span className="text-slate-400">currentStep</span>
+                <span className="text-white font-mono">{currentStep}</span>
+                <span className="text-slate-400">lessonStarted</span>
+                <span className={lessonStarted ? 'text-emerald-400 font-mono' : 'text-slate-400 font-mono'}>
+                  {lessonStarted ? '✅ true' : 'false'}
+                </span>
+
+                <span className="text-slate-500 col-span-2 font-bold pt-1">── 상태 로그 ──</span>
+                {statusLogs.slice(0, 8).map((log, i) => (
+                  <span key={i} className="text-slate-400 col-span-2 text-[10px] leading-relaxed">{log}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       {/* 오른쪽: 학생 그리드 */}
         <div className="flex-1 p-4 overflow-y-auto">
