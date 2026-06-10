@@ -862,21 +862,43 @@ interface LogEntry {
 // ── 수업 시작 확인 카드 (로그인 직후) ──────────────────
 function ConfirmStartCard({
   book, unit, scenario, attemptCount, completedCount, isFirstTime, onStart, onPick, onExit,
+  teacherClasses, selectedClassId, onSelectClass,
 }: {
   book: string
   unit: number
   scenario: LessonScenario | null
   attemptCount: number
   completedCount: number
-  isFirstTime: boolean   // 학생 전체 학습 이력이 전무한 경우(Book/Unit 무관)
+  isFirstTime: boolean
   onStart: () => void
   onPick: () => void
   onExit: () => void
+  teacherClasses?: { id: string; name: string; current_book: string | null; current_unit: number | null }[]
+  selectedClassId?: string | null
+  onSelectClass?: (classId: string) => void
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700/50 rounded-3xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-300">
+        {/* 반 선택 (선생님 수업화면에서만 표시) */}
+        {teacherClasses && teacherClasses.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs text-slate-400 font-medium">🏫 수업할 반</p>
+            <select
+              value={selectedClassId || ''}
+              onChange={e => onSelectClass?.(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
+            >
+              <option value="">반 선택...</option>
+              {teacherClasses.map(cls => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.name} {cls.current_book ? `— ${cls.current_book} Unit ${cls.current_unit}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {isFirstTime ? (
           <>
             <div className="text-center space-y-2">
@@ -1286,6 +1308,38 @@ function TeacherClassroomInner() {
   }, [ready, classId, lessonState])
 
   // Book·Unit 선택 완료 → 프로필에 저장하고 새 회차 시작
+  // 반 선택 시 세션 조회/생성 + 교재 로드
+  const handleSelectClass = async (classId: string) => {
+    if (!classId) return
+    setSelectedClassId(classId)
+    const cls = teacherClasses.find(c => c.id === classId)
+    if (cls) setSelectedClassName(cls.name)
+    const supabase = createClient()
+    // 기존 반 세션 찾기 or 생성
+    const { data: existing } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('class_id', classId)
+      .is('student_id', null)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (existing) {
+      await supabase.from('sessions').update({ status: 'on' }).eq('id', existing.id)
+    } else {
+      await supabase.from('sessions').insert({
+        class_id: classId,
+        student_id: null,
+        status: 'on',
+        started_at: new Date().toISOString(),
+      })
+    }
+    // 교재 로드
+    const book = cls?.current_book || settings.current_book
+    const unit = cls?.current_unit || settings.current_unit
+    await loadUnit(book, unit)
+  }
+
   const handlePickUnit = useCallback((book: string, unit: number) => {
     updateSettings({ current_book: book, current_unit: unit })
     startAttempt(book, unit)
@@ -1308,7 +1362,7 @@ function TeacherClassroomInner() {
       const book = cls?.current_book || settings.current_book
       const unit = cls?.current_unit || settings.current_unit
       // 선생님 수업화면: ConfirmStartCard 없이 바로 수업 시작
-      loadUnit(book, unit).then(() => setLessonState('active'))
+      loadUnit(book, unit).then(() => setLessonState('confirm'))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, studentId])
@@ -2135,6 +2189,9 @@ function TeacherClassroomInner() {
           onStart={() => startAttempt(activeBook, activeUnit)}
           onPick={() => setLessonState('picking')}
           onExit={handleExit}
+          teacherClasses={teacherClasses}
+          selectedClassId={selectedClassId}
+          onSelectClass={handleSelectClass}
         />
       )}
 
