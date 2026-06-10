@@ -451,19 +451,19 @@ function ClassroomContent() {
           )}
         </div>
 
-        {/* 디버그 패널 */}
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-slate-700 rounded-2xl shadow-xl w-[620px]">
+        {/* 디버그 패널 — 오른쪽 사이드 */}
+        <div className="hidden lg:flex flex-col w-[300px] shrink-0 border-l border-slate-800 bg-slate-950">
           {/* 헤더 */}
           <div
-            className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-slate-800 rounded-t-2xl"
+            className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-800 border-b border-slate-800"
             onClick={() => setDebugOpen(prev => !prev)}
           >
             <p className="text-[11px] text-slate-400 font-bold">🔍 디버그 패널</p>
-            <span className="text-slate-500 text-xs">{debugOpen ? '▼ 닫기' : '▲ 열기'}</span>
+            <span className="text-slate-500 text-xs">{debugOpen ? '◀ 닫기' : '▶ 열기'}</span>
           </div>
           {/* 내용 */}
           {debugOpen && (
-            <div className="px-4 pb-4 max-h-[420px] overflow-y-auto">
+            <div className="px-4 pb-4 flex-1 overflow-y-auto">
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
                 <span className="text-slate-500 col-span-2 font-bold pt-1">── 세션 (sessions 테이블) ──</span>
                 <span className="text-slate-400">sessionId</span>
@@ -508,7 +508,6 @@ function ClassroomContent() {
               </div>
             </div>
           )}
-        </div>
       {/* 오른쪽: 학생 그리드 */}
         <div className="flex-1 p-4 overflow-y-auto">
           {students.length === 0 ? (
