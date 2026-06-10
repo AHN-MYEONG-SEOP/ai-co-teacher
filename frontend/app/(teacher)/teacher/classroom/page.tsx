@@ -449,9 +449,11 @@ function ClassroomContent() {
       {/* 본문 */}
       <div className="flex flex-1 overflow-hidden">
         {/* 왼쪽: Coty 아바타 */}
-        <div className="w-[260px] shrink-0 border-r border-slate-800 flex flex-col items-center justify-center p-4 gap-3">
+        <div className="w-[160px] shrink-0 border-r border-slate-800 flex flex-col items-center justify-center p-2 gap-2">
           <p className="text-xs text-pink-400 font-medium">✨ Coty 선생님</p>
-          <CotyAvatar state={cotyState} />
+          <div className="scale-50 origin-top -mb-24">
+            <CotyAvatar state={cotyState} />
+          </div>
           {scenario && (
             <div className="w-full bg-slate-800/50 rounded-xl p-3">
               <p className="text-[10px] text-slate-400 mb-1">📖 {scenario.book} Unit {scenario.unit}</p>
