@@ -1338,6 +1338,7 @@ function TeacherClassroomInner() {
     const book = cls?.current_book || settings.current_book
     const unit = cls?.current_unit || settings.current_unit
     await loadUnit(book, unit)
+    setLessonState('confirm')
   }
 
   const handlePickUnit = useCallback((book: string, unit: number) => {
@@ -2149,7 +2150,7 @@ function TeacherClassroomInner() {
 
       {/* 복습/시작 확인 카드 (로그인 직후 · 수업 완료 후) */}
       {/* 반 선택 UI */}
-      {lessonState === 'confirm' && teacherClasses.length > 1 && (
+      {lessonState === 'confirm' && teacherClasses.length > 0 && (
         <div className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm space-y-4">
             <h3 className="text-white font-medium text-center">🏫 수업할 반 선택</h3>
