@@ -2105,6 +2105,37 @@ export default function StudentPage() {
         </div>
       </div>
     )}
+    {/* 오른쪽: 디버그 패널 (데스크탑 전용) */}
+    <div className="hidden lg:flex flex-col w-[340px] shrink-0 border-l border-slate-800 bg-slate-950 overflow-y-auto p-4 gap-3">
+      <p className="text-xs font-bold text-slate-400">🔍 디버그 패널</p>
+      <div className="space-y-1 text-[11px]">
+        <p className="text-slate-500 font-bold mt-2">── 세션 (sessions 테이블) ──</p>
+        <div className="flex justify-between"><span className="text-slate-400">sessionId</span><span className="text-white font-mono truncate max-w-[180px]">{sessionId || 'null'}</span></div>
+        <div className="flex justify-between"><span className="text-slate-400">studentId</span><span className="text-white font-mono truncate max-w-[180px]">{studentId || 'null'}</span></div>
+
+        <p className="text-slate-500 font-bold mt-2">── 프로필 (profiles 테이블) ──</p>
+        <div className="flex justify-between"><span className="text-slate-400">nickname</span><span className="text-white font-mono">{studentNickname || 'null'}</span></div>
+        <div className="flex justify-between"><span className="text-slate-400">current_book</span><span className="text-white font-mono truncate max-w-[140px]">{settings.current_book}</span></div>
+        <div className="flex justify-between"><span className="text-slate-400">current_unit</span><span className="text-white font-mono">{settings.current_unit}</span></div>
+        <div className="flex justify-between"><span className="text-slate-400">tts_speed</span><span className="text-white font-mono">{settings.tts_speed}</span></div>
+        <div className="flex justify-between"><span className="text-slate-400">class_id</span><span className="text-white font-mono truncate max-w-[180px]">{classId || 'null'}</span></div>
+
+        <p className="text-slate-500 font-bold mt-2">── 수업 상태 ──</p>
+        <div className="flex justify-between"><span className="text-slate-400">lessonState</span><span className="text-emerald-400 font-mono">{lessonState}</span></div>
+        <div className="flex justify-between"><span className="text-slate-400">activeBook</span><span className="text-white font-mono truncate max-w-[140px]">{activeBook}</span></div>
+        <div className="flex justify-between"><span className="text-slate-400">activeUnit</span><span className="text-white font-mono">{activeUnit}</span></div>
+
+        <p className="text-slate-500 font-bold mt-2">── 시나리오 (lesson_scenarios) ──</p>
+        <div className="flex justify-between"><span className="text-slate-400">scenario</span><span className={activeScenario ? 'text-emerald-400 font-mono' : 'text-red-400 font-mono'}>{activeScenario ? `✅ ${activeScenario.title}` : '❌ null'}</span></div>
+        <div className="flex justify-between"><span className="text-slate-400">total_steps</span><span className="text-white font-mono">{activeScenario?.total_steps ?? 'null'}</span></div>
+
+        <p className="text-slate-500 font-bold mt-2">── 진도 (lesson_progress) ──</p>
+        <div className="flex justify-between"><span className="text-slate-400">progressId</span><span className="text-white font-mono truncate max-w-[180px]">{progressId || 'null'}</span></div>
+        <div className="flex justify-between"><span className="text-slate-400">attemptCount</span><span className="text-white font-mono">{attemptCount}</span></div>
+        <div className="flex justify-between"><span className="text-slate-400">completedCount</span><span className="text-white font-mono">{completedCount}</span></div>
+        <div className="flex justify-between"><span className="text-slate-400">hasHistory</span><span className="text-white font-mono">{hasHistory ? 'true' : 'false'}</span></div>
+      </div>
+    </div>
     </div>
   )
 }
