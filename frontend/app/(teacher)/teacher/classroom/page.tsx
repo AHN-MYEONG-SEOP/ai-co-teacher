@@ -83,21 +83,37 @@ function ClassroomContent() {
       .eq('role', 'student')
     setStudents(members || [])
 
-    // 시나리오 로드
+    // 시나리오 로드 (자습화면 방식과 동일)
     const { data: classData } = await supabase
       .from('classes')
       .select('current_book, current_unit')
       .eq('id', sess.class_id)
       .maybeSingle()
     if (classData?.current_book && classData?.current_unit) {
-      addLog(`📖 교재 로드 중: ${classData.current_book} Unit ${classData.current_unit}`)
-      const res = await fetch(`/api/lesson-scenario?book=${encodeURIComponent(classData.current_book)}&unit=${classData.current_unit}`)
-      if (res.ok) {
-        const data = await res.json()
-        setScenario(data?.scenario ?? null)
-        console.log('[선생님] 시나리오 로드:', data?.scenario?.title)
-        addLog(`✅ 시나리오 로드 완료: ${data?.scenario?.title || '제목없음'} (${data?.scenario?.total_steps}스텝)`)
+      try {
+        const res = await fetch(`/api/lesson-scenario?book=${encodeURIComponent(classData.current_book)}&unit=${classData.current_unit}`)
+        const data = res.ok ? await res.json() : null
+        const scen = data?.scenario ?? null
+        setScenario(scen)
+        if (scen) {
+          setStatusLogs(prev => {
+            const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            return [`[${time}] ✅ 시나리오 로드: ${scen.title} (${scen.total_steps}스텝)`, ...prev].slice(0, 20)
+          })
+        } else {
+          setStatusLogs(prev => {
+            const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            return [`[${time}] ❌ 시나리오 없음: ${classData.current_book} Unit ${classData.current_unit}`, ...prev].slice(0, 20)
+          })
+        }
+      } catch (e) {
+        console.error('시나리오 로드 오류:', e)
       }
+    } else {
+      setStatusLogs(prev => {
+        const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        return [`[${time}] ⚠️ 교재 미설정 — 수업 시작 모달에서 교재를 선택해주세요`, ...prev].slice(0, 20)
+      })
     }
     setLoading(false)
   }
