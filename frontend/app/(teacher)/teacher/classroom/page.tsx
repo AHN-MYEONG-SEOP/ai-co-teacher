@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { CotyAvatar, type CotyState } from '@/components/student/CotyAvatar'
 import { cn } from '@/lib/utils'
+import type { ConversationMessage } from '@/types'
 import { APP_VERSION } from '@/lib/version'
 
 // ── 타입 ─────────────────────────────────────────────
@@ -17,11 +18,7 @@ interface ClassStudent {
   name: string
   nickname: string | null
 }
-interface ChatMessage {
-  id: string
-  role: 'ai' | 'student'
-  text: string
-}
+
 
 // ── 메인 컴포넌트 ─────────────────────────────────────
 function ClassroomContent() {
@@ -54,7 +51,7 @@ function ClassroomContent() {
   }
 
   // 학생별 메시지 (배열)
-  const [studentMessages, setStudentMessages] = useState<Record<string, ChatMessage[]>>({})
+  const [studentMessages, setStudentMessages] = useState<Record<string, ConversationMessage[]>>({})
   // 입장한 학생 추적
   const [joinedStudents, setJoinedStudents] = useState<Set<string>>(new Set())
 
@@ -83,6 +80,10 @@ function ClassroomContent() {
       .eq('class_id', sess.class_id)
       .eq('role', 'student')
     setStudents(members || [])
+    // 학생별 메시지 배열 초기화
+    const initialMessages: Record<string, ConversationMessage[]> = {}
+    ;(members || []).forEach(s => { initialMessages[s.id] = [] })
+    setStudentMessages(initialMessages)
 
     // 시나리오 로드 (자습화면 방식과 동일)
     const { data: classData } = await supabase
@@ -145,7 +146,13 @@ function ClassroomContent() {
           setStudentMessages(prev => {
             const arr = prev[log.target_student_id] || []
             if (arr.find(m => m.id === log.id)) return prev
-            return { ...prev, [log.target_student_id]: [...arr, { role: 'ai', text: log.ai_text, id: log.id }] }
+            const msg: ConversationMessage = {
+              id: log.id,
+              role: 'ai',
+              content: log.ai_text,
+              createdAt: log.created_at || new Date().toISOString(),
+            }
+            return { ...prev, [log.target_student_id]: [...arr, msg] }
           })
         }
       })
@@ -162,8 +169,14 @@ function ClassroomContent() {
           setStudentMessages(prev => {
             const arr = prev[log.target_student_id] || []
             const exists = arr.find(m => m.id === log.id)
-            if (exists) return { ...prev, [log.target_student_id]: arr.map(m => m.id === log.id ? { ...m, text: log.ai_text } : m) }
-            return { ...prev, [log.target_student_id]: [...arr, { role: 'ai', text: log.ai_text, id: log.id }] }
+            if (exists) return { ...prev, [log.target_student_id]: arr.map(m => m.id === log.id ? { ...m, content: log.ai_text } : m) }
+            const msg: ConversationMessage = {
+              id: log.id,
+              role: 'ai',
+              content: log.ai_text,
+              createdAt: log.created_at || new Date().toISOString(),
+            }
+            return { ...prev, [log.target_student_id]: [...arr, msg] }
           })
         }
         // 학생 답변 감지
@@ -171,7 +184,21 @@ function ClassroomContent() {
           setStudentMessages(prev => {
             const arr = prev[log.student_id] || []
             if (arr.find(m => m.id === log.id + '_s')) return prev
-            return { ...prev, [log.student_id]: [...arr, { role: 'student', text: log.student_text, id: log.id + '_s' }] }
+            const msg: ConversationMessage = {
+              id: log.id + '_s',
+              role: 'student',
+              content: log.student_text,
+              createdAt: log.created_at || new Date().toISOString(),
+              feedback: log.score != null ? {
+                grammar: log.grammar ?? 0,
+                fluency: 0,
+                vocabulary: 0,
+                overall: log.score ?? 0,
+                correction: '',
+                tip: log.feedback_kr || '',
+              } : undefined,
+            }
+            return { ...prev, [log.student_id]: [...arr, msg] }
           })
           setJoinedStudents(prev => new Set(prev).add(log.student_id))
           setPendingAnswers(prev => {
@@ -508,6 +535,7 @@ function ClassroomContent() {
               </div>
             </div>
           )}
+        </div>
       {/* 오른쪽: 학생 그리드 */}
         <div className="flex-1 p-4 overflow-y-auto">
           {students.length === 0 ? (
@@ -556,8 +584,14 @@ function ClassroomContent() {
                               {msg.role === 'ai' ? '💬 Coty' : '🧑 답변'}
                             </p>
                             <p className={msg.role === 'ai' ? 'text-violet-200' : 'text-emerald-200'}>
-                              {msg.text}
+                              {msg.content}
                             </p>
+                            {msg.feedback && msg.role === 'student' && (
+                              <p className="text-[10px] text-amber-400 mt-1">
+                                점수: {msg.feedback.overall}점
+                                {msg.feedback.tip && <span> · {msg.feedback.tip}</span>}
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>
