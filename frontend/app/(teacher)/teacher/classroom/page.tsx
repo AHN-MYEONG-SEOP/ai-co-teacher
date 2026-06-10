@@ -1082,6 +1082,7 @@ function TeacherClassroomInner() {
 
       // URL에 session 파라미터가 있으면 sessions→class_id 자동 설정
       const supabase2 = createClient()
+      console.log('[init] urlSessionId:', urlSessionId, 'window.location:', typeof window !== 'undefined' ? window.location.search : 'SSR')
       const urlSess = urlSessionId
       if (urlSess) {
         const { data: sess } = await supabase2
