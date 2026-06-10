@@ -862,7 +862,7 @@ interface LogEntry {
 // ── 수업 시작 확인 카드 (로그인 직후) ──────────────────
 function ConfirmStartCard({
   book, unit, scenario, attemptCount, completedCount, isFirstTime, onStart, onPick, onExit,
-  teacherClasses, selectedClassId, onSelectClass,
+  teacherClasses, selectedClassId, onSelectClass, teacherName, teacherEmail,
 }: {
   book: string
   unit: number
@@ -876,22 +876,25 @@ function ConfirmStartCard({
   teacherClasses?: { id: string; name: string; current_book: string | null; current_unit: number | null }[]
   selectedClassId?: string | null
   onSelectClass?: (classId: string) => void
+  teacherName?: string
+  teacherEmail?: string
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700/50 rounded-3xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-300">
         {/* 반 선택 (선생님 수업화면에서만 표시) */}
-            {/* 선생님 정보 */}
-            <div className="flex items-center gap-3 pb-2 border-b border-slate-700">
-              <div className="w-9 h-9 rounded-full bg-emerald-700 flex items-center justify-center text-white font-bold">
-                {teacherName ? teacherName.charAt(0) : '👩‍🏫'}
+            {(teacherName || teacherEmail) && (
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-700">
+                <div className="w-9 h-9 rounded-full bg-emerald-700 flex items-center justify-center text-white font-bold">
+                  {teacherName ? teacherName.charAt(0) : '👩‍🏫'}
+                </div>
+                <div>
+                  <p className="text-white text-sm font-semibold">{teacherName || '선생님'}</p>
+                  <p className="text-slate-400 text-xs">{teacherEmail}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-white text-sm font-semibold">{teacherName || '선생님'}</p>
-                <p className="text-slate-400 text-xs">{teacherEmail}</p>
-              </div>
-            </div>
+            )}
         {teacherClasses && (
           <div className="space-y-1">
             <p className="text-xs text-slate-400 font-medium">🏫 수업할 반</p>
@@ -2227,6 +2230,8 @@ function TeacherClassroomInner() {
           teacherClasses={teacherClasses}
           selectedClassId={selectedClassId}
           onSelectClass={handleSelectClass}
+          teacherName={teacherName}
+          teacherEmail={teacherEmail}
         />
       )}
 
