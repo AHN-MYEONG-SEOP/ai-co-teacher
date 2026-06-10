@@ -1038,7 +1038,52 @@ export default function StudentPage() {
   } = useAudioStore()
   const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage, clearMessages } = useUIStore()
   const [isDevLogOpen, setIsDevLogOpen] = useState(true)
-  const { studentId, classId, sessionId, studentNickname, ready, settings, persona, updateSettings } = useStudentSession()
+  // ── 선생님 세션 ──────────────────────────────────
+  const [teacherId, setTeacherId] = useState<string | null>(null)
+  const [teacherClasses, setTeacherClasses] = useState<{id: string, name: string, current_book: string | null, current_unit: number | null}[]>([])
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
+  const [selectedClassName, setSelectedClassName] = useState<string>('')
+  const [teacherReady, setTeacherReady] = useState(false)
+  // 자습화면 호환용 더미값
+  const studentId = teacherId ?? undefined
+  const classId = selectedClassId
+  const sessionId = undefined
+  const studentNickname = selectedClassName || '선생님'
+  const ready = teacherReady
+  const persona = null
+  const settings = {
+    current_book: teacherClasses.find(c => c.id === selectedClassId)?.current_book || 'STARLAND Phonics 1 Single Letters',
+    current_unit: teacherClasses.find(c => c.id === selectedClassId)?.current_unit || 1,
+    tts_speed: 'normal' as const,
+    show_feedback: true,
+    stt_engine: 'deepgram' as const,
+    silence_threshold: 40,
+  }
+  const updateSettings = async (s: any) => {}
+
+  // 선생님 로그인 + 반 목록 로드
+  useEffect(() => {
+    const init = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      setTeacherId(user.id)
+      // 담당 반 목록
+      const { data: classes } = await supabase
+        .from('classes')
+        .select('id, name, current_book, current_unit')
+        .eq('teacher_id', user.id)
+        .order('name')
+      setTeacherClasses(classes || [])
+      // 반이 1개면 자동 선택
+      if (classes && classes.length === 1) {
+        setSelectedClassId(classes[0].id)
+        setSelectedClassName(classes[0].name)
+      }
+      setTeacherReady(true)
+    }
+    init()
+  }, [])
 
   const router = useRouter()
   const supabase = createClient()
@@ -1240,7 +1285,10 @@ export default function StudentPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       resumeAttempt(savedBook, Number(savedUnit), savedPid).then(() => setLessonState('active'))
     } else {
-      loadUnit(settings.current_book, settings.current_unit).then(() => setLessonState('confirm'))
+      const cls = teacherClasses.find(c => c.id === selectedClassId)
+      const book = cls?.current_book || settings.current_book
+      const unit = cls?.current_unit || settings.current_unit
+      loadUnit(book, unit).then(() => setLessonState('confirm'))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, studentId])
@@ -2026,6 +2074,36 @@ export default function StudentPage() {
       )}
 
       {/* 복습/시작 확인 카드 (로그인 직후 · 수업 완료 후) */}
+      {/* 반 선택 UI */}
+      {lessonState === 'confirm' && teacherClasses.length > 1 && (
+        <div className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-white font-medium text-center">🏫 수업할 반 선택</h3>
+            <div className="space-y-2">
+              {teacherClasses.map(cls => (
+                <button
+                  key={cls.id}
+                  onClick={() => {
+                    setSelectedClassId(cls.id)
+                    setSelectedClassName(cls.name)
+                  }}
+                  className={cn(
+                    'w-full px-4 py-3 rounded-xl text-sm text-left transition-colors',
+                    selectedClassId === cls.id
+                      ? 'bg-emerald-700 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  )}
+                >
+                  <p className="font-medium">{cls.name}</p>
+                  {cls.current_book && (
+                    <p className="text-xs text-slate-400 mt-0.5">{cls.current_book} Unit {cls.current_unit}</p>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {lessonState === 'confirm' && (
         <ConfirmStartCard
           book={activeBook}
