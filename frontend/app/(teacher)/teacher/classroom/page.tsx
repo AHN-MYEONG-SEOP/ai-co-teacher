@@ -882,6 +882,16 @@ function ConfirmStartCard({
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700/50 rounded-3xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-300">
         {/* 반 선택 (선생님 수업화면에서만 표시) */}
+            {/* 선생님 정보 */}
+            <div className="flex items-center gap-3 pb-2 border-b border-slate-700">
+              <div className="w-9 h-9 rounded-full bg-emerald-700 flex items-center justify-center text-white font-bold">
+                {teacherName ? teacherName.charAt(0) : '👩‍🏫'}
+              </div>
+              <div>
+                <p className="text-white text-sm font-semibold">{teacherName || '선생님'}</p>
+                <p className="text-slate-400 text-xs">{teacherEmail}</p>
+              </div>
+            </div>
         {teacherClasses && (
           <div className="space-y-1">
             <p className="text-xs text-slate-400 font-medium">🏫 수업할 반</p>
@@ -1066,6 +1076,7 @@ function TeacherClassroomInner() {
   const urlSessionId = searchParams.get('session')
   const [teacherId, setTeacherId] = useState<string | null>(null)
   const [teacherName, setTeacherName] = useState<string>('')
+  const [teacherEmail, setTeacherEmail] = useState<string>('')
   const [teacherClasses, setTeacherClasses] = useState<{id: string, name: string, current_book: string | null, current_unit: number | null}[]>([])
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [selectedClassName, setSelectedClassName] = useState<string>('')
@@ -1095,6 +1106,9 @@ function TeacherClassroomInner() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setTeacherId(user.id)
+          setTeacherEmail(user.email || '')
+          const { data: prof } = await supabase.from('profiles').select('name').eq('id', user.id).single()
+          if (prof?.name) setTeacherName(prof.name)
       // 담당 반 목록
       const { data: classes } = await supabase
         .from('classes')
