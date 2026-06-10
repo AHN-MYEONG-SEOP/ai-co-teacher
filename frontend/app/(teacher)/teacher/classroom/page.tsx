@@ -1065,6 +1065,7 @@ function TeacherClassroomInner() {
   const searchParams = useSearchParams()
   const urlSessionId = searchParams.get('session')
   const [teacherId, setTeacherId] = useState<string | null>(null)
+  const [teacherName, setTeacherName] = useState<string>('')
   const [teacherClasses, setTeacherClasses] = useState<{id: string, name: string, current_book: string | null, current_unit: number | null}[]>([])
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [selectedClassName, setSelectedClassName] = useState<string>('')
@@ -2184,6 +2185,17 @@ function TeacherClassroomInner() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+      {lessonState === 'confirm' && teacherName && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-800/90 border border-slate-700 rounded-2xl px-5 py-3 flex items-center gap-3 shadow-lg">
+          <div className="w-8 h-8 rounded-full bg-emerald-700 flex items-center justify-center text-white font-bold text-sm">
+            {teacherName.charAt(0)}
+          </div>
+          <div>
+            <p className="text-white text-sm font-medium">{teacherName} 선생님</p>
+            <p className="text-slate-400 text-xs">{selectedClassName || '반 미선택'}</p>
           </div>
         </div>
       )}
