@@ -136,7 +136,7 @@ export default function TeacherDashboard() {
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([])
   const [classroomModal, setClassroomModal] = useState<{ classId: string; className: string } | null>(null)
   const [allStudents, setAllStudents] = useState<RosterStudent[]>([])
-  const [editStudent, setEditStudent] = useState<{ id: string; name: string; nickname: string } | null>(null)
+  const [editStudent, setEditStudent] = useState<{ id: string; name: string; nickname: string; email: string; password: string } | null>(null)
   const [editLoading, setEditLoading] = useState(false)
   const [editMessage, setEditMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [newStudent, setNewStudent] = useState<NewStudent>({ name: '', nickname: '', email: '', password: '', class_id: '' })
@@ -148,21 +148,30 @@ export default function TeacherDashboard() {
     setEditLoading(true)
     setEditMessage(null)
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('profiles')
-        .update({ name: editStudent.name, nickname: editStudent.nickname || editStudent.name })
-        .eq('id', editStudent.id)
-      if (error) throw error
+      // 1) 이름/닉네임 수정 (profiles 테이블)
+      const res = await fetch('/api/teacher/update-student', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: editStudent.id,
+          name: editStudent.name,
+          nickname: editStudent.nickname || editStudent.name,
+          email: editStudent.email || null,
+          password: editStudent.password || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '수정 실패')
       setEditMessage({ text: '수정 완료!', ok: true })
-      setEditStudent(null)
+      setTimeout(() => { setEditStudent(null); setEditMessage(null) }, 1500)
       // 목록 새로고침
-      const { data } = await supabase
+      const supabase = createClient()
+      const { data: students } = await supabase
         .from('profiles')
         .select('id, name, nickname, class_id')
         .eq('role', 'student')
         .order('name')
-      if (data) setAllStudents(data)
+      if (students) setAllStudents(students)
     } catch (e: any) {
       setEditMessage({ text: '수정 실패: ' + e.message, ok: false })
     }
@@ -710,6 +719,26 @@ export default function TeacherDashboard() {
                         className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
                       />
                     </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">이메일 (변경 시에만 입력)</label>
+                      <input
+                        type="email"
+                        value={editStudent.email}
+                        onChange={e => setEditStudent(p => p ? { ...p, email: e.target.value } : null)}
+                        placeholder="변경하지 않으면 비워두세요"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">비밀번호 (변경 시에만 입력)</label>
+                      <input
+                        type="password"
+                        value={editStudent.password}
+                        onChange={e => setEditStudent(p => p ? { ...p, password: e.target.value } : null)}
+                        placeholder="변경하지 않으면 비워두세요"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
                   </div>
                   {editMessage && (
                     <p className={cn('text-xs rounded-lg px-3 py-2',
@@ -759,7 +788,7 @@ export default function TeacherDashboard() {
                         {teacherClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                       <button
-                        onClick={() => setEditStudent({ id: s.id, name: s.name, nickname: s.nickname || '' })}
+                        onClick={() => setEditStudent({ id: s.id, name: s.name, nickname: s.nickname || '', email: '', password: '' })}
                         className="text-xs px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors shrink-0"
                       >
                         ✏️ 수정
