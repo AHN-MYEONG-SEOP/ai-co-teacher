@@ -450,7 +450,33 @@ function ClassroomContent() {
           )}
         </div>
 
-        {/* 오른쪽: 학생 그리드 */}
+        {/* 디버그 패널 */}
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-slate-700 rounded-2xl p-4 w-[600px] max-h-48 overflow-y-auto shadow-xl">
+          <p className="text-[10px] text-slate-500 mb-2 font-bold">🔍 디버그 패널</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+            <span className="text-slate-400">sessionId</span>
+            <span className="text-white font-mono">{sessionId || 'null'}</span>
+            <span className="text-slate-400">session.id</span>
+            <span className="text-white font-mono">{session?.id || 'null'}</span>
+            <span className="text-slate-400">session.class_id</span>
+            <span className="text-white font-mono">{session?.class_id || 'null'}</span>
+            <span className="text-slate-400">session.status</span>
+            <span className="text-white font-mono">{session?.status || 'null'}</span>
+            <span className="text-slate-400">students.length</span>
+            <span className="text-white font-mono">{students.length}명</span>
+            <span className="text-slate-400">scenario</span>
+            <span className={scenario ? 'text-emerald-400 font-mono' : 'text-red-400 font-mono'}>{scenario ? `✅ ${scenario.title} (${scenario.total_steps}스텝)` : '❌ null'}</span>
+            <span className="text-slate-400">currentStep</span>
+            <span className="text-white font-mono">{currentStep}</span>
+            <span className="text-slate-400">lessonStarted</span>
+            <span className={lessonStarted ? 'text-emerald-400 font-mono' : 'text-slate-400 font-mono'}>{lessonStarted ? '✅ true' : 'false'}</span>
+            <span className="text-slate-400">joinedStudents</span>
+            <span className="text-white font-mono">{joinedStudents.size}명</span>
+            <span className="text-slate-400">pendingAnswers</span>
+            <span className="text-white font-mono">{pendingAnswers.size}명</span>
+          </div>
+        </div>
+      {/* 오른쪽: 학생 그리드 */}
         <div className="flex-1 p-4 overflow-y-auto">
           {students.length === 0 ? (
             <div className="flex items-center justify-center h-full">
