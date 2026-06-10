@@ -393,7 +393,7 @@ export default function TeacherDashboard() {
         {/* 탭 */}
         <div className="flex gap-2 flex-wrap">
           {(['realtime', 'history', 'reports', 'personas', 'students', 'classes', 'teachers', 'scenarios', 'classroom'] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
+            <button key={tab} onClick={() => tab === 'classroom' ? (window.location.href = '/teacher/classroom') : setActiveTab(tab)}
               className={cn('px-4 py-2 rounded-xl text-sm transition-colors',
                 activeTab === tab ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
               )}>
