@@ -1039,6 +1039,9 @@ function TeacherClassroomInner() {
   const { isLogDrawerOpen, setLogDrawerOpen, messages, addMessage, clearMessages } = useUIStore()
   const [isDevLogOpen, setIsDevLogOpen] = useState(true)
   // ── 선생님 세션 ──────────────────────────────────
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const urlSessionId = searchParams.get('session')
   const [teacherId, setTeacherId] = useState<string | null>(null)
   const [teacherClasses, setTeacherClasses] = useState<{id: string, name: string, current_book: string | null, current_unit: number | null}[]>([])
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
@@ -1079,7 +1082,7 @@ function TeacherClassroomInner() {
 
       // URL에 session 파라미터가 있으면 sessions→class_id 자동 설정
       const supabase2 = createClient()
-      const urlSess = new URLSearchParams(window.location.search).get('session')
+      const urlSess = urlSessionId
       if (urlSess) {
         const { data: sess } = await supabase2
           .from('sessions')
@@ -1101,9 +1104,6 @@ function TeacherClassroomInner() {
     init()
   }, [])
 
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const urlSessionId = searchParams.get('session')
   const supabase = createClient()
 
   // ── 회차(attempt) 기반 수업 오케스트레이션 ──────────────
