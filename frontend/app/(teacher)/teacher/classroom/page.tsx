@@ -2,8 +2,8 @@
 // DEV_LOG 환경변수로 패널 ON/OFF
 const DEV_LOG_ENABLED = process.env.NEXT_PUBLIC_DEV_LOG !== 'false'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { useMediaRecorder } from '@/hooks/useMediaRecorder'
@@ -1030,7 +1030,7 @@ function BookUnitPickerCard({
 }
 
 // ── 메인 페이지 ───────────────────────────────────────
-export default function StudentPage() {
+function TeacherClassroomInner() {
   const {
     avatarStatus, interimText, interimWords,
     setAvatarStatus, setInterimText, setSpeechResult, setLatency,
@@ -1044,6 +1044,7 @@ export default function StudentPage() {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [selectedClassName, setSelectedClassName] = useState<string>('')
   const [teacherReady, setTeacherReady] = useState(false)
+  const [showClassSelect, setShowClassSelect] = useState(false)
   // 자습화면 호환용 더미값
   const studentId = teacherId ?? undefined
   const classId = selectedClassId
@@ -1075,10 +1076,25 @@ export default function StudentPage() {
         .eq('teacher_id', user.id)
         .order('name')
       setTeacherClasses(classes || [])
-      // 반이 1개면 자동 선택
-      if (classes && classes.length === 1) {
+
+      // URL에 session 파라미터가 있으면 sessions→class_id 자동 설정
+      const supabase2 = createClient()
+      const urlSess = new URLSearchParams(window.location.search).get('session')
+      if (urlSess) {
+        const { data: sess } = await supabase2
+          .from('sessions')
+          .select('class_id')
+          .eq('id', urlSess)
+          .single()
+        if (sess?.class_id) {
+          const cls = (classes || []).find((c: any) => c.id === sess.class_id)
+          if (cls) { setSelectedClassId(cls.id); setSelectedClassName(cls.name) }
+        }
+      } else if (classes && classes.length === 1) {
         setSelectedClassId(classes[0].id)
         setSelectedClassName(classes[0].name)
+      } else if (classes && classes.length > 1) {
+        setShowClassSelect(true)
       }
       setTeacherReady(true)
     }
@@ -1086,6 +1102,8 @@ export default function StudentPage() {
   }, [])
 
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const urlSessionId = searchParams.get('session')
   const supabase = createClient()
 
   // ── 회차(attempt) 기반 수업 오케스트레이션 ──────────────
@@ -1283,12 +1301,13 @@ export default function StudentPage() {
     if (savedPid && savedBook && savedUnit) {
       // mount 시 1회 비동기 이어하기 (setState는 await 이후 콜백에서만 발생)
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      resumeAttempt(savedBook, Number(savedUnit), savedPid).then(() => setLessonState('active'))
+      resumeAttempt(savedBook, Number(savedUnit), savedPid).then(() => setLessonState('active'))  // 선생님: 이어하기도 바로 시작
     } else {
       const cls = teacherClasses.find(c => c.id === selectedClassId)
       const book = cls?.current_book || settings.current_book
       const unit = cls?.current_unit || settings.current_unit
-      loadUnit(book, unit).then(() => setLessonState('confirm'))
+      // 선생님 수업화면: ConfirmStartCard 없이 바로 수업 시작
+      loadUnit(book, unit).then(() => setLessonState('active'))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, studentId])
@@ -2215,5 +2234,17 @@ export default function StudentPage() {
       </div>
     </div>
     </div>
+  )
+}
+
+export default function TeacherClassroomPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <p className="text-slate-400">로딩 중...</p>
+      </div>
+    }>
+      <TeacherClassroomInner />
+    </Suspense>
   )
 }
