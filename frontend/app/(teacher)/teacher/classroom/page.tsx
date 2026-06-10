@@ -1309,6 +1309,14 @@ function TeacherClassroomInner() {
 
   // Book·Unit 선택 완료 → 프로필에 저장하고 새 회차 시작
   // 반 선택 시 세션 조회/생성 + 교재 로드
+  // 반 1개 자동 선택 시 handleSelectClass 자동 호출
+  useEffect(() => {
+    if (teacherReady && selectedClassId && teacherClasses.length === 1) {
+      handleSelectClass(selectedClassId)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacherReady, selectedClassId])
+
   const handleSelectClass = async (classId: string) => {
     if (!classId) return
     setSelectedClassId(classId)
