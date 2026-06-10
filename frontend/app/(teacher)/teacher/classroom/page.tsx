@@ -882,7 +882,7 @@ function ConfirmStartCard({
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700/50 rounded-3xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-300">
         {/* 반 선택 (선생님 수업화면에서만 표시) */}
-        {teacherClasses && teacherClasses.length > 0 && (
+        {teacherClasses && (
           <div className="space-y-1">
             <p className="text-xs text-slate-400 font-medium">🏫 수업할 반</p>
             <select

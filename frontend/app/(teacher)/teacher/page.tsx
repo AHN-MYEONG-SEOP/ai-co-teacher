@@ -824,7 +824,7 @@ export default function TeacherDashboard() {
                       <p className="text-xs text-slate-400 mt-1">반 수업</p>
                     </div>
                     <button
-                      onClick={() => setClassroomModal({ classId: cls.id, className: cls.name })}
+                      onClick={() => { window.location.href = '/teacher/classroom' }}
                       className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
                     >
                       수업 시작 →
@@ -836,19 +836,7 @@ export default function TeacherDashboard() {
           </div>
         )}
       </div>
-      {/* 교실 수업 시작 모달 */}
-      {classroomModal && teacherId && (
-        <ClassroomStartModal
-          classId={classroomModal.classId}
-          className={classroomModal.className}
-          teacherId={teacherId}
-          onClose={() => setClassroomModal(null)}
-          onStart={(sessionId) => {
-            setClassroomModal(null)
-            window.location.href = '/teacher/classroom?session=' + sessionId
-          }}
-        />
-      )}
+
     </main>
   )
 }
