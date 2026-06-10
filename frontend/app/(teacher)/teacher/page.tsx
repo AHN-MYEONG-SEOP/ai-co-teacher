@@ -136,9 +136,38 @@ export default function TeacherDashboard() {
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([])
   const [classroomModal, setClassroomModal] = useState<{ classId: string; className: string } | null>(null)
   const [allStudents, setAllStudents] = useState<RosterStudent[]>([])
+  const [editStudent, setEditStudent] = useState<{ id: string; name: string; nickname: string } | null>(null)
+  const [editLoading, setEditLoading] = useState(false)
+  const [editMessage, setEditMessage] = useState<{ text: string; ok: boolean } | null>(null)
   const [newStudent, setNewStudent] = useState<NewStudent>({ name: '', nickname: '', email: '', password: '', class_id: '' })
   const [createLoading, setCreateLoading] = useState(false)
   const [createMessage, setCreateMessage] = useState<{ text: string; ok: boolean } | null>(null)
+
+  const handleEditStudent = async () => {
+    if (!editStudent) return
+    setEditLoading(true)
+    setEditMessage(null)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('profiles')
+        .update({ name: editStudent.name, nickname: editStudent.nickname || editStudent.name })
+        .eq('id', editStudent.id)
+      if (error) throw error
+      setEditMessage({ text: '수정 완료!', ok: true })
+      setEditStudent(null)
+      // 목록 새로고침
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name, nickname, class_id')
+        .eq('role', 'student')
+        .order('name')
+      if (data) setAllStudents(data)
+    } catch (e: any) {
+      setEditMessage({ text: '수정 실패: ' + e.message, ok: false })
+    }
+    setEditLoading(false)
+  }
 
   const handleCreateStudent = async () => {
     setCreateLoading(true)
@@ -656,6 +685,57 @@ export default function TeacherDashboard() {
               )}
             </div>
 
+            {/* 학생 수정 모달 */}
+            {editStudent && (
+              <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+                <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md space-y-4">
+                  <h3 className="text-white font-medium">✏️ 학생 정보 수정</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">이름</label>
+                      <input
+                        type="text"
+                        value={editStudent.name}
+                        onChange={e => setEditStudent(p => p ? { ...p, name: e.target.value } : null)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">호칭 (닉네임)</label>
+                      <input
+                        type="text"
+                        value={editStudent.nickname}
+                        onChange={e => setEditStudent(p => p ? { ...p, nickname: e.target.value } : null)}
+                        placeholder="비워두면 이름 사용"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                  {editMessage && (
+                    <p className={cn('text-xs rounded-lg px-3 py-2',
+                      editMessage.ok ? 'bg-emerald-900/40 text-emerald-300' : 'bg-red-900/40 text-red-300'
+                    )}>
+                      {editMessage.text}
+                    </p>
+                  )}
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => { setEditStudent(null); setEditMessage(null) }}
+                      className="px-4 py-2 rounded-xl text-sm bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={handleEditStudent}
+                      disabled={editLoading || !editStudent.name}
+                      className="px-4 py-2 rounded-xl text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white transition-colors"
+                    >
+                      {editLoading ? '저장 중...' : '저장'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* 학생 명단 + 반 배정 */}
             <div className="space-y-2">
               <span className="text-sm text-slate-400">📒 학생 명단 ({allStudents.length}명) · 반 배정</span>
@@ -667,7 +747,7 @@ export default function TeacherDashboard() {
                 <div className="bg-slate-900/40 border border-slate-700/30 rounded-2xl p-4 space-y-1.5">
                   {allStudents.map(s => (
                     <div key={s.id} className="flex items-center justify-between gap-2 bg-slate-800/40 rounded-lg px-3 py-2">
-                      <span className="text-sm text-slate-200 truncate">
+                      <span className="text-sm text-slate-200 truncate flex-1">
                         {s.name}{s.nickname && s.nickname !== s.name && <span className="text-slate-500 ml-1">({s.nickname})</span>}
                       </span>
                       <select
@@ -678,6 +758,12 @@ export default function TeacherDashboard() {
                         <option value="">미배정</option>
                         {teacherClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
+                      <button
+                        onClick={() => setEditStudent({ id: s.id, name: s.name, nickname: s.nickname || '' })}
+                        className="text-xs px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors shrink-0"
+                      >
+                        ✏️ 수정
+                      </button>
                     </div>
                   ))}
                 </div>
