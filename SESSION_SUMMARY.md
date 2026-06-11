@@ -3,138 +3,86 @@
 
 ---
 
-## 읽어야 할 파일 순서
-
-1. 이 파일 (SESSION_SUMMARY.md)
-2. https://github.com/AHN-MYEONG-SEOP/ai-co-teacher 공유
-3. "CLAUDE.md와 CHANGELOG.md 읽고 이어서 작업해줘" 라고 하면 됨
-
----
-
 ## 프로젝트 기본 정보
-
 - GitHub: https://github.com/AHN-MYEONG-SEOP/ai-co-teacher (public)
 - 배포: https://ai-co-teacher-frontend.vercel.app
 - 기술스택: Next.js 15, TypeScript, Tailwind, Supabase, Deepgram nova-2, GPT-4o-mini, ElevenLabs
-- AI 선생님: Coty (코티) - CLAUDE.md 기준
-- 대상: 오프라인 영어 학원 최대 8명
-- 현재 버전: v2026-06-11.7
+- AI 선생님: Coty (코티)
+- 현재 버전: v2026-06-11.11
 
 ---
 
 ## 오늘 세션(2026-06-11) 완료한 작업
 
-### 교사 교실 수업화면 버그 수정 (v2026-06-10.18~26)
-- teacherClasses.length > 1 → > 0 수정 (반 1개일 때도 드롭다운 표시)
-- handleSelectClass() 끝에 setLessonState('confirm') 추가
-- CSS 오타 수정: text-lefttransition-colors → text-left transition-colors
-- 교실 수업 탭 클릭 시 바로 /teacher/classroom 이동
-- 반 1개 자동선택 후 수업화면 진입
-- 선생님 이름+이메일 표시 (profiles 테이블 조회)
-- 반 목록 Supabase 직접 쿼리 → /api/teacher/classes API로 교체 (RLS 문제 해결)
-- 디버그 패널에 선생님/반 정보 추가
+### Speaking Assessment 설계 확정
+- 3개 독립 화면:
+  1. /assessment/teacher → 대형화면 + 컨트롤 (조작 전담 선생님)
+  2. /assessment/student → 학생 말하기 화면 (공용 화면, 로그인 불필요)
+  3. /assessment/vote   → 점수 입력 (선생님 1~5점, 학생 👍)
+- 최종 점수: AI(60%) + 선생님평균(30%) + 좋아요(10%)
+- 최종 순위 발표: AI점수 → [선생님점수반영] → [친구점수반영] 버튼으로 순차 공개
+- 순위 변동 시 카드 위치 애니메이션
 
-### 학생 일괄 등록 기능 (v2026-06-11.1~5)
-- /api/teacher/bulk-create-students API 생성
-- BulkStudentUpload.tsx 컴포넌트 생성
-- 아이디에 @sda.ac 자동 추가 (개별/일괄 모두)
-- 샘플 엑셀 다운로드 버튼
-- /api/teacher/check-students API로 중복 아이디 미리보기 표시
-- 학생관리 탭에 엑셀 일괄 등록 섹션 추가
+### DB 테이블 생성 완료 (Supabase SQL 실행)
+- asm_sessions: session_key(날짜-시간), session_date, session_time, status, current_student_id, current_step, current_scenario_id
+- asm_scenarios: scenario_key, session_id, class_id, title, book, unit, steps(jsonb), total_steps
+- asm_results: result_key, session_id, scenario_id, student_id, step, target, spoken, words(jsonb), pronunciation, completeness, pacing, pausing, step_total, feedback_kr
+- asm_teacher_scores: score_key, session_id, student_id, teacher_id, attitude, confidence, effort, comment
+- asm_student_likes: like_key, session_id, from_student_id, to_student_id
 
-### Speaking Assessment 기획 및 초기 구현 (v2026-06-11.6~7)
-- Speaking Assessment 기획서 v1.0 작성 (Word 문서)
-- lesson_scenarios 테이블에 scenario_type 컬럼 추가 (SQL 실행 완료)
-- lesson_scenarios 테이블에 assessment_date 컬럼 추가 (SQL 실행 완료)
-- assessment_results 테이블 생성 (SQL 실행 완료)
-- AssessmentScenarioEditor.tsx 컴포넌트 생성
-  - 교재 드롭다운 (curriculum.json)
-  - Unit 드롭다운 + 직접 입력 토글
-  - 평가 날짜 선택
-  - Step 추가/삭제 (한국어 + 정답 영어문장)
-  - 엑셀 일괄 등록 + 샘플 다운로드
-- 대시보드 탭 그룹 정리:
-  - 수업: 🔴 실시간 | 🏫 교실 수업 | 📝 Speaking Assessment
-  - 학생: 👨‍🎓 학생관리 | 👤 페르소나 | 📋 대화기록 | 📊 학습이력
-  - 설정: 🏫 반 관리 | 👩‍🏫 교사관리 | 🎬 시나리오 | 📝 Assessment 시나리오
+### API 생성
+- /api/asm/sessions  → 세션 생성/조회 (session_key로 중복 방지)
+- /api/asm/scenarios → 시나리오 CRUD
+- /api/asm/results   → GPT 채점 + DB 저장
+- /api/deepgram-stt  → Deepgram HTTP Blob STT
+
+### 컴포넌트/화면 생성
+- AssessmentScenarioEditor.tsx → 시나리오 등록 (세션+시나리오 동시, 아코디언)
+- AssessmentSessionList.tsx    → 세션 목록 (대기/진행/종료 구분)
+- /assessment/student/page.tsx → 학생 말하기 화면 (useWebSpeech 재사용)
+
+### 대시보드 탭 정리
+- 수업: 🔴실시간 | 🏫교실수업 | 📝Speaking Assessment
+- 학생: 👨‍🎓학생관리 | 👤페르소나 | 📋대화기록 | 📊학습이력
+- 설정: 🏫반관리 | 👩‍🏫교사관리 | 🎬시나리오 | 📝Assessment시나리오
 
 ---
 
-## Speaking Assessment 설계 확정 내용
+## 다음 세션에서 할 일 (우선순위)
 
-### 흐름
-1. 선생님이 대시보드 → Speaking Assessment 클릭
-2. Coty 환영 인사 TTS 1회 재생
-3. 반 선택 → 학생 목록 → Unit 선택 → 시작
-4. 한 명씩 순서대로: 한국어 표시 → 마이크 → Deepgram STT → GPT 즉시 채점
-5. Step 완료마다 하단 랭킹 실시간 업데이트
-6. 한 학생 모든 Step 완료 → 다음 학생
-7. 전체 완료 → 최종 랭킹
+1. /assessment/teacher 대형화면 + 컨트롤
+   - 좌측: 학생 목록 (완료✅/진행중🎤/대기⬜)
+   - 중앙: 실시간 랭킹 (상위5등) + 현재 학생 스텝별 진행
+   - [시작] [다음학생] [종료] 버튼
+   - Supabase Realtime 구독
 
-### 채점 항목
-- Pronunciation (발음): Deepgram 인식률 기반
-- Completeness (완성도): 단어 누락/대체 여부
-- Pacing (속도): 80~140 WPM = 100점
-- Pausing (쉼): 0.4초 이상 공백 감점
-- Avg = 4개 항목 누적 평균 → 순위 결정
+2. /assessment/vote 점수 입력 화면
+   - 선생님: 1~5점 (별점)
+   - 학생: 👍 좋아요 1점
+   - 현재 말하는 학생 자동 표시 (Realtime)
+   - /api/asm/teacher-scores, /api/asm/student-likes API
 
-### 랭킹 패널 (화면 하단 가로)
-- 한 줄에 한 학생
-- Pronun:92 ████ | Complete:98 ████ | Pacing:85 ███ | Pausing:80 ███ | 🏆 89
-- Avg는 크고 굵게 강조
-- 스텝 완료마다 누적 평균으로 실시간 업데이트
-
-### 채점 카드 (화면 상단 누적)
-- 완료된 Step: 한국어 + 학생 발화 텍스트 + 4개 점수 + Step Avg 카드로 쌓임
-
-### DB
-- assessment_results: student_id, scenario_id, session_id, step, target, spoken, words(jsonb), pronunciation, completeness, pacing, pausing, step_total, feedback_kr
-- words[] (Deepgram 타임스탬프) 저장 → 나중에 재채점 가능
-- Supabase Realtime으로 랭킹 실시간 업데이트
-
-### 비용
-- GPT-4o-mini, 스텝별 즉시 채점
-- 50명 × 10 step = 약 35원
-- 사실상 무료 수준
-
----
-
-## 현재 미완성 작업 (다음 세션)
-
-1. Speaking Assessment 메인 화면 (app/assessment/page.tsx)
-2. /api/assessment/route.ts GPT 채점 API
-3. RankingPanel.tsx 실시간 랭킹
-4. StepResultCard.tsx 채점 결과 카드
-5. Assessment 시나리오 목록/수정/삭제 UI
-
----
-
-## DB 현황 (2026-06-11 기준)
-
-### 추가된 컬럼/테이블
-- lesson_scenarios.scenario_type text (study/class/assessment/dictation/reading/conversation)
-- lesson_scenarios.assessment_date date
-- assessment_results 테이블 (신규)
-
-### 기존 테이블
-- profiles: id, role, name, nickname, class_id, tts_speed, show_feedback, current_book, current_unit
-- classes: id, teacher_id, name, current_book, current_unit
-- lesson_scenarios: book, book_slug, unit, title, scenario_type, assessment_date, phases(jsonb), is_active
-- lesson_progress: student_id, scenario_id, session_date, attempt, current_step, completed_steps, natural_steps
-- assessment_results: student_id, scenario_id, session_id, step, target, spoken, words, pronunciation, completeness, pacing, pausing, step_total, feedback_kr
+3. /assessment/result 최종 순위
+   - AI 점수만 표시
+   - [선생님점수반영] 버튼 → 오른쪽에 컬럼 추가 + 순위 변동 애니메이션
+   - [친구점수반영] 버튼 → 또 오른쪽에 컬럼 추가
+   - 순위 변동 시 카드 위치 이동 애니메이션 (1등이 맨 위로)
+   - 각 점수 상세 표시 (선생님 별점, 좋아요 개수)
 
 ---
 
 ## 주요 파일 경로
 
-- frontend/app/(student)/page.tsx              - 학생 자습화면
-- frontend/app/(teacher)/teacher/page.tsx      - 교사 대시보드
-- frontend/app/(teacher)/teacher/classroom/page.tsx - 교사 교실화면
-- frontend/app/student/classroom/page.tsx      - 학생 교실화면
-- frontend/app/assessment/page.tsx             - Speaking Assessment (미구현)
-- frontend/components/teacher/AssessmentScenarioEditor.tsx - Assessment 시나리오 편집기
-- frontend/components/teacher/BulkStudentUpload.tsx - 학생 일괄 등록
-- frontend/app/api/teacher/bulk-create-students/route.ts
-- frontend/app/api/teacher/check-students/route.ts
-- frontend/app/api/assessment/route.ts         - GPT 채점 API (미구현)
-- frontend/lib/version.ts                      - 현재 버전: v2026-06-11.7
+- frontend/app/(teacher)/teacher/page.tsx         - 교사 대시보드
+- frontend/app/assessment/student/page.tsx         - 학생 말하기 화면 ✅
+- frontend/app/assessment/teacher/page.tsx         - 대형화면 (미구현)
+- frontend/app/assessment/vote/page.tsx            - 점수입력 (미구현)
+- frontend/app/assessment/result/page.tsx          - 최종결과 (미구현)
+- frontend/components/teacher/AssessmentScenarioEditor.tsx ✅
+- frontend/components/teacher/AssessmentSessionList.tsx    ✅
+- frontend/app/api/asm/sessions/route.ts           ✅
+- frontend/app/api/asm/scenarios/route.ts          ✅
+- frontend/app/api/asm/results/route.ts            ✅
+- frontend/app/api/asm/teacher-scores/route.ts     (미구현)
+- frontend/app/api/asm/student-likes/route.ts      (미구현)
+- frontend/lib/version.ts                          - v2026-06-11.11
