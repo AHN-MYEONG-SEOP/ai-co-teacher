@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import ScenarioEditor from '@/components/teacher/ScenarioEditor'
+import { AssessmentScenarioEditor } from '@/components/teacher/AssessmentScenarioEditor'
 import { ClassroomStartModal } from '@/components/teacher/ClassroomStartModal'
 import { BulkStudentUpload } from '@/components/teacher/BulkStudentUpload'
 import ClassManager from '@/components/teacher/ClassManager'
@@ -133,7 +134,7 @@ export default function TeacherDashboard() {
   const [personas, setPersonas] = useState<PersonaRow[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students' | 'scenarios' | 'classes' | 'teachers' | 'classroom'>('realtime')
+  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students' | 'scenarios' | 'classes' | 'teachers' | 'classroom' | 'assessment'>('realtime')
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([])
   const [classroomModal, setClassroomModal] = useState<{ classId: string; className: string } | null>(null)
   const [allStudents, setAllStudents] = useState<RosterStudent[]>([])
@@ -394,20 +395,46 @@ export default function TeacherDashboard() {
           ))}
         </div>
 
-        {/* 탭 */}
-        <div className="flex gap-2 flex-wrap">
-          {(['realtime', 'history', 'reports', 'personas', 'students', 'classes', 'teachers', 'scenarios', 'classroom'] as const).map(tab => (
-            <button key={tab} onClick={() => tab === 'classroom' ? (window.location.href = '/teacher/classroom') : setActiveTab(tab)}
-              className={cn('px-4 py-2 rounded-xl text-sm transition-colors',
-                activeTab === tab ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
-              )}>
-              {tab === 'realtime' ? '🔴 실시간' : tab === 'history' ? '📋 대화기록' : tab === 'reports' ? '📊 학습이력' : tab === 'personas' ? '👤 페르소나' : tab === 'students' ? '👨‍🎓 학생관리' : tab === 'classes' ? '🏫 반 관리' : tab === 'teachers' ? '👩‍🏫 교사관리' : tab === 'scenarios' ? '🎬 시나리오' : '🏫 교실 수업'}
-            </button>
-          ))}
-          <button onClick={() => { fetchLogs(); fetchReports(selectedStudentId || undefined); const ids = students.map(s => s.id); fetchScenarios(ids); fetchPersonas(ids) }} className="ml-auto px-4 py-2 rounded-xl text-sm bg-slate-800 text-slate-400 hover:text-white transition-colors">
-            🔄 새로고침
-          </button>
-        </div>
+            {/* 탭 그룹 */}
+            <div className="space-y-2">
+              {/* 수업 관리 */}
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-xs text-slate-500 self-center mr-1">수업</span>
+                {(['realtime', 'classroom', 'speaking_assessment'] as const).map(tab => (
+                  <button key={tab} onClick={() => tab === 'classroom' ? (window.location.href = '/teacher/classroom') : tab === 'speaking_assessment' ? (window.location.href = '/assessment') : setActiveTab(tab)}
+                    className={cn('px-4 py-2 rounded-xl text-sm transition-colors',
+                      activeTab === tab ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                    )}>
+                    {tab === 'realtime' ? '🔴 실시간' : tab === 'classroom' ? '🏫 교실 수업' : '📝 Speaking Assessment'}
+                  </button>
+                ))}
+              </div>
+              {/* 학생 관리 */}
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-xs text-slate-500 self-center mr-1">학생</span>
+                {(['students', 'personas', 'history', 'reports'] as const).map(tab => (
+                  <button key={tab} onClick={() => setActiveTab(tab)}
+                    className={cn('px-4 py-2 rounded-xl text-sm transition-colors',
+                      activeTab === tab ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                    )}>
+                    {tab === 'students' ? '👨‍🎓 학생관리' : tab === 'personas' ? '👤 페르소나' : tab === 'history' ? '📋 대화기록' : '📊 학습이력'}
+                  </button>
+                ))}
+              </div>
+              {/* 설정 */}
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-xs text-slate-500 self-center mr-1">설정</span>
+                {(['classes', 'teachers', 'scenarios', 'assessment'] as const).map(tab => (
+                  <button key={tab} onClick={() => setActiveTab(tab)}
+                    className={cn('px-4 py-2 rounded-xl text-sm transition-colors',
+                      activeTab === tab ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                    )}>
+                    {tab === 'classes' ? '🏫 반 관리' : tab === 'teachers' ? '👩‍🏫 교사관리' : tab === 'scenarios' ? '🎬 시나리오' : '📝 Assessment 시나리오'}
+                  </button>
+                ))}
+                <button onClick={() => { fetchLogs(); fetchReports(selectedStudentId || undefined); const ids = students.map(s => s.id); fetchScenarios(ids); fetchPersonas(ids) }} className="ml-auto px-4 py-2 rounded-xl text-sm bg-slate-800 text-slate-400 hover:text-white transition-colors">🔄 새로고침</button>
+              </div>
+            </div>
 
         {/* 학습 이력 */}
         {activeTab === 'reports' && (
@@ -817,6 +844,16 @@ export default function TeacherDashboard() {
 
         {/* 시나리오 편집 */}
         {activeTab === 'scenarios' && <ScenarioEditor />}
+
+        {/* 말하기 평가 시나리오 */}
+        {activeTab === 'assessment' && (
+          <div className="space-y-4">
+            <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6 space-y-4">
+              <h3 className="text-white font-medium">📝 말하기 평가 시나리오 등록</h3>
+              <AssessmentScenarioEditor onSaved={() => {}} />
+            </div>
+          </div>
+        )}
 
         {/* 교실 수업 */}
         {activeTab === 'classroom' && (
