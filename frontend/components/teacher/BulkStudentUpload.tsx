@@ -22,6 +22,7 @@ export function BulkStudentUpload() {
   const [results, setResults] = useState<Result[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [duplicates, setDuplicates] = useState<Set<string>>(new Set())
   const fileRef = useRef<HTMLInputElement>(null)
 
   const downloadSample = () => {
@@ -42,7 +43,7 @@ export function BulkStudentUpload() {
     setError('')
     setResults([])
     const reader = new FileReader()
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const wb = XLSX.read(ev.target?.result, { type: 'binary' })
         const ws = wb.Sheets[wb.SheetNames[0]]
@@ -57,6 +58,17 @@ export function BulkStudentUpload() {
             password: String(r[4] || '').trim(),
           }))
         setPreview(students)
+        const emails = students.map(s => s.id.includes('@') ? s.id : s.id + '@sda.ac')
+        const res = await fetch('/api/teacher/check-students', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emails })
+        })
+        const data = await res.json()
+        const dup = new Set<string>(
+          (data.result || []).filter((r: any) => r.exists).map((r: any) => r.email.toLowerCase())
+        )
+        setDuplicates(dup)
       } catch {
         setError('엑셀 파일을 읽을 수 없습니다.')
       }
@@ -118,7 +130,13 @@ export function BulkStudentUpload() {
 
       {preview.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm text-slate-300 font-medium">📊 미리보기 ({preview.length}명)</p>
+          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-slate-300 font-medium">📊 미리보기 ({preview.length}명)</p>
+            {duplicates.size > 0 && <p className="text-xs text-red-400">⚠️ 중복 {duplicates.size}명 (등록 시 실패)</p>}
+          </div>
+            {duplicates.size > 0 && <p className="text-xs text-red-400">⚠️ 중복 {duplicates.size}명 (등록 시 실패)</p>}
+          </div>
           <div className="bg-slate-800 rounded-xl overflow-auto max-h-64">
             <table className="w-full text-xs">
               <thead>
@@ -131,15 +149,22 @@ export function BulkStudentUpload() {
                 </tr>
               </thead>
               <tbody>
-                {preview.map((s, i) => (
-                  <tr key={i} className="border-b border-slate-700/50">
-                    <td className="p-2 text-white">{s.id}@sda.ac</td>
+                {preview.map((s, i) => {
+                  const email = (s.id.includes('@') ? s.id : s.id + '@sda.ac').toLowerCase()
+                  const isDup = duplicates.has(email)
+                  return (
+                  <tr key={i} className={isDup ? 'border-b border-slate-700/50 bg-red-900/20' : 'border-b border-slate-700/50'}>
+                    <td className="p-2 text-white">
+                      {s.id}@sda.ac
+                      {isDup && <span className="ml-2 text-red-400 text-[10px] font-bold">⚠️ 중복</span>}
+                    </td>
                     <td className="p-2 text-white">{s.name}</td>
                     <td className="p-2 text-slate-300">{s.nickname || s.name}</td>
                     <td className="p-2 text-slate-300">{s.className || '미배정'}</td>
                     <td className="p-2 text-slate-400">{s.password || 'sda3605'}</td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -173,7 +198,8 @@ export function BulkStudentUpload() {
                       }
                     </td>
                   </tr>
-                ))}
+                  )
+                  )}
               </tbody>
             </table>
           </div>
