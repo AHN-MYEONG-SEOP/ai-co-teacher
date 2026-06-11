@@ -180,6 +180,9 @@ export default function TeacherDashboard() {
   }
 
   const handleCreateStudent = async () => {
+    if (newStudent.email && !newStudent.email.includes('@')) {
+      newStudent.email = newStudent.email + '@sda.ac'
+    }
     setCreateLoading(true)
     setCreateMessage(null)
     try {
@@ -655,12 +658,12 @@ export default function TeacherDashboard() {
                   onChange={e => setNewStudent(p => ({ ...p, nickname: e.target.value }))}
                   className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
-                <input
-                  type="email"
-                  placeholder="이메일"
-                  value={newStudent.email}
-                  onChange={e => setNewStudent(p => ({ ...p, email: e.target.value }))}
-                  className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    <input
+                      type="text"
+                      placeholder="아이디 (예: minsu123 → minsu123@sda.ac)"
+                      value={newStudent.email}
+                      onChange={e => setNewStudent(p => ({ ...p, email: e.target.value }))}
+                      className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
                 <input
                   type="password"
