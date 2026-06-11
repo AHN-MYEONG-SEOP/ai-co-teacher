@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import ScenarioEditor from '@/components/teacher/ScenarioEditor'
 import { ClassroomStartModal } from '@/components/teacher/ClassroomStartModal'
+import { BulkStudentUpload } from '@/components/teacher/BulkStudentUpload'
 import ClassManager from '@/components/teacher/ClassManager'
 import TeacherManager from '@/components/teacher/TeacherManager'
 
