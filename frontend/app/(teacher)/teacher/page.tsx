@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import ScenarioEditor from '@/components/teacher/ScenarioEditor'
 import { AssessmentScenarioEditor } from '@/components/teacher/AssessmentScenarioEditor'
+import { AssessmentSessionList } from '@/components/teacher/AssessmentSessionList'
 import { ClassroomStartModal } from '@/components/teacher/ClassroomStartModal'
 import { BulkStudentUpload } from '@/components/teacher/BulkStudentUpload'
 import ClassManager from '@/components/teacher/ClassManager'
@@ -134,7 +135,7 @@ export default function TeacherDashboard() {
   const [personas, setPersonas] = useState<PersonaRow[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students' | 'scenarios' | 'classes' | 'teachers' | 'classroom' | 'assessment'>('realtime')
+  const [activeTab, setActiveTab] = useState<'realtime' | 'history' | 'reports' | 'personas' | 'students' | 'scenarios' | 'classes' | 'teachers' | 'classroom' | 'assessment' | 'speaking_assessment'>('realtime')
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([])
   const [classroomModal, setClassroomModal] = useState<{ classId: string; className: string } | null>(null)
   const [allStudents, setAllStudents] = useState<RosterStudent[]>([])
@@ -401,7 +402,7 @@ export default function TeacherDashboard() {
               <div className="flex gap-2 flex-wrap">
                 <span className="text-xs text-slate-500 self-center mr-1">수업</span>
                 {(['realtime', 'classroom', 'speaking_assessment'] as const).map(tab => (
-                  <button key={tab} onClick={() => tab === 'classroom' ? (window.location.href = '/teacher/classroom') : tab === 'speaking_assessment' ? (window.location.href = '/assessment') : setActiveTab(tab)}
+                  <button key={tab} onClick={() => tab === 'classroom' ? (window.location.href = '/teacher/classroom') : setActiveTab(tab)}
                     className={cn('px-4 py-2 rounded-xl text-sm transition-colors',
                       activeTab === tab ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
                     )}>
@@ -846,6 +847,24 @@ export default function TeacherDashboard() {
         {activeTab === 'scenarios' && <ScenarioEditor />}
 
         {/* 말하기 평가 시나리오 */}
+        {activeTab === 'speaking_assessment' && (
+          <div className="space-y-4">
+            <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6 space-y-4">
+              <h3 className="text-white font-medium">📝 Speaking Assessment</h3>
+              <AssessmentSessionList />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'speaking_assessment' && (
+          <div className="space-y-4">
+            <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6 space-y-4">
+              <h3 className="text-white font-medium">📝 Speaking Assessment</h3>
+              <AssessmentSessionList />
+            </div>
+          </div>
+        )}
+
         {activeTab === 'assessment' && (
           <div className="space-y-4">
             <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6 space-y-4">
