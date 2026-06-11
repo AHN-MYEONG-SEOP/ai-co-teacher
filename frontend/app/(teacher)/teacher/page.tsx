@@ -635,6 +635,10 @@ export default function TeacherDashboard() {
         {activeTab === 'students' && (
           <div className="space-y-4">
             <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6 space-y-4">
+              <h3 className="text-white font-medium">📂 엑셀로 학생 일괄 등록</h3>
+              <BulkStudentUpload />
+            </div>
+            <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6 space-y-4">
               <h3 className="text-white font-medium">👨‍🎓 새 학생 계정 생성</h3>
               <div className="grid grid-cols-2 gap-3">
                 <input
