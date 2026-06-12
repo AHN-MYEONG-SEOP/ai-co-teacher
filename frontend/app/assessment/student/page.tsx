@@ -244,8 +244,18 @@ export default function AssessmentStudentPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 select-none">
-      {/* 종료 버튼 */}
-      <div className="fixed top-4 right-4">
+      {/* 상단 버튼들 */}
+      <div className="fixed top-4 left-0 right-0 flex justify-between px-4">
+        <button
+          onClick={() => {
+            if (!confirm('Step 1부터 다시 시작하시겠습니까?')) return
+            setCurrentStep(1)
+            currentStepRef.current = 1
+            setSpokenText('')
+            setScreen('ready')
+          }}
+          className="px-4 py-2 bg-blue-800 hover:bg-blue-700 text-blue-300 hover:text-white rounded-xl text-sm transition-colors"
+        >🔄 새로운 도전</button>
         <button
           onClick={() => { if (confirm('종료하시겠습니까?')) window.location.href = '/login' }}
           className="px-4 py-2 bg-slate-800 hover:bg-red-700 text-slate-400 hover:text-white rounded-xl text-sm transition-colors"
@@ -340,6 +350,17 @@ export default function AssessmentStudentPage() {
           <p className="text-white text-3xl font-bold">수고했어요!</p>
           <p className="text-slate-400 text-lg">모든 Step을 완료했습니다</p>
           {session && <p className="text-emerald-400 text-sm">{session.student_name} 화이팅! 💪</p>}
+          <button
+            onClick={() => {
+              setScreen('waiting')
+              setSession(null)
+              sessionRef.current = null
+              setCurrentStep(1)
+              currentStepRef.current = 1
+              setSpokenText('')
+            }}
+            className="w-full bg-yellow-600 hover:bg-yellow-500 text-white py-4 rounded-2xl text-lg font-bold transition-colors"
+          >🎮 New Challenger!</button>
         </div>
       )}
       {/* 디버그 패널 */}
