@@ -264,6 +264,18 @@ export default function AssessmentStudentPage() {
           {session && <p className="text-emerald-400 text-sm">{session.student_name} 화이팅! 💪</p>}
         </div>
       )}
+    {/* 디버그 패널 */}
+      <div className="fixed bottom-0 left-0 right-0 bg-black/80 text-green-400 text-xs p-3 font-mono space-y-1 max-h-40 overflow-y-auto">
+        <p>🔧 DEBUG</p>
+        <p>sessionId: {sessionId || 'none'}</p>
+        <p>session: {session ? session.student_name + ' / ' + session.session_id.slice(0,8) : 'null'}</p>
+        <p>sessionRef: {sessionRef.current ? sessionRef.current.student_name : 'null'}</p>
+        <p>screen: {screen}</p>
+        <p>currentStep: {currentStep} (ref: {currentStepRef.current})</p>
+        <p>steps: {session?.steps.length || 0}개</p>
+        <p>isReady: {isReady ? 'true' : 'false'}</p>
+        <p>spokenText: {spokenText || '없음'}</p>
+      </div>
     </div>
   )
 }
