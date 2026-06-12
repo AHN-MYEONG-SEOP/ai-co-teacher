@@ -166,7 +166,7 @@ export default function AssessmentStudentPage() {
     try {
       const res = await fetch('/api/asm/session-state?session_id=' + sessionId)
       const data = await res.json()
-      console.log('세션 상태:', data.status)
+      console.log('🔄 loadSession 결과:', data.status, 'student:', data.student?.nickname, 'sessionRef:', !!sessionRef.current)
 
       if (data.status === 'ended') { window.location.href = '/login'; return }
 
@@ -186,6 +186,8 @@ export default function AssessmentStudentPage() {
         setScreen('ready')
       } else {
         setScreen('waiting')
+        sessionRef.current = null
+        setSession(null)
       }
     } catch (e) {
       console.error('loadSession 오류:', e)
@@ -211,7 +213,8 @@ export default function AssessmentStudentPage() {
         loadSession()
       })
       .subscribe((status) => {
-        console.log('Realtime 상태:', status)
+        console.log('🔌 Realtime 상태:', status)
+        if (status === 'SUBSCRIBED') console.log('✅ Realtime 구독 성공!')
       })
 
     // 폴링 백업 (5초마다, waiting 상태일 때만)
