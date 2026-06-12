@@ -856,15 +856,6 @@ export default function TeacherDashboard() {
           </div>
         )}
 
-        {activeTab === 'speaking_assessment' && (
-          <div className="space-y-4">
-            <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6 space-y-4">
-              <h3 className="text-white font-medium">📝 Speaking Assessment</h3>
-              <AssessmentSessionList />
-            </div>
-          </div>
-        )}
-
         {activeTab === 'assessment' && (
           <div className="space-y-4">
             <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6 space-y-4">
