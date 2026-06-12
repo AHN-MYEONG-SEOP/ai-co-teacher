@@ -95,10 +95,26 @@ export function AssessmentSessionList() {
                   <span className="text-slate-400 text-sm">{s.session_date} {s.session_time}</span>
                   <span className="text-slate-500 text-xs ml-2 font-mono">{s.session_key}</span>
                 </div>
-                <button
-                  onClick={() => window.open('/assessment/result?session_id=' + s.id, '_blank')}
-                  className="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg transition-colors"
-                >🏆 결과보기</button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => window.open('/assessment/result?session_id=' + s.id, '_blank')}
+                    className="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                  >🏆 결과보기</button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('세션을 초기화하시겠습니까?\n(채점결과/점수/좋아요가 삭제되고 ready 상태로 돌아갑니다)')) return
+                      const res = await fetch('/api/asm/reset', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: s.id })
+                      })
+                      const data = await res.json()
+                      if (data.success) { alert('초기화 완료!'); loadSessions() }
+                      else alert('오류: ' + data.error)
+                    }}
+                    className="text-xs bg-orange-700 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                  >🔄 초기화</button>
+                </div>
               </div>
             ))}
           </div>
