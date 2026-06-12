@@ -368,6 +368,16 @@ export default function AssessmentTeacherPage() {
               </button>
             ))}
           </div>
+              {/* 시작 버튼 */}
+              <div className="p-3 border-t border-slate-800">
+                <button
+                  onClick={() => selectedStudent && handleSelectStudent(selectedStudent)}
+                  disabled={!selectedStudent || selectedStudent.status === 'done'}
+                  className="w-full bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white py-2.5 rounded-xl text-sm font-medium transition-colors"
+                >
+                  ▶ 시작
+                </button>
+              </div>
           {/* 다음학생 버튼 */}
           <div className="p-3 border-t border-slate-800">
             <button
