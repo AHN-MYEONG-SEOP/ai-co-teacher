@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
+const APP_URL = 'https://ai-co-teacher-frontend.vercel.app/login'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -102,6 +103,28 @@ export default function LoginPage() {
         <p className="text-center text-xs text-slate-600">
           학생 계정이 없으면 선생님께 문의하세요
         </p>
+
+      {/* QR 코드 */}
+      <div className="mt-8 text-center space-y-3">
+        <p className="text-slate-500 text-xs">📱 스마트폰으로 스캔하면 앱처럼 설치할 수 있어요</p>
+        <div className="flex justify-center">
+          <div className="bg-white p-3 rounded-2xl">
+            <QRCodeSVG value={APP_URL} size={120} />
+          </div>
+        </div>
+        <p className="text-slate-600 text-xs">설치 후 홈 화면에서 바로 실행!</p>
+      </div>
+
+      {/* QR 코드 */}
+      <div className="mt-8 text-center space-y-3">
+        <p className="text-slate-500 text-xs">📱 스마트폰으로 스캔하면 앱처럼 설치할 수 있어요</p>
+        <div className="flex justify-center">
+          <div className="bg-white p-3 rounded-2xl">
+            <QRCodeSVG value={APP_URL} size={120} />
+          </div>
+        </div>
+        <p className="text-slate-600 text-xs">설치 후 홈 화면에서 바로 실행!</p>
+      </div>
       </div>
     </main>
   )
