@@ -21,7 +21,8 @@ export default function LoginPage() {
 
     try {
       // 1. 로그인
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      const loginEmail = email.includes('@') ? email : email + '@sda.ac'
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
       if (signInError) throw signInError
 
       // 2. profiles에서 role 확인
@@ -62,12 +63,12 @@ export default function LoginPage() {
         {/* 폼 */}
         <div className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-6 space-y-4">
           <div className="space-y-2">
-            <label className="text-sm text-slate-400">이메일</label>
+            <label className="text-sm text-slate-400">아이디</label>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="이메일을 입력하세요"
+              placeholder="아이디 입력 (예: minsu123)"
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
             />
           </div>
