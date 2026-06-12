@@ -1,8 +1,5 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createClient } from '@/lib/supabase'
-import { useWebSpeech } from '@/hooks/useWebSpeech'
-import type { WordResult } from '@/types'
 
 interface Step {
   step: number
@@ -25,27 +22,47 @@ export default function AssessmentStudentPage() {
   const [screen, setScreen] = useState<ScreenState>('waiting')
   const [currentStep, setCurrentStep] = useState(1)
   const [spokenText, setSpokenText] = useState('')
-  const [silenceCount, setSilenceCount] = useState<number | null>(null)
+  const [isReady, setIsReady] = useState(false)
 
   const sessionRef = useRef<SessionState | null>(null)
   const currentStepRef = useRef<number>(1)
-  const scoreStepRef = useRef<(spoken: string, words: WordResult[]) => Promise<void>>(async () => {})
-  const supabase = createClient()
+  const scoreStepRef = useRef<(spoken: string, words: any[]) => Promise<void>>(async () => {})
+
+  // 마이크 스트림 (화면 로드 시 열기)
+  const streamRef = useRef<MediaStream | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
 
   const sessionId = typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('session_id') || ''
     : ''
 
+  // 화면 로드 시 마이크 스트림 열기
+  useEffect(() => {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => {
+        streamRef.current = stream
+        setIsReady(true)
+        console.log('✅ 마이크 스트림 열림')
+      })
+      .catch(e => {
+        console.error('마이크 권한 오류:', e)
+        setIsReady(false)
+      })
+    return () => {
+      streamRef.current?.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+      console.log('마이크 스트림 닫힘')
+    }
+  }, [])
+
   // GPT 채점
-  const scoreStep = useCallback(async (spoken: string, words: WordResult[]) => {
+  const scoreStep = useCallback(async (spoken: string, words: any[]) => {
     const sess = sessionRef.current
     const step = currentStepRef.current
-    console.log('🔥 scoreStep 호출! step:', step, 'session:', sess?.student_name, 'steps길이:', sess?.steps.length)
-    if (!sess) { console.log('scoreStep: session null'); return }
-
+    if (!sess) return
     const stepData = sess.steps[step - 1]
     console.log('채점 시작:', { spoken, step, target: stepData?.expected_pattern })
-
     try {
       const res = await fetch('/api/asm/results', {
         method: 'POST',
@@ -61,8 +78,8 @@ export default function AssessmentStudentPage() {
         })
       })
       const data = await res.json()
-      console.log('채점 결과:', data)
       if (data.error) throw new Error(data.error)
+      console.log('채점 완료:', data.score)
 
       setScreen('done')
       await new Promise(r => setTimeout(r, 2000))
@@ -84,29 +101,70 @@ export default function AssessmentStudentPage() {
 
   useEffect(() => { scoreStepRef.current = scoreStep }, [scoreStep])
 
-  // useWebSpeech
-  const { startListening, stopListening, isReady } = useWebSpeech({
-    onFinalResult: async (text: string, confidence: number, words?: WordResult[]) => {
-      console.log('onFinalResult:', text, 'session:', !!sessionRef.current)
-      if (!sessionRef.current || !text) return
-      setSpokenText(text)
-      setScreen('processing')
-      await scoreStepRef.current(text, words || [])
-    },
-    onError: (err) => { console.error('STT 오류:', err); setScreen('ready') },
-    onLog: (msg) => console.log('[STT]', msg),
-    silenceThreshold: 255,
+  // 녹음 시작
+  const startRecording = useCallback(() => {
+    if (!streamRef.current) return
+    const mr = new MediaRecorder(streamRef.current)
+    mediaRecorderRef.current = mr
+    chunksRef.current = []
+    mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+    mr.start(100)
+    console.log('🔴 녹음 시작')
+  }, [])
 
-  })
+  // 녹음 종료 + Deepgram STT
+  const stopRecording = useCallback(async () => {
+    return new Promise<void>((resolve) => {
+      const mr = mediaRecorderRef.current
+      if (!mr || mr.state === 'inactive') { resolve(); return }
+      mr.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        console.log('⏹ 녹음 완료, Blob 크기:', blob.size)
 
-  // 세션 로드 함수 (API 통해서 - RLS 우회)
+        try {
+          // keyword boosting - expected_pattern 단어 추출
+          const sess = sessionRef.current
+          const step = currentStepRef.current
+          const keywords = sess?.steps[step-1]?.expected_pattern
+            ?.split(' ')
+            .filter((w: string) => w.length >= 2) || []
+
+          const formData = new FormData()
+          formData.append('audio', blob)
+          if (keywords.length > 0) {
+            formData.append('keywords', keywords.join(','))
+          }
+
+          const res = await fetch('/api/deepgram-stt', { method: 'POST', body: formData })
+          const data = await res.json()
+          const text = data.transcript || ''
+          const words = data.words || []
+          console.log('STT 결과:', text)
+
+          if (text) {
+            setSpokenText(text)
+            setScreen('processing')
+            await scoreStepRef.current(text, words)
+          } else {
+            setScreen('ready')
+          }
+        } catch (e) {
+          console.error('STT 오류:', e)
+          setScreen('ready')
+        }
+        resolve()
+      }
+      mr.stop()
+    })
+  }, [])
+
+  // 세션 로드 (API 통해서 - RLS 우회)
   const loadSession = useCallback(async () => {
     if (!sessionId) return
-    console.log('loadSession 호출')
     try {
       const res = await fetch('/api/asm/session-state?session_id=' + sessionId)
       const data = await res.json()
-      console.log('세션 상태:', data)
+      console.log('세션 상태:', data.status)
 
       if (data.status === 'ended') { window.location.href = '/login'; return }
 
@@ -118,7 +176,6 @@ export default function AssessmentStudentPage() {
           student_name: data.student.nickname || data.student.name,
           steps: data.scenario.steps || []
         }
-        console.log('세션 로드 완료:', newSession.student_name, '스텝수:', newSession.steps.length)
         setSession(newSession)
         sessionRef.current = newSession
         setCurrentStep(data.current_step || 1)
@@ -133,52 +190,34 @@ export default function AssessmentStudentPage() {
     }
   }, [sessionId])
 
-  // 초기 로드 + Realtime 구독
+  // 초기 로드 + Realtime 구독 + 폴링
   useEffect(() => {
     if (!sessionId) return
+
+    // Supabase Realtime - 직접 import 없이 fetch 폴링으로 대체
     loadSession()
 
-    // Realtime 구독
-    const channel = supabase
-      .channel('asm_student_' + sessionId)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'asm_sessions',
-        filter: 'id=eq.' + sessionId
-      }, (payload) => {
-        console.log('asm_sessions UPDATE 감지:', payload.new)
-        loadSession()
-      })
-      .subscribe((status) => {
-        console.log('Realtime 구독 상태:', status)
-      })
-
-    // 폴링 백업 (3초마다)
+    // 3초마다 폴링 (waiting 상태일 때)
     const pollInterval = setInterval(() => {
-      if (screen === 'waiting') {
-        console.log('폴링: loadSession 호출')
+      if (sessionRef.current === null) {
         loadSession()
       }
     }, 3000)
 
-    return () => {
-      supabase.removeChannel(channel)
-      clearInterval(pollInterval)
-    }
+    return () => clearInterval(pollInterval)
   }, [sessionId, loadSession])
 
   // Push-to-Talk
   const handleMicDown = useCallback(async () => {
-    if (screen !== 'ready') return
+    if (screen !== 'ready' || !isReady) return
     setScreen('recording')
-    await startListening()
-  }, [screen, startListening])
+    startRecording()
+  }, [screen, isReady, startRecording])
 
   const handleMicUp = useCallback(async () => {
     if (screen !== 'recording') return
-    await stopListening()
-  }, [screen, stopListening])
+    await stopRecording()
+  }, [screen, stopRecording])
 
   const currentStepData = session?.steps[currentStep - 1]
 
@@ -192,6 +231,7 @@ export default function AssessmentStudentPage() {
         >✕ 종료</button>
       </div>
 
+      {/* 대기 화면 */}
       {screen === 'waiting' && (
         <div className="text-center space-y-6">
           <div className="text-7xl animate-pulse">⏳</div>
@@ -204,6 +244,7 @@ export default function AssessmentStudentPage() {
         </div>
       )}
 
+      {/* 평가 화면 */}
       {(screen === 'ready' || screen === 'recording' || screen === 'processing' || screen === 'done') && session && (
         <div className="w-full max-w-lg space-y-8">
           <div className="text-center space-y-1">
@@ -222,8 +263,8 @@ export default function AssessmentStudentPage() {
             <button
               onMouseDown={handleMicDown}
               onMouseUp={handleMicUp}
-              onTouchStart={handleMicDown}
-              onTouchEnd={handleMicUp}
+              onTouchStart={(e) => { e.preventDefault(); handleMicDown() }}
+              onTouchEnd={(e) => { e.preventDefault(); handleMicUp() }}
               disabled={screen === 'processing' || !isReady}
               className={`w-32 h-32 rounded-full text-5xl transition-all duration-200 shadow-xl ${
                 screen === 'recording'
@@ -232,20 +273,23 @@ export default function AssessmentStudentPage() {
                   ? 'bg-slate-700 cursor-not-allowed opacity-50'
                   : screen === 'done'
                   ? 'bg-emerald-600 scale-95'
+                  : !isReady
+                  ? 'bg-slate-700 opacity-50'
                   : 'bg-emerald-600 hover:bg-emerald-500 hover:scale-105 active:scale-95'
               }`}
             >
               {screen === 'recording' ? '⏹' :
                screen === 'processing' ? '⚙️' :
-               screen === 'done' ? '✅' : '🎤'}
+               screen === 'done' ? '✅' :
+               !isReady ? '...' : '🎤'}
             </button>
 
             <p className="text-slate-400 text-sm h-6">
               {screen === 'recording' ? '🔴 누르고 있는 동안 녹음됩니다'
-                : screen === 'processing' ? '⚡ 채점 중...'
-                : screen === 'done' ? '✅ 완료! 다음 문장으로...'
-                : !isReady ? '🎤 마이크 준비 중...'
-                : '버튼을 누르고 말하세요'}
+               : screen === 'processing' ? '⚡ 채점 중...'
+               : screen === 'done' ? '✅ 완료! 다음 문장으로...'
+               : !isReady ? '🎤 마이크 준비 중...'
+               : '버튼을 누르고 말하세요'}
             </p>
           </div>
 
@@ -268,6 +312,7 @@ export default function AssessmentStudentPage() {
         </div>
       )}
 
+      {/* 완료 화면 */}
       {screen === 'finished' && (
         <div className="text-center space-y-6">
           <div className="text-8xl">🎉</div>
@@ -276,28 +321,6 @@ export default function AssessmentStudentPage() {
           {session && <p className="text-emerald-400 text-sm">{session.student_name} 화이팅! 💪</p>}
         </div>
       )}
-    {/* 디버그 패널 - 좌측 전체 */}
-      <div className="fixed top-0 left-0 bottom-0 w-72 bg-black/90 text-green-400 text-xs p-3 font-mono space-y-1 overflow-y-auto z-50">
-        <p className="text-yellow-400 font-bold text-sm mb-2">🔧 DEBUG</p>
-        <p>sessionId:</p>
-        <p className="text-white break-all">{sessionId || 'none'}</p>
-        <p className="mt-2">session:</p>
-        <p className="text-white">{session ? session.student_name : 'null'}</p>
-        <p className="mt-2">sessionRef:</p>
-        <p className="text-white">{sessionRef.current ? sessionRef.current.student_name : 'null'}</p>
-        <p className="mt-2">screen: <span className="text-yellow-400">{screen}</span></p>
-        <p>currentStep: <span className="text-yellow-400">{currentStep}</span> (ref: {currentStepRef.current})</p>
-        <p>steps: {session?.steps.length || 0}개</p>
-        <p>isReady: <span className={isReady ? 'text-emerald-400' : 'text-red-400'}>{isReady ? 'true' : 'false'}</span></p>
-        <p className="mt-2">spokenText:</p>
-        <p className="text-white">{spokenText || '없음'}</p>
-        <p className="mt-2 text-slate-500">--- steps ---</p>
-        {session?.steps.map((s, i) => (
-          <p key={i} className={i === currentStep - 1 ? 'text-yellow-400' : 'text-slate-500'}>
-            {i+1}. {s.scene_kr}
-          </p>
-        ))}
-      </div>
     </div>
   )
 }
