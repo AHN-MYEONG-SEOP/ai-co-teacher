@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 
 interface Student {
@@ -223,6 +223,9 @@ export default function AssessmentTeacherPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  const loadDataRef = useRef(loadData)
+  useEffect(() => { loadDataRef.current = loadData }, [loadData])
+
   // Realtime 구독
   useEffect(() => {
     if (!sessionId) return
@@ -231,14 +234,14 @@ export default function AssessmentTeacherPage() {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'asm_results',
         filter: 'session_id=eq.' + sessionId
-      }, () => loadData())
+      }, () => { console.log('asm_results INSERT 감지!'); loadDataRef.current() })
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'asm_sessions',
         filter: 'id=eq.' + sessionId
-      }, () => loadData())
-      .subscribe()
+      }, () => { console.log('asm_sessions UPDATE 감지!'); loadDataRef.current() })
+      .subscribe((status) => { console.log('Realtime 구독 상태:', status) })
     return () => { supabase.removeChannel(channel) }
-  }, [sessionId, loadData])
+  }, [sessionId])
 
   // 학생 선택 (클릭 시)
   const handleClickStudent = (student: Student) => {
