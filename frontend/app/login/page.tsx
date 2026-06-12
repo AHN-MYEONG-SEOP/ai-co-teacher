@@ -1,4 +1,5 @@
 'use client'
+import { QRCodeSVG } from 'qrcode.react'
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
