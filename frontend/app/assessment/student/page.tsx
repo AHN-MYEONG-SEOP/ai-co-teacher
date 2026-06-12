@@ -40,6 +40,7 @@ export default function AssessmentStudentPage() {
   const scoreStep = useCallback(async (spoken: string, words: WordResult[]) => {
     const sess = sessionRef.current
     const step = currentStepRef.current
+    console.log('🔥 scoreStep 호출! step:', step, 'session:', sess?.student_name, 'steps길이:', sess?.steps.length)
     if (!sess) { console.log('scoreStep: session null'); return }
 
     const stepData = sess.steps[step - 1]
