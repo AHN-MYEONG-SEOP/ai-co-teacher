@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createClient } from '@/lib/supabase'
 
 interface Step {
   step: number
@@ -33,6 +34,7 @@ export default function AssessmentStudentPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
+  const supabase = createClient()
   const sessionId = typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('session_id') || ''
     : ''
@@ -190,21 +192,37 @@ export default function AssessmentStudentPage() {
     }
   }, [sessionId])
 
-  // 초기 로드 + Realtime 구독 + 폴링
+  // 초기 로드 + Realtime 구독
   useEffect(() => {
     if (!sessionId) return
 
-    // Supabase Realtime - 직접 import 없이 fetch 폴링으로 대체
     loadSession()
 
-    // 3초마다 폴링 (waiting 상태일 때)
-    const pollInterval = setInterval(() => {
-      if (sessionRef.current === null) {
+    // Realtime 구독
+    const channel = supabase
+      .channel('asm_student_' + sessionId)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'asm_sessions',
+        filter: 'id=eq.' + sessionId
+      }, (payload) => {
+        console.log('asm_sessions UPDATE 감지!', payload.new)
         loadSession()
-      }
-    }, 3000)
+      })
+      .subscribe((status) => {
+        console.log('Realtime 상태:', status)
+      })
 
-    return () => clearInterval(pollInterval)
+    // 폴링 백업 (5초마다, waiting 상태일 때만)
+    const poll = setInterval(() => {
+      if (!sessionRef.current) loadSession()
+    }, 5000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(poll)
+    }
   }, [sessionId, loadSession])
 
   // Push-to-Talk
