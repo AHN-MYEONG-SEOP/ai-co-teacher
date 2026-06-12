@@ -138,8 +138,9 @@ export default function AssessmentStudentPage() {
     if (!sessionId) return
     loadSession()
 
+    // Realtime 구독
     const channel = supabase
-      .channel('asm_student_' + sessionId + '_' + Date.now())
+      .channel('asm_student_' + sessionId)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -153,7 +154,18 @@ export default function AssessmentStudentPage() {
         console.log('Realtime 구독 상태:', status)
       })
 
-    return () => { supabase.removeChannel(channel) }
+    // 폴링 백업 (3초마다)
+    const pollInterval = setInterval(() => {
+      if (screen === 'waiting') {
+        console.log('폴링: loadSession 호출')
+        loadSession()
+      }
+    }, 3000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(pollInterval)
+    }
   }, [sessionId, loadSession])
 
   // Push-to-Talk
