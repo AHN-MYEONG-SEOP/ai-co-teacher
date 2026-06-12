@@ -134,14 +134,16 @@ export default function AssessmentStudentPage() {
   }, [session, currentStep])
 
   // 마이크 버튼
-  const handleMicClick = useCallback(async () => {
-    if (screen === 'ready') {
-      setScreen('recording')
-      await startListening()
-    } else if (screen === 'recording') {
-      await stopListening()
-    }
-  }, [screen, startListening, stopListening])
+  const handleMicDown = useCallback(async () => {
+    if (screen !== 'ready') return
+    setScreen('recording')
+    await startListening()
+  }, [screen, startListening])
+
+  const handleMicUp = useCallback(async () => {
+    if (screen !== 'recording') return
+    await stopListening()
+  }, [screen, stopListening])
 
   const currentStepData = session?.steps[currentStep - 1]
 
@@ -178,7 +180,10 @@ export default function AssessmentStudentPage() {
           {/* 마이크 버튼 */}
           <div className="flex flex-col items-center gap-4">
             <button
-              onClick={handleMicClick}
+              onMouseDown={handleMicDown}
+              onMouseUp={handleMicUp}
+              onTouchStart={handleMicDown}
+              onTouchEnd={handleMicUp}
               disabled={screen === 'processing' || !isReady}
               className={`w-32 h-32 rounded-full text-5xl transition-all duration-200 shadow-xl ${
                 screen === 'recording'
