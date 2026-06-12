@@ -168,19 +168,44 @@ export default function AssessmentTeacherPage() {
       const studentMap = new Map(updatedStudents.map(s => [s.id, s]))
       setRanking(calcRanking(results || [], studentMap))
 
-      // 접속자 (teacher_scores + student_likes row 있는 사람)
-      const { data: tScores } = await supabase.from('asm_teacher_scores').select('teacher_id, score').eq('session_id', sessionId)
-      const { data: sLikes } = await supabase.from('asm_student_likes').select('from_student_id').eq('session_id', sessionId)
-      const voterIds = new Set([
-        ...(tScores || []).map((t:any) => t.teacher_id),
-        ...(sLikes || []).map((s:any) => s.from_student_id),
-      ])
-      const { data: voterProfiles } = await supabase.from('profiles').select('id,name,nickname,role').in('id', Array.from(voterIds))
-      setVoters((voterProfiles || []).map((p:any) => ({
-        id: p.id, name: p.nickname || p.name, role: p.role,
-        teacher_score: (tScores || []).find((t:any) => t.teacher_id === p.id)?.score || null,
-        likes: (sLikes || []).filter((s:any) => s.from_student_id === p.id).length,
-      })))
+      // 접속자 - 현재 테스트 학생 기준으로 투표 완료 여부
+      const currentStudentId = sess.current_student_id
+      if (currentStudentId) {
+        // 선생님들: asm_teacher_scores에 row가 있으면 접속, score!=null 이면 완료
+        const { data: tScores } = await supabase
+          .from('asm_teacher_scores')
+          .select('teacher_id, score')
+          .eq('session_id', sessionId)
+          .eq('student_id', currentStudentId)
+
+        // 학생들: asm_student_likes에 row가 있으면 접속, reaction!=null 이면 완료
+        const { data: sLikes } = await supabase
+          .from('asm_student_likes')
+          .select('from_student_id, reaction')
+          .eq('session_id', sessionId)
+          .eq('to_student_id', currentStudentId)
+
+        const voterIds = new Set([
+          ...(tScores || []).map((t:any) => t.teacher_id),
+          ...(sLikes || []).map((s:any) => s.from_student_id),
+        ])
+
+        if (voterIds.size > 0) {
+          const { data: voterProfiles } = await supabase
+            .from('profiles')
+            .select('id,name,nickname,role')
+            .in('id', Array.from(voterIds))
+          setVoters((voterProfiles || []).map((p:any) => ({
+            id: p.id,
+            name: p.nickname || p.name,
+            role: p.role,
+            teacher_score: (tScores || []).find((t:any) => t.teacher_id === p.id)?.score ?? null,
+            likes: (sLikes || []).find((s:any) => s.from_student_id === p.id)?.reaction ? 1 : 0,
+          })))
+        } else {
+          setVoters([])
+        }
+      }
 
       // 현재 학생 스텝 결과
       if (sess.current_student_id) {
@@ -465,7 +490,7 @@ export default function AssessmentTeacherPage() {
                 {voters.filter(v => v.role === 'teacher').map(v => (
                   <div key={v.id} className="flex items-center justify-between bg-slate-800 rounded-lg px-2 py-1.5">
                     <span className="text-slate-300 text-xs">{v.name}</span>
-                    <span className="text-xs">{v.teacher_score !== null ? <span className="text-emerald-400">★{v.teacher_score}</span> : <span className="text-slate-500">⏳</span>}</span>
+                    <span className="text-xs">{v.teacher_score !== null ? <span className="text-emerald-400">✅</span> : <span className="text-slate-500">⏳</span>}</span>
                   </div>
                 ))}
                 {voters.filter(v => v.role === 'teacher').length === 0 && <p className="text-slate-600 text-xs">아직 없음</p>}
