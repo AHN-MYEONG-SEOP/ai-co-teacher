@@ -95,6 +95,7 @@ export default function AssessmentStudentPage() {
     },
     onError: (err) => { console.error('STT 오류:', err); setScreen('ready') },
     onLog: (msg) => console.log('[STT]', msg),
+    silenceThreshold: 255,
 
   })
 
