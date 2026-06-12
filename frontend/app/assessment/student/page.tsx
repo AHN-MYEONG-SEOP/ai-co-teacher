@@ -98,42 +98,32 @@ export default function AssessmentStudentPage() {
     silenceThreshold: 35,
   })
 
-  // 세션 로드 함수
+  // 세션 로드 함수 (API 통해서 - RLS 우회)
   const loadSession = useCallback(async () => {
     if (!sessionId) return
     console.log('loadSession 호출')
     try {
-      const { data: sess } = await supabase
-        .from('asm_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .single()
-      if (!sess) return
-      console.log('세션 상태:', sess.status, 'current_student_id:', sess.current_student_id)
+      const res = await fetch('/api/asm/session-state?session_id=' + sessionId)
+      const data = await res.json()
+      console.log('세션 상태:', data)
 
-      if (sess.status === 'ended') { window.location.href = '/login'; return }
+      if (data.status === 'ended') { window.location.href = '/login'; return }
 
-      if (sess.current_student_id && sess.current_scenario_id) {
-        const [{ data: student }, { data: scenario }] = await Promise.all([
-          supabase.from('profiles').select('id, name, nickname').eq('id', sess.current_student_id).single(),
-          supabase.from('asm_scenarios').select('*').eq('id', sess.current_scenario_id).single(),
-        ])
-        if (student && scenario) {
-          const newSession = {
-            session_id: sess.id,
-            scenario_id: scenario.id,
-            student_id: student.id,
-            student_name: student.nickname || student.name,
-            steps: scenario.steps || []
-          }
-          console.log('세션 로드 완료:', newSession.student_name, '스텝수:', newSession.steps.length)
-          setSession(newSession)
-          sessionRef.current = newSession
-          setCurrentStep(sess.current_step || 1)
-          currentStepRef.current = sess.current_step || 1
-          setSpokenText('')
-          setScreen('ready')
+      if (data.status === 'active' && data.student && data.scenario) {
+        const newSession = {
+          session_id: data.session_id,
+          scenario_id: data.scenario.id,
+          student_id: data.student.id,
+          student_name: data.student.nickname || data.student.name,
+          steps: data.scenario.steps || []
         }
+        console.log('세션 로드 완료:', newSession.student_name, '스텝수:', newSession.steps.length)
+        setSession(newSession)
+        sessionRef.current = newSession
+        setCurrentStep(data.current_step || 1)
+        currentStepRef.current = data.current_step || 1
+        setSpokenText('')
+        setScreen('ready')
       } else {
         setScreen('waiting')
       }
