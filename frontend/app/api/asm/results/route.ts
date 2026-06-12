@@ -76,11 +76,11 @@ export async function POST(req: NextRequest) {
         target,
         spoken,
         words,
-        pronunciation: score.pronunciation || 0,
-        completeness: score.completeness || 0,
-        pacing: score.pacing || 0,
-        pausing: score.pausing || 0,
-        step_total: score.step_total || 0,
+        pronunciation: Math.round(score.pronunciation || 0),
+        completeness: Math.round(score.completeness || 0),
+        pacing: Math.round(score.pacing || 0),
+        pausing: Math.round(score.pausing || 0),
+        step_total: Math.round(score.step_total || 0),
         feedback_kr: score.feedback_kr || '',
       }, { onConflict: 'result_key' })
       .select()
