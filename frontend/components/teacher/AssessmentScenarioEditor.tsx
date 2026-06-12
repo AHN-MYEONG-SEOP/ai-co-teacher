@@ -54,6 +54,44 @@ export function AssessmentScenarioEditor({ onSaved }: { onSaved?: () => void }) 
     ? sessionDate + '-' + sessionTime.replace(':', '')
     : ''
 
+  // 세션키 변경 시 기존 시나리오 로드
+  useEffect(() => {
+    if (!sessionKey) return
+    const loadExisting = async () => {
+      // 1. 세션 조회
+      const sessRes = await fetch('/api/asm/sessions')
+      const sessData = await sessRes.json()
+      const existing = (sessData.sessions || []).find((s: any) => s.session_key === sessionKey)
+      if (!existing) { setScenarios([emptyScenario()]); return }
+
+      // 2. 해당 세션의 시나리오 조회
+      const scRes = await fetch('/api/asm/scenarios?session_id=' + existing.id)
+      const scData = await scRes.json()
+      if (!scData.scenarios?.length) { setScenarios([emptyScenario()]); return }
+
+      // 3. 기존 시나리오를 폼 형식으로 변환
+      const loaded = scData.scenarios.map((sc: any) => ({
+        id: sc.id,
+        class_id: sc.class_id || '',
+        class_name: sc.classes?.name || '',
+        title: sc.title || '',
+        book: sc.book || '',
+        unit: sc.unit || 1,
+        is_active: sc.is_active !== false,
+        steps: (sc.steps || []).map((s: any) => ({
+          step: s.step,
+          scene_kr: s.scene_kr || '',
+          expected_pattern: s.expected_pattern || '',
+        })),
+        saved: true,
+        saving: false,
+        message: { text: '✅ 기존 시나리오 불러옴', ok: true }
+      }))
+      setScenarios(loaded)
+    }
+    loadExisting()
+  }, [sessionKey])
+
   const loadClasses = async () => {
     if (classesLoaded) return
     const res = await fetch('/api/teacher/classes')
