@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useWebSpeech } from '@/hooks/useWebSpeech'
 import type { WordResult } from '@/types'
@@ -26,15 +26,17 @@ export default function AssessmentStudentPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [spokenText, setSpokenText] = useState('')
   const [silenceCount, setSilenceCount] = useState<number | null>(null)
+  const sessionRef = useRef<SessionState | null>(null)
+  const currentStepRef = useRef<number>(1)
   const supabase = createClient()
 
   // useWebSpeech 훅 사용 (자습화면과 동일)
   const { startListening, stopListening, isReady, isListening } = useWebSpeech({
     onFinalResult: async (text: string, confidence: number, words?: WordResult[]) => {
-      if (!session || !text) return
+      if (!sessionRef.current || !text) return
       setSpokenText(text)
       setScreen('processing')
-      await scoreStep(text, words || [])
+      await scoreStepRef.current(text, words || [])
     },
     onError: (err) => {
       console.error('STT 오류:', err)
@@ -65,14 +67,17 @@ export default function AssessmentStudentPage() {
           supabase.from('asm_scenarios').select('*').eq('id', sess.current_scenario_id).single(),
         ])
         if (student && scenario) {
-          setSession({
+          const newSession = {
             session_id: sess.id,
             scenario_id: scenario.id,
             student_id: student.id,
             student_name: student.nickname || student.name,
             steps: scenario.steps || []
-          })
+          }
+          setSession(newSession)
+          sessionRef.current = newSession
           setCurrentStep(sess.current_step || 1)
+      currentStepRef.current = sess.current_step || 1
           setSpokenText('')
           setScreen('ready')
         }
@@ -96,7 +101,10 @@ export default function AssessmentStudentPage() {
   }, [])
 
   // GPT 채점
+  const scoreStepRef = useRef<(spoken: string, words: WordResult[]) => Promise<void>>(async () => {})
   const scoreStep = useCallback(async (spoken: string, words: WordResult[]) => {
+    const session = sessionRef.current
+    const currentStep = currentStepRef.current
     if (!session) return
     const step = session.steps[currentStep - 1]
     try {
@@ -124,6 +132,7 @@ export default function AssessmentStudentPage() {
         setScreen('finished')
       } else {
         setCurrentStep(next)
+        currentStepRef.current = next
         setSpokenText('')
         setScreen('ready')
       }
@@ -131,7 +140,8 @@ export default function AssessmentStudentPage() {
       console.error('채점 오류:', e)
       setScreen('ready')
     }
-  }, [session, currentStep])
+  }, [])
+  useEffect(() => { scoreStepRef.current = scoreStep }, [scoreStep])
 
   // 마이크 버튼
   const handleMicDown = useCallback(async () => {
