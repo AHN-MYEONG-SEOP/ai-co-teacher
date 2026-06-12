@@ -321,6 +321,39 @@ export default function AssessmentStudentPage() {
           {session && <p className="text-emerald-400 text-sm">{session.student_name} 화이팅! 💪</p>}
         </div>
       )}
+      {/* 디버그 패널 */}
+      <div className="fixed top-0 left-0 bottom-0 w-64 bg-black/90 text-green-400 text-xs p-3 font-mono space-y-1 overflow-y-auto z-50">
+        <p className="text-yellow-400 font-bold">🔧 DEBUG</p>
+        <p>sessionId: <span className="text-white text-[10px]">{sessionId.slice(0,16)}...</span></p>
+        <p>session: <span className="text-white">{session ? session.student_name : 'null'}</span></p>
+        <p>screen: <span className="text-yellow-400">{screen}</span></p>
+        <p>step: <span className="text-yellow-400">{currentStep}</span>/{session?.steps.length || 0}</p>
+        <p>isReady: <span className={isReady ? 'text-emerald-400' : 'text-red-400'}>{isReady ? 'true' : 'false'}</span></p>
+        <p>spoken: <span className="text-white">{spokenText || '없음'}</span></p>
+        <p className="text-slate-500 mt-2">--- steps ---</p>
+        {(session?.steps || []).map((s, i) => (
+          <p key={i} className={i === currentStep - 1 ? 'text-yellow-400' : 'text-slate-600'}>
+            {i+1}. {s?.scene_kr || ''}
+          </p>
+        ))}
+      </div>
+
+      {/* 디버그 패널 */}
+      <div className="fixed top-0 left-0 bottom-0 w-64 bg-black/90 text-green-400 text-xs p-3 font-mono space-y-1 overflow-y-auto z-50">
+        <p className="text-yellow-400 font-bold">🔧 DEBUG</p>
+        <p>sessionId: <span className="text-white text-[10px]">{sessionId.slice(0,16)}...</span></p>
+        <p>session: <span className="text-white">{session ? session.student_name : 'null'}</span></p>
+        <p>screen: <span className="text-yellow-400">{screen}</span></p>
+        <p>step: <span className="text-yellow-400">{currentStep}</span>/{session?.steps.length || 0}</p>
+        <p>isReady: <span className={isReady ? 'text-emerald-400' : 'text-red-400'}>{isReady ? 'true' : 'false'}</span></p>
+        <p>spoken: <span className="text-white">{spokenText || '없음'}</span></p>
+        <p className="text-slate-500 mt-2">--- steps ---</p>
+        {(session?.steps || []).map((s, i) => (
+          <p key={i} className={i === currentStep - 1 ? 'text-yellow-400' : 'text-slate-600'}>
+            {i+1}. {s?.scene_kr || ''}
+          </p>
+        ))}
+      </div>
     </div>
   )
 }
