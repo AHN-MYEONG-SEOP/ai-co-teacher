@@ -255,17 +255,27 @@ export default function AssessmentStudentPage() {
           {session && <p className="text-emerald-400 text-sm">{session.student_name} 화이팅! 💪</p>}
         </div>
       )}
-    {/* 디버그 패널 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black/80 text-green-400 text-xs p-3 font-mono space-y-1 max-h-40 overflow-y-auto">
-        <p>🔧 DEBUG</p>
-        <p>sessionId: {sessionId || 'none'}</p>
-        <p>session: {session ? session.student_name + ' / ' + session.session_id.slice(0,8) : 'null'}</p>
-        <p>sessionRef: {sessionRef.current ? sessionRef.current.student_name : 'null'}</p>
-        <p>screen: {screen}</p>
-        <p>currentStep: {currentStep} (ref: {currentStepRef.current})</p>
+    {/* 디버그 패널 - 좌측 전체 */}
+      <div className="fixed top-0 left-0 bottom-0 w-72 bg-black/90 text-green-400 text-xs p-3 font-mono space-y-1 overflow-y-auto z-50">
+        <p className="text-yellow-400 font-bold text-sm mb-2">🔧 DEBUG</p>
+        <p>sessionId:</p>
+        <p className="text-white break-all">{sessionId || 'none'}</p>
+        <p className="mt-2">session:</p>
+        <p className="text-white">{session ? session.student_name : 'null'}</p>
+        <p className="mt-2">sessionRef:</p>
+        <p className="text-white">{sessionRef.current ? sessionRef.current.student_name : 'null'}</p>
+        <p className="mt-2">screen: <span className="text-yellow-400">{screen}</span></p>
+        <p>currentStep: <span className="text-yellow-400">{currentStep}</span> (ref: {currentStepRef.current})</p>
         <p>steps: {session?.steps.length || 0}개</p>
-        <p>isReady: {isReady ? 'true' : 'false'}</p>
-        <p>spokenText: {spokenText || '없음'}</p>
+        <p>isReady: <span className={isReady ? 'text-emerald-400' : 'text-red-400'}>{isReady ? 'true' : 'false'}</span></p>
+        <p className="mt-2">spokenText:</p>
+        <p className="text-white">{spokenText || '없음'}</p>
+        <p className="mt-2 text-slate-500">--- steps ---</p>
+        {session?.steps.map((s, i) => (
+          <p key={i} className={i === currentStep - 1 ? 'text-yellow-400' : 'text-slate-500'}>
+            {i+1}. {s.scene_kr}
+          </p>
+        ))}
       </div>
     </div>
   )
