@@ -291,7 +291,7 @@ export default function AssessmentTeacherPage() {
   const handleEnd = async () => {
     if (!confirm('세션을 종료하시겠습니까?')) return
     await supabase.from('asm_sessions').update({ status: 'ended' }).eq('id', sessionId)
-    window.location.href = '/assessment/result?session_id=' + sessionId
+    window.location.href = '/teacher'
   }
 
   const scoreBar = (score: number) => {
