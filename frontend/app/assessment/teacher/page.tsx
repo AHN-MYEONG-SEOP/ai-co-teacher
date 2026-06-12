@@ -52,6 +52,10 @@ export default function AssessmentTeacherPage() {
   const [currentSteps, setCurrentSteps] = useState<StepResult[]>([])
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null)
   const [totalSteps, setTotalSteps] = useState(0)
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [showTeacherScore, setShowTeacherScore] = useState(false)
+  const [showFriendScore, setShowFriendScore] = useState(false)
+  const [voters, setVoters] = useState<{id:string,name:string,role:string,teacher_score:number|null,likes:number}[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -164,6 +168,20 @@ export default function AssessmentTeacherPage() {
       const studentMap = new Map(updatedStudents.map(s => [s.id, s]))
       setRanking(calcRanking(results || [], studentMap))
 
+      // 접속자 (teacher_scores + student_likes row 있는 사람)
+      const { data: tScores } = await supabase.from('asm_teacher_scores').select('teacher_id, score').eq('session_id', sessionId)
+      const { data: sLikes } = await supabase.from('asm_student_likes').select('from_student_id').eq('session_id', sessionId)
+      const voterIds = new Set([
+        ...(tScores || []).map((t:any) => t.teacher_id),
+        ...(sLikes || []).map((s:any) => s.from_student_id),
+      ])
+      const { data: voterProfiles } = await supabase.from('profiles').select('id,name,nickname,role').in('id', Array.from(voterIds))
+      setVoters((voterProfiles || []).map((p:any) => ({
+        id: p.id, name: p.nickname || p.name, role: p.role,
+        teacher_score: (tScores || []).find((t:any) => t.teacher_id === p.id)?.score || null,
+        likes: (sLikes || []).filter((s:any) => s.from_student_id === p.id).length,
+      })))
+
       // 현재 학생 스텝 결과
       if (sess.current_student_id) {
         const cur = updatedStudents.find(s => s.id === sess.current_student_id)
@@ -197,7 +215,13 @@ export default function AssessmentTeacherPage() {
     return () => { supabase.removeChannel(channel) }
   }, [sessionId, loadData])
 
-  // 학생 선택 + 시작
+  // 학생 선택 (클릭 시)
+  const handleClickStudent = (student: Student) => {
+    if (student.status === 'done') return
+    setSelectedStudent(student)
+  }
+
+  // 학생 시작 (시작 버튼 클릭 시)
   const handleSelectStudent = async (student: Student) => {
     if (!session) return
     const scenario = await supabase
@@ -300,11 +324,12 @@ export default function AssessmentTeacherPage() {
             {students.map(s => (
               <button
                 key={s.id}
-                onClick={() => s.status !== 'done' && handleSelectStudent(s)}
+                onClick={() => handleClickStudent(s)}
                 disabled={s.status === 'done'}
                 className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors ${
                   s.status === 'active' ? 'bg-emerald-700 text-white' :
                   s.status === 'done' ? 'bg-slate-800/50 text-slate-500 cursor-not-allowed' :
+                  selectedStudent?.id === s.id ? 'bg-blue-700 text-white' :
                   'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
@@ -425,6 +450,39 @@ export default function AssessmentTeacherPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* 우측: 접속자 패널 */}
+        <div className="w-56 shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col">
+          <div className="p-3 border-b border-slate-800">
+            <p className="text-xs text-slate-400 font-medium">👋 점수 입력 참여자</p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-4">
+            <div>
+              <p className="text-xs text-slate-500 mb-2">👩‍🏫 선생님</p>
+              <div className="space-y-1">
+                {voters.filter(v => v.role === 'teacher').map(v => (
+                  <div key={v.id} className="flex items-center justify-between bg-slate-800 rounded-lg px-2 py-1.5">
+                    <span className="text-slate-300 text-xs">{v.name}</span>
+                    <span className="text-xs">{v.teacher_score !== null ? <span className="text-emerald-400">★{v.teacher_score}</span> : <span className="text-slate-500">⏳</span>}</span>
+                  </div>
+                ))}
+                {voters.filter(v => v.role === 'teacher').length === 0 && <p className="text-slate-600 text-xs">아직 없음</p>}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-2">👨‍🎓 학생</p>
+              <div className="space-y-1">
+                {voters.filter(v => v.role === 'student').map(v => (
+                  <div key={v.id} className="flex items-center justify-between bg-slate-800 rounded-lg px-2 py-1.5">
+                    <span className="text-slate-300 text-xs">{v.name}</span>
+                    <span className="text-emerald-400 text-xs">👍{v.likes}</span>
+                  </div>
+                ))}
+                {voters.filter(v => v.role === 'student').length === 0 && <p className="text-slate-600 text-xs">아직 없음</p>}
+              </div>
+            </div>
           </div>
         </div>
       </div>
