@@ -37,7 +37,7 @@ export default function LoginPage() {
       if (profile.role === 'teacher') {
         router.push('/teacher')
       } else {
-        router.push('/')
+        router.push('/student/home')
       }
       router.refresh()
 
