@@ -258,8 +258,10 @@ export function useWebSpeech({
       console.groupEnd()
       onLogRef.current?.('녹음 시작 — 말씀하세요')
 
-      // ── VAD: 3초 침묵 시 자동 전송 ──────────────────────
-      try {
+      // ── VAD: 3초 침묵 시 자동 전송 (silenceThreshold=255이면 스킵) ──
+      if (silenceThresholdRef.current >= 255) {
+        onLogRef.current?.('VAD 비활성화 (Push-to-Talk 모드)')
+      } else try {
         const actx = audioCtxRef.current
         if (actx) {
           const analyser = actx.createAnalyser()
