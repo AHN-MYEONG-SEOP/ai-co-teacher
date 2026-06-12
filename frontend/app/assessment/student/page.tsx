@@ -95,8 +95,7 @@ export default function AssessmentStudentPage() {
     },
     onError: (err) => { console.error('STT 오류:', err); setScreen('ready') },
     onLog: (msg) => console.log('[STT]', msg),
-    onSilenceCountdown: (count) => setSilenceCount(count),
-    silenceThreshold: 35,
+
   })
 
   // 세션 로드 함수 (API 통해서 - RLS 우회)
@@ -241,9 +240,7 @@ export default function AssessmentStudentPage() {
             </button>
 
             <p className="text-slate-400 text-sm h-6">
-              {screen === 'recording' && silenceCount !== null
-                ? `🔴 녹음 중... ${silenceCount}초 후 자동 종료`
-                : screen === 'recording' ? '🔴 누르고 있는 동안 녹음됩니다'
+              {screen === 'recording' ? '🔴 누르고 있는 동안 녹음됩니다'
                 : screen === 'processing' ? '⚡ 채점 중...'
                 : screen === 'done' ? '✅ 완료! 다음 문장으로...'
                 : !isReady ? '🎤 마이크 준비 중...'
