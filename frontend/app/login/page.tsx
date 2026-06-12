@@ -116,16 +116,6 @@ export default function LoginPage() {
         <p className="text-slate-600 text-xs">설치 후 홈 화면에서 바로 실행!</p>
       </div>
 
-      {/* QR 코드 */}
-      <div className="mt-8 text-center space-y-3">
-        <p className="text-slate-500 text-xs">📱 스마트폰으로 스캔하면 앱처럼 설치할 수 있어요</p>
-        <div className="flex justify-center">
-          <div className="bg-white p-3 rounded-2xl">
-            <QRCodeSVG value={APP_URL} size={120} />
-          </div>
-        </div>
-        <p className="text-slate-600 text-xs">설치 후 홈 화면에서 바로 실행!</p>
-      </div>
       </div>
     </main>
   )
