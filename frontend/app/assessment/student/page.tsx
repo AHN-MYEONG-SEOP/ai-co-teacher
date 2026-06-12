@@ -111,7 +111,7 @@ export default function AssessmentStudentPage() {
       if (!sess) return
       console.log('세션 상태:', sess.status, 'current_student_id:', sess.current_student_id)
 
-      if (sess.status === 'ended') { setScreen('finished'); return }
+      if (sess.status === 'ended') { window.location.href = '/login'; return }
 
       if (sess.current_student_id && sess.current_scenario_id) {
         const [{ data: student }, { data: scenario }] = await Promise.all([
