@@ -184,12 +184,23 @@ export default function AssessmentStudentPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 select-none">
+      {/* 종료 버튼 */}
+      <div className="fixed top-4 right-4">
+        <button
+          onClick={() => { if (confirm('종료하시겠습니까?')) window.location.href = '/login' }}
+          className="px-4 py-2 bg-slate-800 hover:bg-red-700 text-slate-400 hover:text-white rounded-xl text-sm transition-colors"
+        >✕ 종료</button>
+      </div>
 
       {screen === 'waiting' && (
         <div className="text-center space-y-6">
           <div className="text-7xl animate-pulse">⏳</div>
           <p className="text-white text-2xl font-bold">선생님을 기다리고 있어요</p>
           <p className="text-slate-400 text-sm">선생님이 시작하면 자동으로 화면이 바뀝니다</p>
+          <button
+            onClick={() => window.location.href = '/login'}
+            className="mt-4 px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl text-sm transition-colors"
+          >✕ 종료</button>
         </div>
       )}
 
